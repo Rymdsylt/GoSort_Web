@@ -1,0 +1,237 @@
+<?php
+session_start();
+require_once 'gs_DB/connection.php';
+
+
+if (isset($_GET['logout'])) {
+
+    session_destroy();
+
+    setcookie('user_logged_in', '', time() - 3600, '/');
+
+    header("Location: GoSort_Login.php");
+    exit();
+}
+
+
+if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
+    header("Location: GoSort_Login.php");
+    exit();
+}
+
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+    $category = $_POST['category'] ?? '';
+    
+    if ($category) {
+        $sorted = '';
+        switch($category) {
+            case 'Bio':
+                $sorted = 'biodegradable';
+                break;
+            case 'Non-Bio':
+                $sorted = 'non-biodegradable';
+                break;
+            case 'Recyclables':
+                $sorted = 'recyclable';
+                break;
+        }
+        $stmt = $pdo->prepare("INSERT INTO trash_sorted (sorted, user_id) VALUES (?, ?)");
+        $stmt->execute([$sorted, $_SESSION['user_id']]);
+    }
+}
+
+$stmt = $pdo->query("SELECT 
+    CASE 
+        WHEN sorted = 'biodegradable' THEN 'Bio'
+        WHEN sorted = 'non-biodegradable' THEN 'Non-Bio'
+        WHEN sorted = 'recyclable' THEN 'Recyclables'
+    END as category,
+    COUNT(*) as total_count 
+    FROM trash_sorted 
+    GROUP BY sorted");
+$wasteData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+$categories = [];
+$counts = [];
+foreach ($wasteData as $data) {
+    $categories[] = $data['category'];
+    $counts[] = intval($data['total_count']);
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoSort - Dashboard</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">GoSort Dashboard</a>
+            <div class="d-flex">
+                <a href="?logout=1" class="btn btn-light">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Add New Waste Data (!UNIT TESTING! REMOVE IN RELEASE VERSION)
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="category" class="form-label">Category</label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="Non-Bio">Non-Bio</option>
+                                    <option value="Bio">Bio</option>
+                                    <option value="Recyclables">Recyclables</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Add Sorted Item</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Waste Distribution
+                    </div>
+                    <div class="card-body">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                Waste Data Table
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Total Items Sorted</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($wasteData as $data): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($data['category']); ?></td>
+                            <td><?php echo number_format($data['total_count']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script>
+        let chart;
+        
+
+        function updateTable(data) {
+            const tbody = document.querySelector('table tbody');
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.category}</td>
+                        <td>${new Intl.NumberFormat().format(item.total_count)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+
+        function updateChart(data) {
+            const categories = data.map(item => item.category);
+            const counts = data.map(item => item.total_count);
+
+            if (!chart) {
+        
+                const ctx = document.getElementById('pieChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: categories,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: [
+                                'rgba(255, 99, 132, 0.8)',
+                                'rgba(75, 192, 192, 0.8)',
+                                'rgba(255, 205, 86, 0.8)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        },
+                        animation: {
+                            duration: 500
+                        }
+                    }
+                });
+            } else {
+
+                chart.data.labels = categories;
+                chart.data.datasets[0].data = counts;
+                chart.update();
+            }
+        }
+
+
+        function fetchData() {
+            fetch('gs_DB/get_data.php')
+                .then(response => response.json())
+                .then(data => {
+                    updateTable(data);
+                    updateChart(data);
+                })
+                .catch(error => console.error('Error fetching data:', error));
+        }
+
+
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    fetchData(); 
+                }
+            })
+            .catch(error => console.error('Error submitting form:', error));
+        });
+
+
+        updateChart(<?php echo json_encode($wasteData); ?>);
+
+        setInterval(fetchData, 1000);
+    </script>
+</body>
+</html>
