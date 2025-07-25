@@ -5,9 +5,9 @@ An automated waste segregation system that combines computer vision, robotics, a
 ## Quick Start
 
 To test the application, simply run:
-
+```bash
 run.bat
-
+```
 All necessary setup and instructions are handled inside the batch file.
 
 ## Developer Guide
