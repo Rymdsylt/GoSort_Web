@@ -1,25 +1,44 @@
-GoSort: Intelligent Waste Segregation System
+# GoSort: Intelligent Waste Segregation System
 
-To Test the Application:
-Simply run run.bat. All necessary setup and instructions are handled inside the batch file.
+An automated waste segregation system that combines computer vision, robotics, and data management to intelligently sort waste materials.
 
-🔧 FOR DEVELOPERS:
-🟦 Arduino Setup
-Pan Servo: Connected to D8
+## Quick Start
 
-Tilt Servo: Connected to D9
+To test the application, simply run:
 
-LCD Display: Use 1602 LCD with I2C module for simplified wiring and control.
+run.bat
 
-🔁 Python ↔ Arduino Communication
-Communication is handled via serial connection.
+All necessary setup and instructions are handled inside the batch file.
 
-The Arduino Mega 2560 receives serialized data from the Python application and executes commands accordingly.
+## Developer Guide
 
-Serial data is also sent back to Python for real-time debugging and system feedback.
+### 🔧 Arduino Hardware Setup
 
-🌐 Python ↔ XAMPP Server (MySQL Database)
-After each successful sorting operation, relevant data is automatically sent to the database.
+#### Component Connections
+- **Pan Servo:** Connected to D8
+- **Tilt Servo:** Connected to D9
+- **LCD Display:** 1602 LCD with I2C module for simplified wiring and control
 
-This enables admin monitoring, system analytics, and report generation through the GoSort admin panel.
+### 🔁 System Communication
 
+#### Arduino Communication
+- Serial connection handles data transfer between Python and Arduino
+- Arduino Mega 2560 receives serialized commands from the Python application
+- Bi-directional communication enables real-time debugging and system feedback
+
+#### Database Integration
+- System integrates with XAMPP Server (MySQL Database)
+- Automatic data logging after each successful sorting operation
+- Enables:
+  - Admin monitoring
+  - System analytics
+  - Report generation through GoSort admin panel
+
+## Project Structure
+```
+├── GoSort.ino              # Arduino control code
+├── GoSort.py               # Main Python application
+├── GoSort_Detect.py        # Object detection module
+├── gosort_config.json      # Configuration settings
+└── run.bat                 # Main execution script
+```
