@@ -1,44 +1,49 @@
-# GoSort: Intelligent Waste Segregation System
+# GoSort_Web
 
-An automated waste segregation system that combines computer vision, robotics, and data management to intelligently sort waste materials.
+> ⚠️ **Note:** This project is currently under construction.
 
-## Quick Start
+GoSort_Web is a web-based application designed to facilitate sorting and detection tasks, likely for waste or object sorting, using a combination of PHP, Python, and modern web technologies.
 
-To test the application, simply run:
-```bash
-run.bat
-```
-All necessary setup and instructions are handled inside the batch file.
-
-## Developer Guide
-
-### 🔧 Arduino Hardware Setup
-
-#### Component Connections
-- **Pan Servo:** Connected to D8
-- **Tilt Servo:** Connected to D9
-- **LCD Display:** 1602 LCD with I2C module for simplified wiring and control
-
-### 🔁 System Communication
-
-#### Arduino Communication
-- Serial connection handles data transfer between Python and Arduino
-- Arduino Mega 2560 receives serialized commands from the Python application
-- Bi-directional communication enables real-time debugging and system feedback
-
-#### Database Integration
-- System integrates with XAMPP Server (MySQL Database)
-- Automatic data logging after each successful sorting operation
-- Enables:
-  - Admin monitoring
-  - System analytics
-  - Report generation through GoSort admin panel
+## Features
+- User authentication and login system (`GoSort_Login.php`)
+- Main dashboard and interface (`GoSort_Main.php`)
+- Database integration for storing and retrieving data (`gs_DB/`)
+- Responsive UI using Bootstrap CSS and JS (`css/`, `js/`)
 
 ## Project Structure
 ```
-├── GoSort.ino              # Arduino control code
-├── GoSort.py               # Main Python application
-├── GoSort_Detect.py        # Object detection module
-├── gosort_config.json      # Configuration settings
-└── run.bat                 # Main execution script
+gosort_config.json         # Configuration file
+GoSort_Detect.py           # Python detection script
+GoSort_Login.php           # User login page
+GoSort_Main.php            # Main dashboard
+css/                       # Bootstrap CSS files
+js/                        # Bootstrap JS files
+gs_DB/                     # Database connection and logic
 ```
+
+## Setup Instructions
+1. **Requirements:**
+   - XAMPP or similar local server (Apache, PHP, MySQL)
+   - Python 3.x
+2. **Clone the repository:**
+   ```
+   git clone <repo-url>
+   ```
+3. **Place the project in your XAMPP `htdocs` directory:**
+   - Example: `C:/xampp/htdocs/GoSort_Web`
+4. **Configure the database:**
+   - Edit `gs_DB/connection.php` with your MySQL credentials.
+   - Import any provided SQL files to set up the database.
+5. **Install Python dependencies:**
+   - Navigate to the project directory and install required packages (see `GoSort_Detect.py` for requirements).
+6. **Start XAMPP services:**
+   - Start Apache and MySQL from the XAMPP control panel.
+7. **Access the application:**
+   - Open your browser and go to `http://localhost/GoSort_Web/GoSort_Login.php`
+
+## Usage
+- Log in with your credentials.
+- Use the main dashboard to interact with the detection and sorting features.
+
+## Author
+Rymdsylt
