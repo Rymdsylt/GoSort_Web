@@ -1,15 +1,25 @@
-GoSort
+GoSort: Intelligent Waste Segregation System
 
-Just open "run.bat" for testing. Everything will be explained in the batch file.
+To Test the Application:
+Simply run run.bat. All necessary setup and instructions are handled inside the batch file.
 
-FOR DEVELOPERS:
+🔧 FOR DEVELOPERS:
+🟦 Arduino Setup
+Pan Servo: Connected to D8
 
-(ARDUINO) - Pan servo is in D8, tilt servo is in d9.
-          - Use i2c module for LCD 1602.
+Tilt Servo: Connected to D9
 
-(PYTHON <-> ARDUINO) - Data are being communicated through serialization and mega2560 will do the instruction based on the serial data received.
-                     - The python application will also receive serial data for debug.
+LCD Display: Use 1602 LCD with I2C module for simplified wiring and control.
 
-(PYTHON <-> XAMPP SERVER) - Once trash is sorted, data will be sent to the database for admin and analytics.
-                   
+🔁 Python ↔ Arduino Communication
+Communication is handled via serial connection.
+
+The Arduino Mega 2560 receives serialized data from the Python application and executes commands accordingly.
+
+Serial data is also sent back to Python for real-time debugging and system feedback.
+
+🌐 Python ↔ XAMPP Server (MySQL Database)
+After each successful sorting operation, relevant data is automatically sent to the database.
+
+This enables admin monitoring, system analytics, and report generation through the GoSort admin panel.
 
