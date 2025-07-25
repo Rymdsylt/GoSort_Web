@@ -27,7 +27,6 @@ A web interface for the automated waste segregation system that combines compute
 ## Project Structure
 ```
 ├── GoSort_Main.php        # Main web interface
-├── GoSort_Detect.py       # Computer vision module
 ├── gosort_config.json     # System configuration
 ├── gs_DB/                 # Database integration
 ├── css/                   # UI styling
