@@ -2,7 +2,7 @@
 
 > ⚠️ **Note:** This project is currently under construction.
 
-A web interface for the automated waste segregation system that combines computer vision, robotics, and data management to intelligently sort waste materials.
+A web interface for the automated waste segregation system that combines computer vision, robotics, and data management to intelligently sort waste materials. Part of the [GoSort Tools](https://github.com/Rymdsylt/GoSort_Tools) ecosystem.
 
 ## System Architecture
 
