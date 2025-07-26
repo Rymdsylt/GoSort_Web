@@ -1,7 +1,7 @@
 <?php
 session_start();
 if(isset($_SESSION['user_id'])) {
-    header("Location: GoSort_Main.php");
+    header("Location: GoSort_Sorters.php");
     exit();
 }
 
@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($user && password_verify($password, $user['password'])) {
         $_SESSION['user_id'] = $user['id'];
         setcookie('user_logged_in', 'true', time() + (86400 * 30), "/"); // 30 days
-        header("Location: GoSort_Main.php");
+        header("Location: GoSort_Sorters.php");
         exit();
     } else {
         $error = 'Invalid username or password';

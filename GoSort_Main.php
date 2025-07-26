@@ -4,11 +4,14 @@ require_once 'gs_DB/connection.php';
 
 
 if (isset($_GET['logout'])) {
+    // Clean up maintenance mode if active
+    require_once 'gs_DB/maintenance_tracking.php';
+    if (isset($_SESSION['user_id'])) {
+        endMaintenanceMode($_SESSION['user_id']);
+    }
 
     session_destroy();
-
     setcookie('user_logged_in', '', time() - 3600, '/');
-
     header("Location: GoSort_Login.php");
     exit();
 }
@@ -70,14 +73,65 @@ foreach ($wasteData as $data) {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4">
         <div class="container">
             <a class="navbar-brand" href="#">GoSort Dashboard</a>
-            <div class="d-flex">
+            <div class="d-flex gap-2">
+                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#maintenanceModal">Maintenance</button>
                 <a href="?logout=1" class="btn btn-light">Logout</a>
             </div>
         </div>
     </nav>
+
+    <!-- Maintenance Confirmation Modal -->
+    <div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="maintenanceModalLabel">Maintenance Mode Warning</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Maintenance will disable the trash sorter device, continue?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <a href="GoSort_Maintenance.php" class="btn btn-warning">Continue to Maintenance</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php if (isset($_GET['maintenance_error']) && $_GET['maintenance_error'] === 'active'): ?>
+    <!-- Maintenance Error Modal -->
+    <div class="modal fade" id="maintenanceErrorModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Maintenance Mode Active</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        Someone is already in maintenance mode: <strong><?php echo htmlspecialchars($_GET['user'] ?? 'Unknown User'); ?></strong>
+                    </div>
+                    <p>Please try again later when maintenance mode is free.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Show the error modal if we have a maintenance error
+        document.addEventListener('DOMContentLoaded', function() {
+            const maintenanceErrorModal = new bootstrap.Modal(document.getElementById('maintenanceErrorModal'));
+            maintenanceErrorModal.show();
+        });
+    </script>
+    <?php endif; ?>
 
     <div class="container">
         <div class="row mb-4">
@@ -96,7 +150,7 @@ foreach ($wasteData as $data) {
                                     <option value="Recyclables">Recyclables</option>
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-primary">Add Sorted Item</button>
+                            <button type="submit" class="btn btn-success">Add Sorted Item</button>
                         </form>
                     </div>
                 </div>

@@ -7,12 +7,16 @@ $password = '';
 try {
     $pdo = new PDO("mysql:host=$host", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 
+    // Create database if it doesn't exist
     $sql = "CREATE DATABASE IF NOT EXISTS $dbname";
     $pdo->exec($sql);
     
-  
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    // Connect to the specific database
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 
     $sql = "CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
