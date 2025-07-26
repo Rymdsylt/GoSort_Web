@@ -3,6 +3,19 @@ session_start();
 require_once 'gs_DB/connection.php';
 require_once 'gs_DB/sorters_DB.php';
 
+// Handle logout
+if (isset($_GET['logout'])) {
+    // Clean up maintenance mode if active
+    require_once 'gs_DB/maintenance_tracking.php';
+    if (isset($_SESSION['user_id'])) {
+        endMaintenanceMode($_SESSION['user_id']);
+    }
+    session_destroy();
+    setcookie('user_logged_in', '', time() - 3600, '/');
+    header("Location: GoSort_Login.php");
+    exit();
+}
+
 if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
     header("Location: GoSort_Login.php");
     exit();
@@ -26,11 +39,13 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4">
         <div class="container">
-            <a class="navbar-brand" href="#">GoSort</a>
+            <a class="navbar-brand" href="GoSort_Sorters.php">GoSort Devices</a>
             <div class="navbar-nav me-auto">
+                <a class="nav-link active" href="GoSort_Sorters.php">Sorters</a>
+                <a class="nav-link" href="GoSort_Statistics.php">Overall Statistics</a>
             </div>
             <div>
-                <a href="GoSort_Main.php?logout=1" class="btn btn-light">Logout</a>
+                <a href="GoSort_Sorters.php?logout=1" class="btn btn-light">Logout</a>
             </div>
         </div>
     </nav>
@@ -65,11 +80,11 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     <div class="card-footer">
                         <div class="d-flex justify-content-between">
-                            <a href="GoSort_Main.php?device=<?php echo $sorter['id']; ?>" class="btn btn-primary btn-sm">
+                            <a href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>" class="btn btn-primary btn-sm">
                                 View Statistics
                             </a>
                             <?php if ($sorter['status'] !== 'maintenance'): ?>
-                            <a href="GoSort_Maintenance.php?device=<?php echo $sorter['id']; ?>" class="btn btn-warning btn-sm">
+                            <a href="GoSort_Maintenance.php?device=<?php echo $sorter['id']; ?>&name=<?php echo urlencode($sorter['device_name']); ?>" class="btn btn-warning btn-sm">
                                 Maintenance
                             </a>
                             <?php endif; ?>

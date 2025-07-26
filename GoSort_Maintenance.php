@@ -5,20 +5,40 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+require_once 'gs_DB/connection.php';
 require_once 'gs_DB/maintenance_tracking.php';
+
+// Get device info
+$device_id = $_GET['device'] ?? null;
+$device_name = $_GET['name'] ?? 'Unknown Device';
+
+if (!$device_id) {
+    header("Location: GoSort_Sorters.php");
+    exit();
+}
+
+// Verify device exists and is not in maintenance
+$stmt = $pdo->prepare("SELECT * FROM sorters WHERE id = ?");
+$stmt->execute([$device_id]);
+$device = $stmt->fetch();
+
+if (!$device || $device['status'] === 'maintenance') {
+    header("Location: GoSort_Sorters.php");
+    exit();
+}
 
 // Check if someone else is already in maintenance mode
 $activeSession = getActiveMaintenanceSession();
 if ($activeSession && $activeSession['user_id'] != $_SESSION['user_id']) {
     // Someone else is in maintenance mode, redirect back with error
-    header("Location: GoSort_Main.php?maintenance_error=active&user=" . urlencode($activeSession['userName']));
+    header("Location: GoSort_Sorters.php?maintenance_error=active&user=" . urlencode($activeSession['userName']));
     exit();
 }
 
 // Start maintenance mode for this user
 $result = startMaintenanceMode($_SESSION['user_id']);
 if ($result['status'] === 'error') {
-    header("Location: GoSort_Main.php?maintenance_error=active&user=" . urlencode($result['user']));
+    header("Location: GoSort_Sorters.php?maintenance_error=active&user=" . urlencode($result['user']));
     exit();
 }
 ?>
@@ -39,14 +59,38 @@ if ($result['status'] === 'error') {
         .connection-status {
             margin-bottom: 0 !important;
         }
+        .btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            pointer-events: none;
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: #fff;
+        }
+        .btn-success:disabled {
+            background-color: #198754;
+            border-color: #198754;
+        }
+        .btn-danger:disabled {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        .btn-warning:disabled {
+            background-color: #ffc107;
+            border-color: #ffc107;
+        }
+        .btn-info:disabled {
+            background-color: #0dcaf0;
+            border-color: #0dcaf0;
+        }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4">
         <div class="container">
-            <a class="navbar-brand" href="GoSort_Main.php">GoSort Dashboard</a>
+            <a class="navbar-brand" href="GoSort_Sorters.php">GoSort Dashboard</a>
             <div class="d-flex gap-2">
-                <a href="GoSort_Main.php" class="btn btn-warning">Dashboard</a>
+                <a href="GoSort_Sorters.php" class="btn btn-warning">Dashboard</a>
                 <a href="?logout=1" class="btn btn-light">Logout</a>
             </div>
         </div>
@@ -64,7 +108,7 @@ if ($result['status'] === 'error') {
                     <div class="card-body">
                         <h4 class="card-title text-center mb-4">Servo Control</h4>
                         <div class="mb-4">
-                            <h5 class="text-center">Move Controls</h5>
+                            <h5 class="text-center">Move Controls *WARNING: DON'T INITIATE WHEN CLOGGED!*</h5>
                             <div class="d-grid gap-3">
                                 <button class="btn btn-success btn-lg" onclick="moveServo('bio')">Move to Bio</button>
                                 <button class="btn btn-danger btn-lg" onclick="moveServo('nbio')">Move to Non-Bio</button>
@@ -193,7 +237,7 @@ if ($result['status'] === 'error') {
         });
 
         // Also handle when user clicks "Dashboard" or "Logout"
-        document.querySelectorAll('a[href="GoSort_Main.php"], a[href="?logout=1"]').forEach(link => {
+        document.querySelectorAll('a[href="GoSort_Sorters.php"], a[href="?logout=1"]').forEach(link => {
             link.addEventListener('click', async (e) => {
                 e.preventDefault();
                 await cleanupMaintenance();
@@ -208,9 +252,11 @@ if ($result['status'] === 'error') {
                     const statusDiv = document.querySelector('.connection-status');
                     if (!statusDiv) return; // Guard against null element
                     
-                    if (data.status === 'connected') {
+                    if (data.status === 'connected' || data.status === 'maintenance') {
                         statusDiv.className = 'connection-status alert mb-4 alert-success';
-                        statusDiv.innerHTML = '✅ GoSort Python App is connected and running';
+                        statusDiv.innerHTML = data.status === 'maintenance' 
+                            ? '🔧 GoSort Python App is in maintenance mode'
+                            : '✅ GoSort Python App is connected and running';
                         document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
                     } else {
                         statusDiv.className = 'connection-status alert mb-4 alert-danger';
@@ -222,9 +268,9 @@ if ($result['status'] === 'error') {
                     const statusDiv = document.querySelector('.connection-status');
                     if (!statusDiv) return; // Guard against null element
                     
-                    statusDiv.className = 'connection-status alert mb-4 alert-danger';
-                    statusDiv.innerHTML = '❌ Error checking connection status';
-                    document.querySelectorAll('.btn').forEach(btn => btn.disabled = true);
+                    // Don't disable controls on connection check error during maintenance
+                    statusDiv.className = 'connection-status alert mb-4 alert-warning';
+                    statusDiv.innerHTML = '⚠️ Error checking connection status, but maintenance mode is active';
                 });
         }
 
@@ -232,8 +278,31 @@ if ($result['status'] === 'error') {
         setInterval(updateConnectionStatus, 1000);
         updateConnectionStatus(); // Initial check
 
+        let currentServoOperation = null;
+
         function moveServo(position) {
+            // If there's already an operation in progress, ignore new requests
+            if (currentServoOperation) {
+                return;
+            }
+
             const statusDiv = document.getElementById('status');
+            const buttons = document.querySelectorAll('.btn');
+            
+            // Create an AbortController for this operation
+            const controller = new AbortController();
+            currentServoOperation = controller;
+            
+            // Special handling for unclog operation which takes longer (3 seconds hold)
+            const operationTime = position === 'unclog' ? 5000 : 2000; // 3s hold + 2s movement for unclog, 2s for normal moves
+            
+            // Disable all control buttons while command is executing
+            const controlButtons = document.querySelectorAll('.card-body .btn');
+            controlButtons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.65';
+            });
+            
             statusDiv.style.display = 'block';
             statusDiv.className = 'alert mt-3 alert-info';
             statusDiv.textContent = 'Sending command...';
@@ -247,7 +316,8 @@ if ($result['status'] === 'error') {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: formData.toString()
+                body: formData.toString(),
+                signal: controller.signal
             })
             .then(response => {
                 if (!response.ok) {
@@ -258,8 +328,25 @@ if ($result['status'] === 'error') {
             .then(data => {
                 statusDiv.className = 'alert mt-3 ' + (data.includes('Success') ? 'alert-success' : 'alert-danger');
                 statusDiv.textContent = data || 'Command completed successfully';
+                
+                // Wait for the full servo operation to complete (matching Arduino timing)
+                // Arduino uses 4 delay(500) = 2000ms total for movement
+                setTimeout(() => {
+                    // Re-enable control buttons after servo completes all movements
+                    const controlButtons = document.querySelectorAll('.card-body .btn');
+                    controlButtons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    });
+                    currentServoOperation = null;
+                }, operationTime);
             })
             .catch(error => {
+                if (error.name === 'AbortError') {
+                    console.log('Servo operation was aborted');
+                    return;
+                }
+                
                 console.error('Error:', error);
                 statusDiv.className = 'alert mt-3 alert-danger';
                 if (error.message.includes('400')) {
@@ -267,6 +354,14 @@ if ($result['status'] === 'error') {
                 } else {
                     statusDiv.textContent = 'Error: ' + error.message;
                 }
+                
+                // Re-enable control buttons if there's an error
+                const controlButtons = document.querySelectorAll('.card-body .btn');
+                controlButtons.forEach(btn => {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                });
+                currentServoOperation = null;
             });
         }
     </script>

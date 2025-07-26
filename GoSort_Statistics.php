@@ -22,6 +22,19 @@ if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
     exit();
 }
 
+// Get device info if device ID is provided
+$device_id = $_GET['device'] ?? null;
+$device_info = null;
+if ($device_id) {
+    $stmt = $pdo->prepare("SELECT * FROM sorters WHERE id = ?");
+    $stmt->execute([$device_id]);
+    $device_info = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$device_info) {
+        header("Location: GoSort_Sorters.php");
+        exit();
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
     $category = $_POST['category'] ?? '';
@@ -39,20 +52,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WIT
                 $sorted = 'recyclable';
                 break;
         }
-        $stmt = $pdo->prepare("INSERT INTO trash_sorted (sorted, user_id) VALUES (?, ?)");
-        $stmt->execute([$sorted, $_SESSION['user_id']]);
+        $stmt = $pdo->prepare("INSERT INTO trash_sorted (sorted, user_id, device_id) VALUES (?, ?, ?)");
+        $stmt->execute([$sorted, $_SESSION['user_id'], $device_id]);
     }
 }
 
-$stmt = $pdo->query("SELECT 
+$query = "SELECT 
     CASE 
         WHEN sorted = 'biodegradable' THEN 'Bio'
         WHEN sorted = 'non-biodegradable' THEN 'Non-Bio'
         WHEN sorted = 'recyclable' THEN 'Recyclables'
     END as category,
     COUNT(*) as total_count 
-    FROM trash_sorted 
-    GROUP BY sorted");
+    FROM trash_sorted";
+
+// Just use GROUP BY for now until we add device_id support
+$stmt = $pdo->query($query . " GROUP BY sorted");
 $wasteData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
@@ -75,13 +90,44 @@ foreach ($wasteData as $data) {
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4">
         <div class="container">
-            <a class="navbar-brand" href="#">GoSort Dashboard</a>
-            <div class="d-flex gap-2">
-                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#maintenanceModal">Maintenance</button>
-                <a href="?logout=1" class="btn btn-light">Logout</a>
+            <a class="navbar-brand" href="GoSort_Sorters.php">GoSort Dashboard</a>
+            <div class="navbar-nav me-auto">
+                <a class="nav-link" href="GoSort_Sorters.php">Sorters</a>
+                <a class="nav-link active" href="GoSort_Statistics.php">Overall Statistics</a>
             </div>
+            <?php if ($device_info): ?>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#maintenanceModal">Maintenance</button>
+                    <a href="GoSort_Sorters.php" class="btn btn-primary">Back to Sorters</a>
+                    <a href="?logout=1" class="btn btn-light">Logout</a>
+                </div>
+            <?php else: ?>
+                <div>
+                    <a href="?logout=1" class="btn btn-light">Logout</a>
+                </div>
+            <?php endif; ?>
         </div>
     </nav>
+
+    <?php if ($device_info): ?>
+    <div class="container mb-4">
+        <div class="alert alert-info">
+            <h4 class="mb-0">
+                <i class="bi bi-info-circle-fill"></i>
+                Viewing Statistics for: <?php echo htmlspecialchars($device_info['device_name']); ?>
+                <span class="badge <?php 
+                    echo match($device_info['status']) {
+                        'online' => 'bg-success',
+                        'maintenance' => 'bg-warning',
+                        default => 'bg-danger'
+                    };
+                ?>">
+                    <?php echo ucfirst(htmlspecialchars($device_info['status'])); ?>
+                </span>
+            </h4>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Maintenance Confirmation Modal -->
     <div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">

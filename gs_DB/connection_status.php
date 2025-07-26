@@ -51,6 +51,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    // Check if heartbeat exists and is recent (within last 5 seconds)
+    $status = 'offline';
+    if (file_exists('../python_heartbeat.txt')) {
+        $last_heartbeat = (int)file_get_contents('../python_heartbeat.txt');
+        if (time() - $last_heartbeat <= 5) {
+            // Python app is running, check maintenance mode
+            if (file_exists('../python_maintenance_mode.txt')) {
+                $status = 'maintenance';
+            } else {
+                $status = 'connected';
+            }
+        }
+    }
+    
     // Update status of all devices that haven't sent a heartbeat in 5 seconds
     try {
         $stmt = $pdo->prepare("
@@ -70,7 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         
         echo json_encode([
             'success' => true,
-            'devices' => $devices
+            'devices' => $devices,
+            'status' => $status
         ]);
     } catch (PDOException $e) {
         http_response_code(500);
