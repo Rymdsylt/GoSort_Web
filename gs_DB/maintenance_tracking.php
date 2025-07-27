@@ -1,20 +1,22 @@
 <?php
 require_once 'connection.php';
 
-// Create maintenance_mode table if it doesn't exist
-$pdo->query("
-    CREATE TABLE IF NOT EXISTS maintenance_mode (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        active BOOLEAN DEFAULT TRUE,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-");
+// Table creation moved to main_DB.php
 
 // Function to get current active maintenance session
 function getActiveMaintenanceSession() {
     global $pdo;
+    
+    // First clean up any stale maintenance sessions (older than 30 minutes)
+    $cleanup = $pdo->prepare("
+        UPDATE maintenance_mode 
+        SET active = FALSE 
+        WHERE active = TRUE 
+        AND start_time < NOW() - INTERVAL 30 MINUTE
+    ");
+    $cleanup->execute();
+    
+    // Now get active session if any
     $stmt = $pdo->query("
         SELECT m.*, u.userName 
         FROM maintenance_mode m 

@@ -5,40 +5,57 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-require_once 'gs_DB/connection.php';
-require_once 'gs_DB/maintenance_tracking.php';
+require_once __DIR__ . '/gs_DB/connection.php';
 
 // Get device info
 $device_id = $_GET['device'] ?? null;
 $device_name = $_GET['name'] ?? 'Unknown Device';
+$device_identity = $_GET['identity'] ?? null;
 
-if (!$device_id) {
-    header("Location: GoSort_Sorters.php");
+// Check for missing parameters
+$missing = [];
+if (!$device_id) $missing[] = 'device';
+if (!$device_identity) $missing[] = 'identity';
+
+if (!empty($missing)) {
+    header("Location: GoSort_Sorters.php?error=missing_params&params=" . implode(',', $missing));
     exit();
 }
 
-// Verify device exists and is not in maintenance
-$stmt = $pdo->prepare("SELECT * FROM sorters WHERE id = ?");
-$stmt->execute([$device_id]);
+// First check if the device exists and get its status
+$stmt = $pdo->prepare("SELECT * FROM sorters WHERE device_identity = ?");
+$stmt->execute([$device_identity]);
 $device = $stmt->fetch();
 
-if (!$device || $device['status'] === 'maintenance') {
-    header("Location: GoSort_Sorters.php");
+// Verify device exists and check ID
+if (!$device) {
+    header("Location: GoSort_Sorters.php?error=device_not_found&identity=" . urlencode($device_identity));
     exit();
 }
 
-// Check if someone else is already in maintenance mode
-$activeSession = getActiveMaintenanceSession();
-if ($activeSession && $activeSession['user_id'] != $_SESSION['user_id']) {
-    // Someone else is in maintenance mode, redirect back with error
-    header("Location: GoSort_Sorters.php?maintenance_error=active&user=" . urlencode($activeSession['userName']));
+if ($device['id'] != $device_id) {
+    header("Location: GoSort_Sorters.php?error=device_mismatch&id=" . urlencode($device_id));
     exit();
 }
 
-// Start maintenance mode for this user
-$result = startMaintenanceMode($_SESSION['user_id']);
-if ($result['status'] === 'error') {
-    header("Location: GoSort_Sorters.php?maintenance_error=active&user=" . urlencode($result['user']));
+// Check if device is online
+if ($device['status'] !== 'online') {
+    header("Location: GoSort_Sorters.php?error=device_offline&device=" . urlencode($device_name));
+    exit();
+}
+
+// Check if already in maintenance mode
+if ($device['maintenance_mode'] == 1) {
+    header("Location: GoSort_Sorters.php?error=already_in_maintenance&device=" . urlencode($device_name));
+    exit();
+}
+
+// Set maintenance mode only if device is online
+$stmt = $pdo->prepare("UPDATE sorters SET maintenance_mode = 1 WHERE id = ? AND device_identity = ? AND status = 'online'");
+$result = $stmt->execute([$device_id, $device_identity]);
+
+if (!$result) {
+    header("Location: GoSort_Sorters.php?error=database_error");
     exit();
 }
 ?>
@@ -186,39 +203,13 @@ if ($result['status'] === 'error') {
         async function cleanupMaintenance() {
             clearInterval(maintenanceInterval);
             
-            // Create FormData objects for each request
-            const modeData = new URLSearchParams();
-            modeData.append('mode', 'disable');
-            
-            const controlData = new URLSearchParams();
-            controlData.append('action', 'maintenance_end');
-            
-            const trackingData = new URLSearchParams();
-            trackingData.append('action', 'end_maintenance');
-            
-            await Promise.all([
-                fetch('gs_DB/set_maintenance_mode.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: modeData.toString()
-                }),
-                fetch('gs_DB/maintenance_control.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: controlData.toString()
-                }),
-                fetch('gs_DB/maintenance_tracking.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: trackingData.toString()
-                })
-            ]);
+            // Send request to end maintenance mode
+            await fetch('gs_DB/end_maintenance.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
         }
 
         // Handle page unload
@@ -228,12 +219,8 @@ if ($result['status'] === 'error') {
             // Chrome requires returnValue to be set
             e.returnValue = '';
             
-            // Perform cleanup synchronously to ensure it happens
-            navigator.sendBeacon('gs_DB/maintenance_tracking.php', new URLSearchParams({
-                'action': 'end_maintenance'
-            }));
-            
-            cleanupMaintenance();
+            // Use sendBeacon for reliable cleanup during page unload
+            navigator.sendBeacon('gs_DB/end_maintenance.php');
         });
 
         // Also handle when user clicks "Dashboard" or "Logout"
@@ -252,15 +239,24 @@ if ($result['status'] === 'error') {
                     const statusDiv = document.querySelector('.connection-status');
                     if (!statusDiv) return; // Guard against null element
                     
-                    if (data.status === 'connected' || data.status === 'maintenance') {
+                    // Log sorter status to console
+                    console.log('Sorter Status:', {
+                        status: data.status,
+                        timestamp: new Date().toISOString(),
+                        details: data
+                    });
+                    
+                    // Check device status from the devices array
+                    const device = data.devices?.[0];
+                    if (device && device.status === 'online') {
                         statusDiv.className = 'connection-status alert mb-4 alert-success';
-                        statusDiv.innerHTML = data.status === 'maintenance' 
-                            ? '🔧 GoSort Python App is in maintenance mode'
-                            : '✅ GoSort Python App is connected and running';
+                        statusDiv.innerHTML = '✅ GoSort Python App is connected and running';
+                        // Enable all control buttons
                         document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
                     } else {
                         statusDiv.className = 'connection-status alert mb-4 alert-danger';
                         statusDiv.innerHTML = '❌ GoSort Python App is not running - Controls disabled';
+                        // Disable all control buttons
                         document.querySelectorAll('.btn').forEach(btn => btn.disabled = true);
                     }
                 })
@@ -305,18 +301,21 @@ if ($result['status'] === 'error') {
             
             statusDiv.style.display = 'block';
             statusDiv.className = 'alert mt-3 alert-info';
-            statusDiv.textContent = 'Sending command...';
+            statusDiv.textContent = 'Operating...';
 
-            // Encode the position parameter
-            const formData = new URLSearchParams();
-            formData.append('action', position);
+            // Get device identity from URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const deviceIdentity = urlParams.get('identity');
 
-            fetch('gs_DB/maintenance_control.php', {
+            fetch('gs_DB/save_maintenance_command.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/json',
                 },
-                body: formData.toString(),
+                body: JSON.stringify({
+                    device_identity: deviceIdentity,
+                    command: position
+                }),
                 signal: controller.signal
             })
             .then(response => {
@@ -326,8 +325,8 @@ if ($result['status'] === 'error') {
                 return response.text();
             })
             .then(data => {
-                statusDiv.className = 'alert mt-3 ' + (data.includes('Success') ? 'alert-success' : 'alert-danger');
-                statusDiv.textContent = data || 'Command completed successfully';
+                statusDiv.className = 'alert mt-3 alert-success';
+                statusDiv.textContent = 'Done';
                 
                 // Wait for the full servo operation to complete (matching Arduino timing)
                 // Arduino uses 4 delay(500) = 2000ms total for movement

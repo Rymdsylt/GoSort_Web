@@ -2,6 +2,7 @@
 session_start();
 require_once 'gs_DB/connection.php';
 require_once 'gs_DB/sorters_DB.php';
+require_once 'gs_DB/main_DB.php';
 
 // Handle logout
 if (isset($_GET['logout'])) {
@@ -51,6 +52,46 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </nav>
 
     <div class="container">
+        <?php
+        // Handle maintenance errors
+        if (isset($_GET['maintenance_error']) && $_GET['maintenance_error'] === 'active') {
+            $user = $_GET['user'] ?? 'another user';
+            echo "<div class='alert alert-warning alert-dismissible fade show' role='alert'>";
+            echo "<strong>Maintenance Mode Active:</strong> The system is currently in maintenance mode by $user.";
+            echo "<button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>";
+            echo "</div>";
+        }
+        
+        // Handle other errors
+        if (isset($_GET['error'])) {
+            $errorType = $_GET['error'];
+            $errorMsg = '';
+            $errorClass = 'alert-danger';
+            
+            switch ($errorType) {
+                case 'missing_params':
+                    $params = explode(',', $_GET['params']);
+                    $errorMsg = 'Missing required parameters: ' . implode(', ', $params);
+                    break;
+                case 'device_not_found':
+                    $id = $_GET['id'] ?? 'unknown';
+                    $identity = $_GET['identity'] ?? 'unknown';
+                    $errorMsg = "Device not found or mismatch (ID: $id, Identity: $identity)";
+                    break;
+                case 'already_in_maintenance':
+                    $device = $_GET['device'] ?? 'Unknown device';
+                    $errorMsg = "Device '$device' is already in maintenance mode";
+                    break;
+            }
+            
+            if ($errorMsg) {
+                echo "<div class='alert $errorClass alert-dismissible fade show' role='alert'>";
+                echo "<strong>Error:</strong> $errorMsg";
+                echo "<button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>";
+                echo "</div>";
+            }
+        }
+        ?>
 
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
             <?php foreach ($sorters as $sorter): ?>
@@ -80,11 +121,11 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     <div class="card-footer">
                         <div class="d-flex justify-content-between">
-                            <a href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>" class="btn btn-primary btn-sm">
+                            <a href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-primary btn-sm">
                                 View Statistics
                             </a>
                             <?php if ($sorter['status'] !== 'maintenance'): ?>
-                            <a href="GoSort_Maintenance.php?device=<?php echo $sorter['id']; ?>&name=<?php echo urlencode($sorter['device_name']); ?>" class="btn btn-warning btn-sm">
+                            <a href="GoSort_Maintenance.php?device=<?php echo $sorter['id']; ?>&name=<?php echo urlencode($sorter['device_name']); ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-warning btn-sm">
                                 Maintenance
                             </a>
                             <?php endif; ?>
@@ -223,14 +264,30 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         // First check if the device is trying to connect
         showStatus(`Checking if device "${deviceIdentity}" is attempting to connect...`, false, true);
         
+        // Convert FormData to JSON
+        const jsonData = {
+            deviceName: formData.get('deviceName'),
+            location: formData.get('location'),
+            deviceIdentity: formData.get('deviceIdentity')
+        };
+
         fetch('gs_DB/add_device_new.php', {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(jsonData)
         })
         .then(response => {
             if (!response.ok) {
                 return response.text().then(text => {
-                    throw new Error('Server returned: ' + text);
+                    console.error('Server response:', text);
+                    try {
+                        const jsonError = JSON.parse(text);
+                        throw new Error(jsonError.message || 'Server error');
+                    } catch (e) {
+                        throw new Error('Server returned: ' + text);
+                    }
                 });
             }
             return response.json();
@@ -302,7 +359,12 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
     // Update device statuses every 5 seconds
     setInterval(() => {
         fetch('gs_DB/connection_status.php')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success && data.devices) {
                     // Update status badges for each device
@@ -322,14 +384,26 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                             // Update last active time
                             const lastActive = deviceCard.querySelector('.last-active');
-                            if (lastActive) {
-                                lastActive.textContent = new Date(device.last_active).toLocaleString();
+                            if (lastActive && device.last_active) {
+                                const date = new Date(device.last_active);
+                                if (!isNaN(date)) {
+                                    lastActive.textContent = date.toLocaleString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                        hour: 'numeric',
+                                        minute: 'numeric',
+                                        hour12: true
+                                    });
+                                }
                             }
                         }
                     });
                 }
             })
-            .catch(console.error);
+            .catch(error => {
+                console.error('Error updating device statuses:', error);
+            });
     }, 5000);
     </script>
 </body>
