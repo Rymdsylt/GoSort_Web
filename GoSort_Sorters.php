@@ -130,7 +130,7 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </a>
                             <?php endif; ?>
                             <?php if ($sorter['status'] === 'online'): ?>
-                            <button class="btn btn-dark btn-sm" onclick="confirmShutdownDevice('<?php echo $sorter['device_identity']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
+                            <button class="btn btn-dark btn-sm" onclick="shutdownDevice('<?php echo $sorter['device_identity']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
                                 Shut Down Device
                             </button>
                             <?php endif; ?>
@@ -241,26 +241,6 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Device</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Shutdown Confirmation Modal -->
-    <div class="modal fade" id="shutdownModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Shutdown</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to shut down the device "<span id="shutdownDeviceName"></span>"?</p>
-                    <p class="text-danger"><strong>Warning:</strong> This will immediately power off the device's computer. Don't forget to turn off the device's AVR after shutting down.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-dark" id="confirmShutdownBtn">Shut Down</button>
                 </div>
             </div>
         </div>
@@ -381,24 +361,10 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
     });
 
-    let shutdownDeviceIdentity = null;
-    let shutdownDeviceName = null;
-    const shutdownModal = new bootstrap.Modal(document.getElementById('shutdownModal'));
-
-    function confirmShutdownDevice(deviceIdentity, deviceName) {
-        shutdownDeviceIdentity = deviceIdentity;
-        shutdownDeviceName = deviceName;
-        document.getElementById('shutdownDeviceName').textContent = deviceName;
-        shutdownModal.show();
-    }
-
-    document.getElementById('confirmShutdownBtn').addEventListener('click', function() {
-        if (!shutdownDeviceIdentity) return;
-        shutdownModal.hide();
-        shutdownDevice(shutdownDeviceIdentity, shutdownDeviceName);
-    });
-
     function shutdownDevice(deviceIdentity, deviceName) {
+        if (!confirm(`Are you sure you want to shut down the device "${deviceName}"? This will force the computer to power off immediately.`)) {
+            return;
+        }
         showStatus(`Sending shutdown command to "${deviceName}"...`, false, true);
         fetch('gs_DB/save_maintenance_command.php', {
             method: 'POST',

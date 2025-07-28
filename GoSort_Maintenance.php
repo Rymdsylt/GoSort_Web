@@ -148,6 +148,9 @@ if (!$result) {
                             </div>
                         </div>
                         <div id="status" class="alert mt-3" style="display: none;"></div>
+                        <div class="d-grid mt-4">
+                            <button class="btn btn-dark btn-lg" id="shutdownBtn">Shut Down Device</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -363,6 +366,43 @@ if (!$result) {
                 currentServoOperation = null;
             });
         }
+
+        document.getElementById('shutdownBtn').addEventListener('click', function() {
+            if (!confirm('Are you sure you want to shut down this device? This will force the computer to power off immediately.')) {
+                return;
+            }
+            const statusDiv = document.getElementById('status');
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'alert mt-3 alert-info';
+            statusDiv.textContent = 'Sending shutdown command...';
+            const urlParams = new URLSearchParams(window.location.search);
+            const deviceIdentity = urlParams.get('identity');
+            fetch('gs_DB/save_maintenance_command.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    device_identity: deviceIdentity,
+                    command: 'shutdown'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.className = 'alert mt-3 alert-success';
+                    statusDiv.textContent = '✅ Shutdown command sent. The device will shut down shortly.';
+                } else {
+                    statusDiv.className = 'alert mt-3 alert-danger';
+                    statusDiv.textContent = '❌ Failed to send shutdown command: ' + data.message;
+                }
+            })
+            .catch(error => {
+                statusDiv.className = 'alert mt-3 alert-danger';
+                statusDiv.textContent = '❌ Error sending shutdown command: ' + error.message;
+                console.error('Error:', error);
+            });
+        });
     </script>
 </body>
 </html>
