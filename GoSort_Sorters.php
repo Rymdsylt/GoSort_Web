@@ -129,6 +129,11 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 Maintenance
                             </a>
                             <?php endif; ?>
+                            <?php if ($sorter['status'] === 'online'): ?>
+                            <button class="btn btn-dark btn-sm" onclick="shutdownDevice('<?php echo $sorter['device_identity']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
+                                Shut Down Device
+                            </button>
+                            <?php endif; ?>
                             <?php if ($sorter['status'] === 'offline'): ?>
                             <button class="btn btn-danger btn-sm" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
                                 Delete
@@ -355,6 +360,32 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
             console.error('Error:', error);
         });
     });
+
+    function shutdownDevice(deviceIdentity, deviceName) {
+        showStatus(`Sending shutdown command to "${deviceName}"...`, false, true);
+        fetch('gs_DB/save_maintenance_command.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                device_identity: deviceIdentity,
+                command: 'shutdown'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatus(`✅ Shutdown command sent to "${deviceName}". The device will shut down shortly.`, false, false);
+            } else {
+                showStatus(`❌ Failed to send shutdown command: ${data.message}`, true, false);
+            }
+        })
+        .catch(error => {
+            showStatus(`❌ Error sending shutdown command: ${error.message}`, true, false);
+            console.error('Error:', error);
+        });
+    }
 
     // Update device statuses every 5 seconds
     setInterval(() => {
