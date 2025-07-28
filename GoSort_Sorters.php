@@ -121,24 +121,15 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     <div class="card-footer">
                         <div class="d-flex justify-content-between">
-                            <a href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-primary btn-sm">
+                            <a href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-primary btn-sm stats-btn">
                                 View Statistics
                             </a>
-                            <?php if ($sorter['status'] !== 'maintenance'): ?>
-                            <a href="GoSort_Maintenance.php?device=<?php echo $sorter['id']; ?>&name=<?php echo urlencode($sorter['device_name']); ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-warning btn-sm">
+                            <a href="GoSort_Maintenance.php?device=<?php echo $sorter['id']; ?>&name=<?php echo urlencode($sorter['device_name']); ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-warning btn-sm maintenance-btn">
                                 Maintenance
                             </a>
-                            <?php endif; ?>
-                            <?php if ($sorter['status'] === 'online'): ?>
-                            <button class="btn btn-dark btn-sm" onclick="shutdownDevice('<?php echo $sorter['device_identity']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
-                                Shut Down Device
-                            </button>
-                            <?php endif; ?>
-                            <?php if ($sorter['status'] === 'offline'): ?>
-                            <button class="btn btn-danger btn-sm" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
+                            <button class="btn btn-danger btn-sm delete-btn" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
                                 Delete
                             </button>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -300,10 +291,14 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .then(data => {
             if (data.success) {
                 showStatus(`✅ ${data.message}`, false, false);
-                // Reload after 2 seconds on success
+                // Redirect to GoSort_Maintenance.php after 1s
                 setTimeout(() => {
-                    location.reload();
-                }, 2000);
+                    const deviceName = encodeURIComponent(formData.get('deviceName'));
+                    const deviceIdentity = encodeURIComponent(formData.get('deviceIdentity'));
+                    // We don't have the device id directly, so reload and find it by identity
+                    // For now, redirect with identity and name only
+                    window.location.href = `GoSort_Maintenance.php?identity=${deviceIdentity}&name=${deviceName}`;
+                }, 1000);
             } else {
                 showStatus(`❌ ${data.message}`, true, false);
             }
@@ -433,12 +428,28 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             }
                         }
                     });
+
+                    // Show/hide buttons
+                    data.devices.forEach(device => {
+                        const deviceCard = document.querySelector(`[data-device="${device.device_name}"]`);
+                        if (deviceCard) {
+                            const maintenanceBtn = deviceCard.querySelector('.maintenance-btn');
+                            const deleteBtn = deviceCard.querySelector('.delete-btn');
+                            if (device.status === 'online') {
+                                maintenanceBtn.style.display = '';
+                                deleteBtn.style.display = 'none';
+                            } else {
+                                maintenanceBtn.style.display = 'none';
+                                deleteBtn.style.display = '';
+                            }
+                        }
+                    });
                 }
             })
             .catch(error => {
                 console.error('Error updating device statuses:', error);
             });
-    }, 5000);
+    }, 500);
     </script>
 </body>
 </html>

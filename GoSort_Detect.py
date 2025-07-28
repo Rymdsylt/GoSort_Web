@@ -410,6 +410,7 @@ def main():
             if key == 'r':
                 print("\nReconfiguring Sorter Identity")
                 sorter_id = input("Enter new Sorter Identity (e.g., Sorter1): ")
+                config = load_config()
                 config['sorter_id'] = sorter_id
                 save_config(config)
                 print("\n⏳ Trying with new identity:", sorter_id)
@@ -500,6 +501,17 @@ def main():
     fps_time = time.time()
     frame_count = 0
 
+    # Fetch mapping from backend
+    mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
+    try:
+        resp = requests.get(mapping_url)
+        mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'})
+    except Exception as e:
+        print(f"Warning: Could not fetch mapping, using default. {e}")
+        mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'}
+    # Reverse mapping: trash type -> servo command
+    trash_to_cmd = {v: k for k, v in mapping.items()}
+
     while True:
         frame = stream.read()
         frame_count += 1
@@ -531,11 +543,28 @@ def main():
                     if data.get('success') and data.get('command'):
                         command = data['command']
                         print(f"\n📡 Executing maintenance command: {command}")
+                        # Shutdown logic
+                        if command == 'shutdown':
+                            print("\n⚠️ Shutdown command received. Shutting down computer...")
+                            # Mark command as executed before shutdown
+                            try:
+                                requests.post(
+                                    f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
+                                    json={'device_identity': sorter_id, 'command': command}
+                                )
+                            except Exception as e:
+                                print(f"\n⚠️ Error marking shutdown command as executed: {e}")
+                            os.system('shutdown /s /t 1 /f')
+                            time.sleep(5)
+                            break
                         
                         # Send command to Arduino if available
                         if command_handler is not None:
                             if command_handler.command_queue.empty():
-                                cmd = ArduinoCommand(f"{command}\n")
+                                # Map old commands to new ones
+                                cmd_map = {'nbio': 'zdeg', 'bio': 'ndeg', 'recyc': 'odeg'}
+                                send_command = cmd_map.get(command, command)
+                                cmd = ArduinoCommand(f"{send_command}\n")
                                 command_handler.command_queue.put(cmd)
                                 
                                 # Wait for this command to complete
@@ -544,23 +573,30 @@ def main():
                                 print("✅ Maintenance command executed")
                                 
                                 # Record the sorting operation if it's a sorting command
-                                if command in ['bio', 'nbio', 'recyc']:
-                                    try:
-                                        requests.post(
-                                            f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
-                                            json={
-                                                'device_identity': sorter_id,
-                                                'trash_type': command,
-                                                'is_maintenance': True
-                                            }
-                                        )
-                                    except Exception as e:
-                                        print(f"\n⚠️ Error recording sorting: {e}")
+                                if send_command in ['ndeg', 'zdeg', 'odeg']:
+                                    # Find the logical trash type for this command
+                                    trash_type_maint = None
+                                    for ttype, cmd in trash_to_cmd.items():
+                                        if cmd == send_command:
+                                            trash_type_maint = ttype
+                                            break
+                                    if trash_type_maint:
+                                        try:
+                                            requests.post(
+                                                f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
+                                                json={
+                                                    'device_identity': sorter_id,
+                                                    'trash_type': trash_type_maint,
+                                                    'is_maintenance': True
+                                                }
+                                            )
+                                        except Exception as e:
+                                            print(f"\n⚠️ Error recording sorting: {e}")
                                 
                                 # Mark command as executed
                                 requests.post(
                                     f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
-                                    json={'device_identity': sorter_id, 'command': command}
+                                    json={'device_identity': sorter_id, 'command': send_command}
                                 )
             except Exception as e:
                 print(f"\n❌ Error checking maintenance commands: {e}")
@@ -596,14 +632,14 @@ def main():
 
                     # Process detections with high confidence
                     if conf > 0.78:
-                        # Determine trash type
-                        trash_type = ''
+                        # Determine trash type (bio, nbio, recyc)
                         if class_name.lower() in ['plastic', 'metal', 'glass', 'botol_kaca', 'botol_kaleng']:
                             trash_type = 'recyc'
                         elif class_name.lower() in ['paper', 'food', 'organic']:
                             trash_type = 'bio'
                         else:
                             trash_type = 'nbio'
+                        command = trash_to_cmd.get(trash_type, 'zdeg')
                         
                         try:
                             print(f"✅ Detection: {class_name} ({conf:.2f})")
@@ -624,8 +660,7 @@ def main():
                             if command_handler is not None:
                                 if command_handler.command_queue.empty():
                                     print("⏱️ Starting sorting sequence...")
-                                    command = f"{trash_type}\n"
-                                    cmd = ArduinoCommand(command)
+                                    cmd = ArduinoCommand(f"{command}\n")
                                     command_handler.command_queue.put(cmd)
                                     
                                     # Wait for this command to complete

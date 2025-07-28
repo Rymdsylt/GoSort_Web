@@ -123,6 +123,29 @@ if (!$result) {
                         </div>
                     </div>
                     <div class="card-body">
+                        <h4 class="card-title text-center mb-4">Customize Trash Quadrant Mapping</h4>
+                        <div class="mb-4 text-center">
+                            <svg id="quadrant-svg" width="320" height="180" viewBox="0 0 320 180">
+                                <!-- zDeg: 0-60deg -->
+                                <path id="arc-zdeg" d="M160,160 L160,20 A140,140 0 0,1 280,160 Z" fill="#e7f1ff" stroke="#0d6efd" stroke-width="2" cursor="pointer"/>
+                                <!-- nDeg: 60-120deg -->
+                                <path id="arc-ndeg" d="M160,160 L280,160 A140,140 0 0,1 40,160 Z" fill="#e9ecef" stroke="#6c757d" stroke-width="2" cursor="pointer"/>
+                                <!-- oDeg: 120-180deg -->
+                                <path id="arc-odeg" d="M160,160 L40,160 A140,140 0 0,1 160,20 Z" fill="#fff3cd" stroke="#ffc107" stroke-width="2" cursor="pointer"/>
+                                <!-- Labels -->
+                                <text x="250" y="90" text-anchor="middle" font-size="16" fill="#0d6efd">0°</text>
+                                <text x="160" y="35" text-anchor="middle" font-size="16" fill="#6c757d">90°</text>
+                                <text x="70" y="90" text-anchor="middle" font-size="16" fill="#ffc107">180°</text>
+                            </svg>
+                            <div class="mt-3">
+                                <button id="btn-zdeg" class="btn btn-outline-primary quadrant-btn mx-2">Bio</button>
+                                <button id="btn-ndeg" class="btn btn-outline-secondary quadrant-btn mx-2">Non-Bio</button>
+                                <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn mx-2">Recyc</button>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-primary" onclick="saveQuadrantMapping()">Save Mapping</button>
+                            </div>
+                        </div>
                         <h4 class="card-title text-center mb-4">Servo Control</h4>
                         <div class="mb-4">
                             <h5 class="text-center">Move Controls *WARNING: DON'T INITIATE WHEN CLOGGED!*</h5>
@@ -155,6 +178,25 @@ if (!$result) {
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Shutdown Confirmation Modal -->
+    <div class="modal fade" id="shutdownModal" tabindex="-1" aria-labelledby="shutdownModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="shutdownModalLabel">Confirm Shut Down</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Confirm shut down? <br><strong>Remember to turn off the device's AVR after shutting down.</strong>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirmShutdownBtn">Shut Down</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="js/bootstrap.bundle.min.js"></script>
@@ -368,9 +410,13 @@ if (!$result) {
         }
 
         document.getElementById('shutdownBtn').addEventListener('click', function() {
-            if (!confirm('Are you sure you want to shut down this device? This will force the computer to power off immediately.')) {
-                return;
-            }
+            var shutdownModal = new bootstrap.Modal(document.getElementById('shutdownModal'));
+            shutdownModal.show();
+        });
+        document.getElementById('confirmShutdownBtn').addEventListener('click', function() {
+            var shutdownModalEl = document.getElementById('shutdownModal');
+            var shutdownModal = bootstrap.Modal.getInstance(shutdownModalEl);
+            shutdownModal.hide();
             const statusDiv = document.getElementById('status');
             statusDiv.style.display = 'block';
             statusDiv.className = 'alert mt-3 alert-info';
@@ -403,6 +449,95 @@ if (!$result) {
                 console.error('Error:', error);
             });
         });
+    </script>
+    <script>
+    // Quadrant mapping logic
+    let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'recyc'};
+    // Update button labels/colors
+    function updateQuadrantButtons() {
+        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', recyc: 'Recyc'};
+        const mapToClass = {bio: 'btn-outline-primary', nbio: 'btn-outline-secondary', recyc: 'btn-outline-warning'};
+        ['zdeg','ndeg','odeg'].forEach(q => {
+            const btn = document.getElementById('btn-' + q);
+            btn.textContent = mapToLabel[quadrantMap[q]];
+            btn.className = 'btn quadrant-btn mx-2 ' + mapToClass[quadrantMap[q]];
+        });
+    }
+    // Fetch mapping from backend on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const deviceIdentity = urlParams.get('identity');
+        if (!deviceIdentity) { updateQuadrantButtons(); return; }
+        fetch('gs_DB/save_sorter_mapping.php?device_identity=' + encodeURIComponent(deviceIdentity))
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.mapping) {
+                    quadrantMap = data.mapping;
+                }
+                updateQuadrantButtons();
+            })
+            .catch(() => updateQuadrantButtons());
+    });
+    // Show select menu for quadrant
+    function showQuadrantSelect(q) {
+        const current = quadrantMap[q];
+        const options = [
+            {val:'bio', label:'Bio'},
+            {val:'nbio', label:'Non-Bio'},
+            {val:'recyc', label:'Recyc'}
+        ];
+        let html = '<div id="quadrant-select-modal" class="modal" tabindex="-1" style="display:block;background:rgba(0,0,0,0.3)"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Select Trash Type</h5><button type="button" class="btn-close" onclick="closeQuadrantSelect()"></button></div><div class="modal-body">';
+        options.forEach(opt => {
+            html += `<button class="btn btn-block btn-lg w-100 my-1 ${current===opt.val?'btn-primary':'btn-outline-primary'}" onclick="setQuadrantType('${q}','${opt.val}')">${opt.label}</button>`;
+        });
+        html += '</div></div></div></div>';
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+    function closeQuadrantSelect() {
+        const modal = document.getElementById('quadrant-select-modal');
+        if(modal) modal.remove();
+    }
+    function setQuadrantType(q, val) {
+        quadrantMap[q] = val;
+        updateQuadrantButtons();
+        closeQuadrantSelect();
+    }
+    document.getElementById('btn-zdeg').onclick = () => showQuadrantSelect('zdeg');
+    document.getElementById('btn-ndeg').onclick = () => showQuadrantSelect('ndeg');
+    document.getElementById('btn-odeg').onclick = () => showQuadrantSelect('odeg');
+    // Save mapping to backend
+    function saveQuadrantMapping() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const deviceIdentity = urlParams.get('identity');
+        // Check for duplicate trash types
+        const values = [quadrantMap.zdeg, quadrantMap.ndeg, quadrantMap.odeg];
+        const unique = new Set(values);
+        if (unique.size < 3) {
+            alert('Same Trash types are not allowed');
+            return;
+        }
+        fetch('gs_DB/save_sorter_mapping.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                device_identity: deviceIdentity,
+                zdeg: quadrantMap.zdeg,
+                ndeg: quadrantMap.ndeg,
+                odeg: quadrantMap.odeg
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                alert('Mapping saved!');
+            } else {
+                alert('Error saving mapping: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => alert('Error saving mapping: ' + err));
+    }
+    // Initial
+    updateQuadrantButtons();
     </script>
 </body>
 </html>

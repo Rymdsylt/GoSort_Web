@@ -271,6 +271,17 @@ def main():
         config['sorter_id'] = sorter_id
         save_config(config)
     
+    # Fetch mapping from backend
+    mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
+    try:
+        resp = requests.get(mapping_url)
+        mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'})
+    except Exception as e:
+        print(f"Warning: Could not fetch mapping, using default. {e}")
+        mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'}
+    # Reverse mapping: trash type -> servo command
+    trash_to_cmd = {v: k for k, v in mapping.items()}
+
     print("\nRequesting device registration with the server...")
     dots_thread = None
 
@@ -436,18 +447,25 @@ def main():
                                 print(f"🟢 Arduino Response: {response}")
                         
                         # Record the sorting operation if it's a sorting command
-                        if command in ['bio', 'nbio', 'recyc']:
-                            try:
-                                requests.post(
-                                    f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
-                                    json={
-                                        'device_identity': config['sorter_id'],
-                                        'trash_type': command,
-                                        'is_maintenance': True
-                                    }
-                                )
-                            except Exception as e:
-                                print(f"\n⚠️ Error recording sorting: {e}")
+                        if command in ['ndeg', 'zdeg', 'odeg']:
+                            # Find the logical trash type for this command
+                            trash_type = None
+                            for ttype, cmd in trash_to_cmd.items():
+                                if cmd == command:
+                                    trash_type = ttype
+                                    break
+                            if trash_type:
+                                try:
+                                    requests.post(
+                                        f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
+                                        json={
+                                            'device_identity': config['sorter_id'],
+                                            'trash_type': trash_type,
+                                            'is_maintenance': True
+                                        }
+                                    )
+                                except Exception as e:
+                                    print(f"\n⚠️ Error recording sorting: {e}")
                         
                         # Mark command as executed
                         requests.post(
@@ -501,11 +519,10 @@ def main():
                 print("✅ All configuration cleared. Please restart the application.")
                 break
             elif choice in ['1', '2', '3']:
-                command = {
-                    '1': 'nbio',
-                    '2': 'bio',
-                    '3': 'recyc'
-                }[choice]
+                # Map menu to trash type
+                menu_to_trash = {'1': 'nbio', '2': 'bio', '3': 'recyc'}
+                trash_type = menu_to_trash[choice]
+                command = trash_to_cmd.get(trash_type, 'zdeg')
                 ser.write(f"{command}\n".encode())
                 print(f"\n🔄 Moving to {command.upper()}...")
                 time.sleep(0.1)
@@ -520,7 +537,7 @@ def main():
                         f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
                         json={
                             'device_identity': config['sorter_id'],
-                            'trash_type': command,
+                            'trash_type': trash_type,
                             'is_maintenance': False
                         }
                     )
