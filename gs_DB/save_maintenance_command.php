@@ -12,13 +12,13 @@ if (!$device_identity || !$command) {
 }
 
 try {
-    // First verify the device is in maintenance mode
-    $stmt = $pdo->prepare("SELECT maintenance_mode FROM sorters WHERE device_identity = ? AND status = 'online'");
+    // Only verify the device is online (not maintenance mode)
+    $stmt = $pdo->prepare("SELECT status FROM sorters WHERE device_identity = ? AND status = 'online'");
     $stmt->execute([$device_identity]);
     $device = $stmt->fetch();
 
-    if (!$device || $device['maintenance_mode'] != 1) {
-        echo json_encode(['success' => false, 'message' => 'Device not in maintenance mode']);
+    if (!$device) {
+        echo json_encode(['success' => false, 'message' => 'Device not online or not found']);
         exit();
     }
 

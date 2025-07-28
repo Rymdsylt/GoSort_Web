@@ -246,6 +246,26 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+    <!-- Shutdown Confirmation Modal -->
+    <div class="modal fade" id="shutdownModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Shutdown</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to shut down the device "<span id="shutdownDeviceName"></span>"?</p>
+                    <p class="text-danger"><strong>Warning:</strong> This will force the device to power off immediately.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-dark" id="confirmShutdownBtn">Shut Down Device</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
     const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
     const statusMessage = document.getElementById('statusMessage');
@@ -361,31 +381,45 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
     });
 
+    let shutdownDeviceIdentity = null;
+    let shutdownDeviceName = null;
+    const shutdownModal = new bootstrap.Modal(document.getElementById('shutdownModal'));
+
     function shutdownDevice(deviceIdentity, deviceName) {
-        showStatus(`Sending shutdown command to "${deviceName}"...`, false, true);
+        shutdownDeviceIdentity = deviceIdentity;
+        shutdownDeviceName = deviceName;
+        document.getElementById('shutdownDeviceName').textContent = deviceName;
+        shutdownModal.show();
+    }
+
+    document.getElementById('confirmShutdownBtn').addEventListener('click', function() {
+        if (!shutdownDeviceIdentity) return;
+        showStatus(`Sending shutdown command to "${shutdownDeviceName}"...`, false, true);
         fetch('gs_DB/save_maintenance_command.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                device_identity: deviceIdentity,
+                device_identity: shutdownDeviceIdentity,
                 command: 'shutdown'
             })
         })
         .then(response => response.json())
         .then(data => {
+            shutdownModal.hide();
             if (data.success) {
-                showStatus(`✅ Shutdown command sent to "${deviceName}". The device will shut down shortly.`, false, false);
+                showStatus(`✅ Shutdown command sent to "${shutdownDeviceName}". The device will shut down shortly.`, false, false);
             } else {
                 showStatus(`❌ Failed to send shutdown command: ${data.message}`, true, false);
             }
         })
         .catch(error => {
+            shutdownModal.hide();
             showStatus(`❌ Error sending shutdown command: ${error.message}`, true, false);
             console.error('Error:', error);
         });
-    }
+    });
 
     // Update device statuses every 5 seconds
     setInterval(() => {
