@@ -12,13 +12,26 @@ if (!$device_identity || !$command) {
 }
 
 try {
-    // Only verify the device is online (not maintenance mode)
-    $stmt = $pdo->prepare("SELECT status FROM sorters WHERE device_identity = ? AND status = 'online'");
+    // Allow shutdown command regardless of maintenance mode
+    if ($command === 'shutdown') {
+        $stmt = $pdo->prepare("
+            INSERT INTO maintenance_commands (device_identity, command) 
+            VALUES (?, ?)
+        ");
+        if ($stmt->execute([$device_identity, $command])) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to save shutdown command']);
+        }
+        exit();
+    }
+    // First verify the device is in maintenance mode for other commands
+    $stmt = $pdo->prepare("SELECT maintenance_mode FROM sorters WHERE device_identity = ? AND status = 'online'");
     $stmt->execute([$device_identity]);
     $device = $stmt->fetch();
 
-    if (!$device) {
-        echo json_encode(['success' => false, 'message' => 'Device not online or not found']);
+    if (!$device || $device['maintenance_mode'] != 1) {
+        echo json_encode(['success' => false, 'message' => 'Device not in maintenance mode']);
         exit();
     }
 
