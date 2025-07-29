@@ -291,14 +291,10 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .then(data => {
             if (data.success) {
                 showStatus(`✅ ${data.message}`, false, false);
-                // Redirect to GoSort_Maintenance.php after 1s
+                // Reload the page to show the newly added device
                 setTimeout(() => {
-                    const deviceName = encodeURIComponent(formData.get('deviceName'));
-                    const deviceIdentity = encodeURIComponent(formData.get('deviceIdentity'));
-                    // We don't have the device id directly, so reload and find it by identity
-                    // For now, redirect with identity and name only
-                    window.location.href = `GoSort_Maintenance.php?identity=${deviceIdentity}&name=${deviceName}`;
-                }, 1000);
+                    location.reload();
+                }, 2000);
             } else {
                 showStatus(`❌ ${data.message}`, true, false);
             }

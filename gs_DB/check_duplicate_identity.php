@@ -11,42 +11,34 @@ if (!isset($data['identity'])) {
 }
 
 $identity = $data['identity'];
-$current_identity = isset($data['current_identity']) ? $data['current_identity'] : null;
 
 try {
-    // Check both waiting_devices and sorters tables, excluding current identity
-    $stmt = $conn->prepare("
-        SELECT 
-            CASE 
-                WHEN EXISTS (
-                    SELECT 1 FROM waiting_devices 
-                    WHERE device_identity = ? 
-                    AND device_identity != ?
-                )
-                    THEN 'waiting'
-                WHEN EXISTS (
-                    SELECT 1 FROM sorters 
-                    WHERE device_identity = ?
-                    AND device_identity != ?
-                )
-                    THEN 'registered'
-                ELSE 'available'
-            END as status
-    ");
+    // Check if identity exists in sorters table first (registered devices)
+    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM sorters WHERE device_identity = ?");
+    $stmt->execute([$identity]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    $stmt->bind_param("ssss", $identity, $current_identity, $identity, $current_identity);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
+    if ($row['count'] > 0) {
+        echo json_encode([
+            'success' => true,
+            'status' => 'registered'
+        ]);
+        exit;
+    }
+    
+    // Check if identity exists in waiting_devices table
+    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM waiting_devices WHERE device_identity = ?");
+    $stmt->execute([$identity]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $is_duplicate = $row['count'] > 0;
     
     echo json_encode([
         'success' => true,
-        'status' => $row['status']
+        'status' => $is_duplicate ? 'waiting' : 'available'
     ]);
     
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
-
-$conn->close();
 ?>
