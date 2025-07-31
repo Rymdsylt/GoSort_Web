@@ -100,6 +100,109 @@ if (!$result) {
             background-color: #0dcaf0;
             border-color: #0dcaf0;
         }
+        /* Improved UI/UX styles */
+        .servo-position {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .servo-position:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .servo-position.selected {
+            border-width: 3px !important;
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+        }
+        .section-divider {
+            border-top: 2px solid #e9ecef;
+            margin: 2rem 0;
+            padding-top: 1rem;
+        }
+        .control-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .control-section h5 {
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .warning-badge {
+            background: #fff3cd;
+            color: #856404;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        .status-indicator.success {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        .status-indicator.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-indicator.danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .btn-group-vertical .btn {
+            margin-bottom: 0.5rem;
+        }
+        .mapping-preview {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .mapping-preview h6 {
+            color: #6c757d;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        .servo-mapping-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .servo-position {
+            min-width: 140px;
+            flex: 1 1 140px;
+            max-width: 220px;
+            margin: 0.5rem 0.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        @media (max-width: 767px) {
+            .servo-mapping-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .servo-position {
+                max-width: 100%;
+                min-width: 0;
+            }
+        }
+        .quadrant-btn {
+            width: 100%;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -123,56 +226,112 @@ if (!$result) {
                         </div>
                     </div>
                     <div class="card-body">
-                        <h4 class="card-title text-center mb-4">Customize Trash Quadrant Mapping</h4>
-                        <div class="mb-4 text-center">
-                            <svg id="quadrant-svg" width="320" height="180" viewBox="0 0 320 180">
-                                <!-- zDeg: 0-60deg -->
-                                <path id="arc-zdeg" d="M160,160 L160,20 A140,140 0 0,1 280,160 Z" fill="#e7f1ff" stroke="#0d6efd" stroke-width="2" cursor="pointer"/>
-                                <!-- nDeg: 60-120deg -->
-                                <path id="arc-ndeg" d="M160,160 L280,160 A140,140 0 0,1 40,160 Z" fill="#e9ecef" stroke="#6c757d" stroke-width="2" cursor="pointer"/>
-                                <!-- oDeg: 120-180deg -->
-                                <path id="arc-odeg" d="M160,160 L40,160 A140,140 0 0,1 160,20 Z" fill="#fff3cd" stroke="#ffc107" stroke-width="2" cursor="pointer"/>
-                                <!-- Labels -->
-                                <text x="250" y="90" text-anchor="middle" font-size="16" fill="#0d6efd">0°</text>
-                                <text x="160" y="35" text-anchor="middle" font-size="16" fill="#6c757d">90°</text>
-                                <text x="70" y="90" text-anchor="middle" font-size="16" fill="#ffc107">180°</text>
-                            </svg>
-                            <div class="mt-3">
-                                <button id="btn-zdeg" class="btn btn-outline-primary quadrant-btn mx-2">Bio</button>
-                                <button id="btn-ndeg" class="btn btn-outline-secondary quadrant-btn mx-2">Non-Bio</button>
-                                <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn mx-2">Recyc</button>
+                        <h4 class="card-title text-center mb-4">Customize Trash Position Mapping</h4>
+                        
+                        <!-- Mapping Section -->
+                        <div class="control-section">
+                            <h5 class="text-center mb-3">
+                                <i class="fas fa-cogs"></i> Servo Position Assignment
+                            </h5>
+                            <div class="servo-mapping-container">
+                                <div class="servo-position" style="border: 2px solid #ffc107; border-radius: 10px; padding: 15px; background: #fff3cd;">
+                                    <h6 style="color: #ffc107; margin: 0;">Left</h6>
+                                    <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Recyc</button>
+                                </div>
+                                <div class="servo-position" style="border: 2px solid #6c757d; border-radius: 10px; padding: 15px; background: #f8f9fa;">
+                                    <h6 style="color: #6c757d; margin: 0;">Center</h6>
+                                    <button id="btn-ndeg" class="btn btn-outline-secondary quadrant-btn">Non-Bio</button>
+                                </div>
+                                <div class="servo-position" style="border: 2px solid #0d6efd; border-radius: 10px; padding: 15px; background: #e7f1ff;">
+                                    <h6 style="color: #0d6efd; margin: 0;">Right</h6>
+                                    <button id="btn-zdeg" class="btn btn-outline-primary quadrant-btn">Bio</button>
+                                </div>
                             </div>
-                            <div class="mt-3">
-                                <button class="btn btn-primary" onclick="saveQuadrantMapping()">Save Mapping</button>
+                                <div class="text-center mt-3">
+                                    <small class="text-muted">Click each position to assign a trash type</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Mapping Preview -->
+                            <div class="mapping-preview">
+                                <h6>Current Mapping Preview:</h6>
+                                <div id="mapping-preview-content" class="small text-muted">
+                                    Loading...
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mt-3">
+                                <button class="btn btn-primary btn-lg" onclick="saveQuadrantMapping()">
+                                    <i class="fas fa-save"></i> Save Mapping
+                                </button>
                             </div>
                         </div>
-                        <h4 class="card-title text-center mb-4">Servo Control</h4>
-                        <div class="mb-4">
-                            <h5 class="text-center">Move Controls *WARNING: DON'T INITIATE WHEN CLOGGED!*</h5>
-                            <div class="d-grid gap-3">
-                                <button class="btn btn-success btn-lg" onclick="moveServo('bio')">Move to Bio</button>
-                                <button class="btn btn-danger btn-lg" onclick="moveServo('nbio')">Move to Non-Bio</button>
-                                <button class="btn btn-success btn-lg" onclick="moveServo('recyc')">Move to Recyclable</button>
+                        
+                        <div class="section-divider"></div>
+                        
+                        <!-- Servo Control Section -->
+                        <div class="control-section">
+                            <h5 class="text-center mb-3">
+                                <i class="fas fa-robot"></i> Servo Control
+                            </h5>
+                            
+                            <div class="warning-badge">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                WARNING: Don't initiate when clogged!
+                            </div>
+                            
+                            <div class="btn-group-vertical w-100" id="dynamic-servo-controls">
+                                <!-- Dynamic buttons will be inserted here -->
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <h5 class="text-center">Unclog Control</h5>
-                            <p class="text-muted text-center small mb-3">Will tilt mechanism up for 3 seconds while maintaining current pan position</p>
+                        
+                        <div class="section-divider"></div>
+                        
+                        <!-- Unclog Control Section -->
+                        <div class="control-section">
+                            <h5 class="text-center mb-3">
+                                <i class="fas fa-tools"></i> Unclog Control
+                            </h5>
+                            <p class="text-muted text-center mb-3">
+                                Will tilt mechanism up for 3 seconds while maintaining current pan position
+                            </p>
                             <div class="d-grid">
-                                <button class="btn btn-warning btn-lg" onclick="moveServo('unclog')">Unclog Current Section</button>
+                                <button class="btn btn-warning btn-lg" onclick="moveServo('unclog')">
+                                    <i class="fas fa-wrench"></i> Unclog Current Section
+                                </button>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <h5 class="text-center">Test Controls *WARNING: DON'T INITIATE WHEN CLOGGED!*</h5>
-                            <p class="text-muted text-center small mb-3">Test servo movements</p>
+                        
+                        <div class="section-divider"></div>
+                        
+                        <!-- Test Controls Section -->
+                        <div class="control-section">
+                            <h5 class="text-center mb-3">
+                                <i class="fas fa-vial"></i> Test Controls
+                            </h5>
+                            <div class="warning-badge">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                WARNING: Don't initiate when clogged!
+                            </div>
                             <div class="d-grid gap-3">
-                                <button class="btn btn-info btn-lg" onclick="moveServo('sweep1')">Test Pan Sweep Only</button>
-                                <button class="btn btn-info btn-lg" onclick="moveServo('sweep2')">Test Full Sweep</button>
+                                <button class="btn btn-info btn-lg" onclick="moveServo('sweep1')">
+                                    <i class="fas fa-arrows-alt-h"></i> Test Pan Sweep Only
+                                </button>
+                                <button class="btn btn-info btn-lg" onclick="moveServo('sweep2')">
+                                    <i class="fas fa-arrows-alt"></i> Test Full Sweep
+                                </button>
                             </div>
                         </div>
+                        
+                        <div class="section-divider"></div>
+                        
+                        <!-- Status and Shutdown -->
                         <div id="status" class="alert mt-3" style="display: none;"></div>
+                        
                         <div class="d-grid mt-4">
-                            <button class="btn btn-dark btn-lg" id="shutdownBtn">Shut Down Device</button>
+                            <button class="btn btn-dark btn-lg" id="shutdownBtn">
+                                <i class="fas fa-power-off"></i> Shut Down Device
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -455,13 +614,49 @@ if (!$result) {
     let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'recyc'};
     // Update button labels/colors
     function updateQuadrantButtons() {
-        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', recyc: 'Recyc'};
+        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', recyc: 'Recyclable'};
         const mapToClass = {bio: 'btn-outline-primary', nbio: 'btn-outline-secondary', recyc: 'btn-outline-warning'};
         ['zdeg','ndeg','odeg'].forEach(q => {
             const btn = document.getElementById('btn-' + q);
             btn.textContent = mapToLabel[quadrantMap[q]];
             btn.className = 'btn quadrant-btn mx-2 ' + mapToClass[quadrantMap[q]];
         });
+        renderServoControls();
+        updateMappingPreview();
+    }
+    
+    function updateMappingPreview() {
+        const previewContent = document.getElementById('mapping-preview-content');
+        if (!previewContent) return;
+        
+        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', recyc: 'Recyclable'};
+        const servoLabels = {zdeg: 'Right', ndeg: 'Center', odeg: 'Left'};
+        
+        let preview = '';
+        for (const [servoKey, trashType] of Object.entries(quadrantMap)) {
+            preview += `<div class="mb-1"><strong>${servoLabels[servoKey]}:</strong> ${mapToLabel[trashType]}</div>`;
+        }
+        previewContent.innerHTML = preview;
+    }
+    function renderServoControls() {
+        const trashTypes = ['bio', 'nbio', 'recyc'];
+        const mapToLabel = {bio: 'Move to Bio', nbio: 'Move to Non-Bio', recyc: 'Move to Recyclable'};
+        const mapToClass = {bio: 'btn-success', nbio: 'btn-success', recyc: 'btn-success'};
+        let html = '';
+        for (const trashType of trashTypes) {
+            // Find which servo position is mapped to this trash type
+            let mappedServo = null;
+            for (const [servoKey, mappedType] of Object.entries(quadrantMap)) {
+                if (mappedType === trashType) {
+                    mappedServo = servoKey;
+                    break;
+                }
+            }
+            if (mappedServo) {
+                html += `<button class="btn ${mapToClass[trashType] || 'btn-secondary'} btn-lg mb-2" onclick="moveServo('${mappedServo}')">${mapToLabel[trashType]}</button>`;
+            }
+        }
+        document.getElementById('dynamic-servo-controls').innerHTML = html;
     }
     // Fetch mapping from backend on page load
     window.addEventListener('DOMContentLoaded', function() {
@@ -475,6 +670,7 @@ if (!$result) {
                     quadrantMap = data.mapping;
                 }
                 updateQuadrantButtons();
+                renderServoControls();
             })
             .catch(() => updateQuadrantButtons());
     });
@@ -541,3 +737,4 @@ if (!$result) {
     </script>
 </body>
 </html>
+

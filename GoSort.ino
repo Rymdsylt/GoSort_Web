@@ -186,6 +186,10 @@ void loop() {
 
     if (inChar == '\n' || inChar == '\r') {
       inputString.trim();
+      // Normalize aliases for trash types
+      if (inputString == "bio") inputString = "zdeg";
+      else if (inputString == "nbio") inputString = "ndeg";
+      else if (inputString == "recyc") inputString = "odeg";
       isSorting = !maintenanceMode; // Only set sorting flag if not in maintenance mode
 
       if (inputString == "zdeg") {
