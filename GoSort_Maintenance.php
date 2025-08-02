@@ -7,55 +7,14 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/gs_DB/connection.php';
 
-// Get device info
+// Get device info from URL parameters
 $device_id = $_GET['device'] ?? null;
 $device_name = $_GET['name'] ?? 'Unknown Device';
 $device_identity = $_GET['identity'] ?? null;
 
-// Check for missing parameters
-$missing = [];
-if (!$device_id) $missing[] = 'device';
-if (!$device_identity) $missing[] = 'identity';
-
-if (!empty($missing)) {
-    header("Location: GoSort_Sorters.php?error=missing_params&params=" . implode(',', $missing));
-    exit();
-}
-
-// First check if the device exists and get its status
-$stmt = $pdo->prepare("SELECT * FROM sorters WHERE device_identity = ?");
-$stmt->execute([$device_identity]);
-$device = $stmt->fetch();
-
-// Verify device exists and check ID
-if (!$device) {
-    header("Location: GoSort_Sorters.php?error=device_not_found&identity=" . urlencode($device_identity));
-    exit();
-}
-
-if ($device['id'] != $device_id) {
-    header("Location: GoSort_Sorters.php?error=device_mismatch&id=" . urlencode($device_id));
-    exit();
-}
-
-// Check if device is online
-if ($device['status'] !== 'online') {
-    header("Location: GoSort_Sorters.php?error=device_offline&device=" . urlencode($device_name));
-    exit();
-}
-
-// Check if already in maintenance mode
-if ($device['maintenance_mode'] == 1) {
-    header("Location: GoSort_Sorters.php?error=already_in_maintenance&device=" . urlencode($device_name));
-    exit();
-}
-
-// Set maintenance mode only if device is online
-$stmt = $pdo->prepare("UPDATE sorters SET maintenance_mode = 1 WHERE id = ? AND device_identity = ? AND status = 'online'");
-$result = $stmt->execute([$device_id, $device_identity]);
-
-if (!$result) {
-    header("Location: GoSort_Sorters.php?error=database_error");
+// Basic parameter validation
+if (!$device_id || !$device_identity) {
+    header("Location: GoSort_Sorters.php");
     exit();
 }
 ?>
@@ -325,6 +284,9 @@ if (!$result) {
         </div>
     </nav>
 
+    <!-- Status Alert Container for AJAX messages -->
+    <div id="statusAlertContainer"></div>
+
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-md-8">
@@ -504,6 +466,85 @@ if (!$result) {
 
     <script src="js/bootstrap.bundle.min.js"></script>
     <script>
+        // Function to show status alerts
+        function showStatusAlert(message, type = 'danger', dismissible = true) {
+            const alertContainer = document.getElementById('statusAlertContainer');
+            const alertClass = type === 'success' ? 'alert-success' : 
+                              type === 'warning' ? 'alert-warning' : 
+                              type === 'info' ? 'alert-info' : 'alert-danger';
+            
+            const dismissButton = dismissible ? 
+                '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' : '';
+            
+            const alertHtml = `
+                <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                    ${message}
+                    ${dismissButton}
+                </div>
+            `;
+            
+            alertContainer.innerHTML = alertHtml;
+        }
+
+        // Function to validate device status on page load
+        function validateDeviceStatus() {
+            const deviceId = <?php echo json_encode($device_id); ?>;
+            const deviceIdentity = <?php echo json_encode($device_identity); ?>;
+            
+            fetch('gs_DB/check_device_status.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    device_id: deviceId,
+                    device_identity: deviceIdentity
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Device is ready for maintenance, set maintenance mode
+                    const formData = new FormData();
+                    formData.append('mode', 'enable');
+                    formData.append('device_id', deviceId);
+                    formData.append('device_identity', deviceIdentity);
+                    
+                    return fetch('gs_DB/set_maintenance_mode.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+                } else {
+                    // Show error and redirect back to sorters page
+                    showStatusAlert(`<strong>Error:</strong> ${data.message}`, 'danger');
+                    setTimeout(() => {
+                        window.location.href = 'GoSort_Sorters.php';
+                    }, 3000);
+                    throw new Error(data.message);
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Maintenance mode set successfully - no alert needed
+                    // showStatusAlert(`<strong>Success:</strong> Maintenance mode activated for ${<?php echo json_encode($device_name); ?>}`, 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to set maintenance mode');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if (!error.message.includes('Error:')) {
+                    showStatusAlert(`<strong>Error:</strong> Failed to initialize maintenance mode. Please try again.`, 'danger');
+                }
+            });
+        }
+
+        // Validate device status when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            validateDeviceStatus();
+        });
+
         // Enable maintenance mode when page loads
         function setMaintenanceMode(mode) {
             fetch('gs_DB/maintenance_control.php', {

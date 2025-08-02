@@ -52,46 +52,8 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </nav>
 
     <div class="container">
-        <?php
-        // Handle maintenance errors
-        if (isset($_GET['maintenance_error']) && $_GET['maintenance_error'] === 'active') {
-            $user = $_GET['user'] ?? 'another user';
-            echo "<div class='alert alert-warning alert-dismissible fade show' role='alert'>";
-            echo "<strong>Maintenance Mode Active:</strong> The system is currently in maintenance mode by $user.";
-            echo "<button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>";
-            echo "</div>";
-        }
-        
-        // Handle other errors
-        if (isset($_GET['error'])) {
-            $errorType = $_GET['error'];
-            $errorMsg = '';
-            $errorClass = 'alert-danger';
-            
-            switch ($errorType) {
-                case 'missing_params':
-                    $params = explode(',', $_GET['params']);
-                    $errorMsg = 'Missing required parameters: ' . implode(', ', $params);
-                    break;
-                case 'device_not_found':
-                    $id = $_GET['id'] ?? 'unknown';
-                    $identity = $_GET['identity'] ?? 'unknown';
-                    $errorMsg = "Device not found or mismatch (ID: $id, Identity: $identity)";
-                    break;
-                case 'already_in_maintenance':
-                    $device = $_GET['device'] ?? 'Unknown device';
-                    $errorMsg = "Device '$device' is already in maintenance mode";
-                    break;
-            }
-            
-            if ($errorMsg) {
-                echo "<div class='alert $errorClass alert-dismissible fade show' role='alert'>";
-                echo "<strong>Error:</strong> $errorMsg";
-                echo "<button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>";
-                echo "</div>";
-            }
-        }
-        ?>
+        <!-- Status Alert Container for AJAX messages -->
+        <div id="statusAlertContainer"></div>
 
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
             <?php foreach ($sorters as $sorter): ?>
@@ -124,9 +86,10 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <a href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-primary btn-sm stats-btn">
                                 View Statistics
                             </a>
-                            <a href="GoSort_Maintenance.php?device=<?php echo $sorter['id']; ?>&name=<?php echo urlencode($sorter['device_name']); ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-warning btn-sm maintenance-btn">
+                            <button class="btn btn-warning btn-sm maintenance-btn" 
+                                    onclick="checkMaintenanceStatus(<?php echo $sorter['id']; ?>, '<?php echo htmlspecialchars($sorter['device_name']); ?>', '<?php echo htmlspecialchars($sorter['device_identity']); ?>')">
                                 Maintenance
-                            </a>
+                            </button>
                             <button class="btn btn-danger btn-sm delete-btn" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
                                 Delete
                             </button>
@@ -241,6 +204,74 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
     const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
     const statusMessage = document.getElementById('statusMessage');
     const progressBar = document.querySelector('#statusModal .progress');
+
+    // Function to show status alerts
+    function showStatusAlert(message, type = 'danger', dismissible = true) {
+        const alertContainer = document.getElementById('statusAlertContainer');
+        const alertClass = type === 'success' ? 'alert-success' : 
+                          type === 'warning' ? 'alert-warning' : 
+                          type === 'info' ? 'alert-info' : 'alert-danger';
+        
+        const dismissButton = dismissible ? 
+            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' : '';
+        
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                ${message}
+                ${dismissButton}
+            </div>
+        `;
+        
+        alertContainer.innerHTML = alertHtml;
+        
+        // Auto-dismiss success messages after 5 seconds
+        if (type === 'success') {
+            setTimeout(() => {
+                const alert = alertContainer.querySelector('.alert');
+                if (alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            }, 5000);
+        }
+    }
+
+    // Function to check maintenance status before proceeding
+    function checkMaintenanceStatus(deviceId, deviceName, deviceIdentity) {
+        // Show loading state
+        showStatusAlert(`Checking status for ${deviceName}...`, 'info', false);
+        
+        fetch('gs_DB/check_device_status.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                device_id: deviceId,
+                device_identity: deviceIdentity
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear any existing alerts
+                document.getElementById('statusAlertContainer').innerHTML = '';
+                // Proceed to maintenance page
+                window.location.href = `GoSort_Maintenance.php?device=${deviceId}&name=${encodeURIComponent(deviceName)}&identity=${encodeURIComponent(deviceIdentity)}`;
+            } else {
+                // Show error message
+                let alertType = 'danger';
+                if (data.error === 'maintenance_active') {
+                    alertType = 'warning';
+                }
+                showStatusAlert(`<strong>Error:</strong> ${data.message}`, alertType);
+            }
+        })
+        .catch(error => {
+            showStatusAlert(`<strong>Error:</strong> Failed to check device status. Please try again.`, 'danger');
+            console.error('Error:', error);
+        });
+    }
 
     function showStatus(message, isError = false, showProgress = false) {
         statusMessage.innerHTML = message;
