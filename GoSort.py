@@ -488,14 +488,44 @@ def main():
                         command = data['command']
                         print(f"\n📡 Received maintenance command from server: {command}")
                         print(f"Current mapping: {mapping}")
+                        
+                        # For maintenance commands that require maintenance mode, send maintmode first
+                        if command in ['unclog', 'sweep1', 'sweep2']:
+                            print("Sending maintmode command to enable maintenance mode...")
+                            ser.write("maintmode\n".encode())
+                            time.sleep(0.5)  # Give Arduino time to process maintmode command
+                            
+                            while ser.in_waiting:
+                                response = ser.readline().decode().strip()
+                                if response:
+                                    print(f"🟢 Arduino Response: {response}")
+                        
                         print(f"Sending to Arduino: {command}")
                         ser.write(f"{command}\n".encode())
-                        time.sleep(0.1)
+                        
+                        # Wait longer for maintenance commands that take more time
+                        if command == 'unclog':
+                            time.sleep(6)  # 3s hold + 2s movement + 1s buffer
+                        elif command in ['sweep1', 'sweep2']:
+                            time.sleep(5)  # 4s sweep + 1s buffer
+                        else:
+                            time.sleep(0.1)
                         
                         while ser.in_waiting:
                             response = ser.readline().decode().strip()
                             if response:
                                 print(f"🟢 Arduino Response: {response}")
+                        
+                        # For maintenance commands that require maintenance mode, send maintend after
+                        if command in ['unclog', 'sweep1', 'sweep2']:
+                            print("Sending maintend command to exit maintenance mode...")
+                            ser.write("maintend\n".encode())
+                            time.sleep(0.5)  # Give Arduino time to process maintend command
+                            
+                            while ser.in_waiting:
+                                response = ser.readline().decode().strip()
+                                if response:
+                                    print(f"🟢 Arduino Response: {response}")
                         
                         # Record the sorting operation if it's a sorting command
                         if command in ['ndeg', 'zdeg', 'odeg']:

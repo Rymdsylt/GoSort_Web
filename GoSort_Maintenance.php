@@ -77,29 +77,138 @@ if (!$result) {
             margin-bottom: 0 !important;
         }
         .btn:disabled {
-            opacity: 0.65;
-            cursor: not-allowed;
-            pointer-events: none;
-            background-color: #6c757d;
-            border-color: #6c757d;
-            color: #fff;
+            opacity: 0.4 !important;
+            cursor: not-allowed !important;
+            pointer-events: none !important;
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #fff !important;
+            filter: grayscale(100%) !important;
+            transform: none !important;
+            box-shadow: none !important;
         }
         .btn-success:disabled {
-            background-color: #198754;
-            border-color: #198754;
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
         }
         .btn-danger:disabled {
-            background-color: #dc3545;
-            border-color: #dc3545;
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
         }
         .btn-warning:disabled {
-            background-color: #ffc107;
-            border-color: #ffc107;
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
         }
         .btn-info:disabled {
-            background-color: #0dcaf0;
-            border-color: #0dcaf0;
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
         }
+        .btn-primary:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+        .btn-outline-primary:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #fff !important;
+        }
+        .btn-outline-secondary:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #fff !important;
+        }
+        .btn-outline-warning:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #fff !important;
+        }
+        .btn-outline-success:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #fff !important;
+        }
+        .btn-outline-danger:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #fff !important;
+        }
+        .btn-outline-info:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #fff !important;
+        }
+        .btn-dark:disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+        
+        /* Floating Progress Bar */
+        .floating-progress {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            display: none;
+            backdrop-filter: blur(10px);
+        }
+        
+        .floating-progress .progress-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .floating-progress .progress-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .floating-progress .progress-time {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .floating-progress .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+        }
+        
+        .floating-progress .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .floating-progress .progress-status {
+            font-size: 12px;
+            margin-top: 8px;
+            opacity: 0.9;
+        }
+        
+        /* Animation for progress bar */
+        .floating-progress .progress-fill.animated {
+            background: linear-gradient(90deg, #007bff, #0056b3, #007bff);
+            background-size: 200% 100%;
+            animation: progressShimmer 2s infinite;
+        }
+        
+        @keyframes progressShimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
         /* Improved UI/UX styles */
         .servo-position {
             transition: all 0.3s ease;
@@ -269,6 +378,23 @@ if (!$result) {
                         
                         <div class="section-divider"></div>
                         
+                        <!-- Unclog Control Section -->
+                        <div class="control-section">
+                            <h5 class="text-center mb-3">
+                                <i class="fas fa-tools"></i> Unclog Control
+                            </h5>
+                            <p class="text-muted text-center mb-3">
+                                Will tilt mechanism up for 3 seconds while maintaining current pan position
+                            </p>
+                            <div class="d-grid">
+                                <button class="btn btn-warning btn-lg" onclick="moveServo('unclog')">
+                                    <i class="fas fa-wrench"></i> Unclog Current Section
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="section-divider"></div>
+                        
                         <!-- Servo Control Section -->
                         <div class="control-section">
                             <h5 class="text-center mb-3">
@@ -287,23 +413,6 @@ if (!$result) {
                         
                         <div class="section-divider"></div>
                         
-                        <!-- Unclog Control Section -->
-                        <div class="control-section">
-                            <h5 class="text-center mb-3">
-                                <i class="fas fa-tools"></i> Unclog Control
-                            </h5>
-                            <p class="text-muted text-center mb-3">
-                                Will tilt mechanism up for 3 seconds while maintaining current pan position
-                            </p>
-                            <div class="d-grid">
-                                <button class="btn btn-warning btn-lg" onclick="moveServo('unclog')">
-                                    <i class="fas fa-wrench"></i> Unclog Current Section
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="section-divider"></div>
-                        
                         <!-- Test Controls Section -->
                         <div class="control-section">
                             <h5 class="text-center mb-3">
@@ -314,10 +423,10 @@ if (!$result) {
                                 WARNING: Don't initiate when clogged!
                             </div>
                             <div class="d-grid gap-3">
-                                <button class="btn btn-info btn-lg" onclick="moveServo('sweep1')">
+                                <button class="btn btn-info btn-lg" onclick="confirmOperation('sweep1', 'Test Pan Sweep Only')">
                                     <i class="fas fa-arrows-alt-h"></i> Test Pan Sweep Only
                                 </button>
-                                <button class="btn btn-info btn-lg" onclick="moveServo('sweep2')">
+                                <button class="btn btn-info btn-lg" onclick="confirmOperation('sweep2', 'Test Full Sweep')">
                                     <i class="fas fa-arrows-alt"></i> Test Full Sweep
                                 </button>
                             </div>
@@ -339,6 +448,18 @@ if (!$result) {
         </div>
     </div>
 
+    <!-- Floating Progress Bar -->
+    <div id="floatingProgress" class="floating-progress">
+        <div class="progress-header">
+            <div class="progress-title" id="progressTitle">Operation in Progress</div>
+            <div class="progress-time" id="progressTime">0s</div>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-status" id="progressStatus">Initializing...</div>
+    </div>
+
     <!-- Shutdown Confirmation Modal -->
     <div class="modal fade" id="shutdownModal" tabindex="-1" aria-labelledby="shutdownModalLabel" aria-hidden="true">
       <div class="modal-dialog">
@@ -353,6 +474,29 @@ if (!$result) {
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="button" class="btn btn-danger" id="confirmShutdownBtn">Shut Down</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operation Confirmation Modal -->
+    <div class="modal fade" id="operationModal" tabindex="-1" aria-labelledby="operationModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="operationModalLabel">Confirm Operation</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning">
+              <i class="fas fa-exclamation-triangle"></i>
+              <strong>Warning:</strong> Make sure the device is not clogged before proceeding!
+            </div>
+            <p>Are you sure you want to execute: <strong id="operationName"></strong>?</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="confirmOperationBtn">Execute</button>
           </div>
         </div>
       </div>
@@ -455,13 +599,15 @@ if (!$result) {
                     if (device && device.status === 'online') {
                         statusDiv.className = 'connection-status alert mb-4 alert-success';
                         statusDiv.innerHTML = '✅ GoSort Python App is connected and running';
-                        // Enable all control buttons
-                        document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
+                        // Enable all control buttons (only if no operation is in progress)
+                        if (!currentServoOperation) {
+                            document.querySelectorAll('.card-body .btn, .servo-position button, .btn-group-vertical .btn, .control-section .btn, .d-grid .btn').forEach(btn => btn.disabled = false);
+                        }
                     } else {
                         statusDiv.className = 'connection-status alert mb-4 alert-danger';
                         statusDiv.innerHTML = '❌ GoSort Python App is not running - Controls disabled';
                         // Disable all control buttons
-                        document.querySelectorAll('.btn').forEach(btn => btn.disabled = true);
+                        document.querySelectorAll('.card-body .btn, .servo-position button, .btn-group-vertical .btn, .control-section .btn, .d-grid .btn').forEach(btn => btn.disabled = true);
                     }
                 })
                 .catch(error => {
@@ -480,34 +626,77 @@ if (!$result) {
 
         let currentServoOperation = null;
 
+        // Operation timing based on Arduino code analysis
+        const OPERATION_TIMINGS = {
+            'zdeg': 2000,    // 4 × 500ms delays = 2000ms
+            'ndeg': 2000,    // 4 × 500ms delays = 2000ms  
+            'odeg': 2000,    // 4 × 500ms delays = 2000ms
+            'unclog': 3500,  // 3000ms hold + 500ms movement = 3500ms
+            'sweep1': 4000,  // 4 × 1000ms delays = 4000ms
+            'sweep2': 5000   // 4 × 1000ms + 1000ms setup = 5000ms
+        };
+
         function moveServo(position) {
             // If there's already an operation in progress, ignore new requests
             if (currentServoOperation) {
+                console.log('Operation already in progress, ignoring new request');
                 return;
             }
 
             const statusDiv = document.getElementById('status');
-            const buttons = document.querySelectorAll('.btn');
+            
+            // Get operation time from timing table
+            const operationTime = OPERATION_TIMINGS[position] || 2000;
             
             // Create an AbortController for this operation
             const controller = new AbortController();
             currentServoOperation = controller;
             
-            // Special handling for unclog operation which takes longer (3 seconds hold)
-            const operationTime = position === 'unclog' ? 5000 : 2000; // 3s hold + 2s movement for unclog, 2s for normal moves
-            
             // Disable all control buttons while command is executing
-            const controlButtons = document.querySelectorAll('.card-body .btn');
+            const controlButtons = document.querySelectorAll('.card-body .btn, .servo-position button, .btn-group-vertical .btn, .control-section .btn, .d-grid .btn');
             controlButtons.forEach(btn => {
                 btn.disabled = true;
-                btn.style.opacity = '0.65';
             });
             
-            statusDiv.style.display = 'block';
-            statusDiv.className = 'alert mt-3 alert-info';
-            statusDiv.textContent = 'Operating...';
+            // Show floating progress bar
+            const floatingProgress = document.getElementById('floatingProgress');
+            const progressTitle = document.getElementById('progressTitle');
+            const progressTime = document.getElementById('progressTime');
+            const progressFill = document.getElementById('progressFill');
+            const progressStatus = document.getElementById('progressStatus');
+            
+            // Set operation title
+            const operationNames = {
+                'zdeg': 'Moving to Bio',
+                'ndeg': 'Moving to Non-Bio', 
+                'odeg': 'Moving to Recyclable',
+                'unclog': 'Unclogging Section',
+                'sweep1': 'Testing Pan Sweep',
+                'sweep2': 'Testing Full Sweep'
+            };
+            
+            progressTitle.textContent = operationNames[position] || 'Operation in Progress';
+            progressTime.textContent = '0s';
+            progressStatus.textContent = 'Initializing...';
+            progressFill.style.width = '0%';
+            progressFill.classList.add('animated');
+            
+            floatingProgress.style.display = 'block';
+            
+            // Start progress animation
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 2; // Update every 40ms for smooth animation
+                progressFill.style.width = Math.min(progress, 100) + '%';
+                progressTime.textContent = Math.floor((progress / 100) * (operationTime / 1000)) + 's';
+                
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    progressStatus.textContent = 'Waiting for completion...';
+                }
+            }, operationTime / 50); // 50 steps over the operation time
 
-            // Get device identity from URL parameters
+                        // Get device identity from URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             const deviceIdentity = urlParams.get('identity');
 
@@ -529,20 +718,8 @@ if (!$result) {
                 return response.text();
             })
             .then(data => {
-                statusDiv.className = 'alert mt-3 alert-success';
-                statusDiv.textContent = 'Done';
-                
-                // Wait for the full servo operation to complete (matching Arduino timing)
-                // Arduino uses 4 delay(500) = 2000ms total for movement
-                setTimeout(() => {
-                    // Re-enable control buttons after servo completes all movements
-                    const controlButtons = document.querySelectorAll('.card-body .btn');
-                    controlButtons.forEach(btn => {
-                        btn.disabled = false;
-                        btn.style.opacity = '1';
-                    });
-                    currentServoOperation = null;
-                }, operationTime);
+                // Start polling for command completion instead of using fixed timer
+                pollCommandCompletion(deviceIdentity, position, statusDiv, controlButtons, controller);
             })
             .catch(error => {
                 if (error.name === 'AbortError') {
@@ -559,16 +736,131 @@ if (!$result) {
                 }
                 
                 // Re-enable control buttons if there's an error
-                const controlButtons = document.querySelectorAll('.card-body .btn');
+                const controlButtons = document.querySelectorAll('.card-body .btn, .servo-position button, .btn-group-vertical .btn, .control-section .btn, .d-grid .btn');
                 controlButtons.forEach(btn => {
                     btn.disabled = false;
-                    btn.style.opacity = '1';
                 });
                 currentServoOperation = null;
             });
         }
 
+        // Function to poll for command completion
+        function pollCommandCompletion(deviceIdentity, command, statusDiv, controlButtons, controller) {
+            let pollCount = 0;
+            const maxPolls = 60; // Maximum 60 seconds of polling (60 * 1000ms)
+            const pollInterval = 1000; // Poll every 1 second
+            
+            const floatingProgress = document.getElementById('floatingProgress');
+            const progressFill = document.getElementById('progressFill');
+            const progressStatus = document.getElementById('progressStatus');
+            const progressTime = document.getElementById('progressTime');
+            
+            const pollTimer = setInterval(() => {
+                pollCount++;
+                
+                // Check if operation was aborted
+                if (controller.signal.aborted) {
+                    clearInterval(pollTimer);
+                    floatingProgress.style.display = 'none';
+                    return;
+                }
+                
+                // Check if we've exceeded max polling time
+                if (pollCount > maxPolls) {
+                    clearInterval(pollTimer);
+                    
+                    // Show timeout in floating progress
+                    progressStatus.textContent = 'Operation timeout - buttons re-enabled';
+                    progressFill.style.background = 'linear-gradient(90deg, #dc3545, #c82333)';
+                    progressFill.classList.remove('animated');
+                    
+                    // Re-enable control buttons
+                    controlButtons.forEach(btn => {
+                        btn.disabled = false;
+                    });
+                    currentServoOperation = null;
+                    
+                    // Hide progress bar after timeout
+                    setTimeout(() => {
+                        floatingProgress.style.display = 'none';
+                    }, 3000);
+                    return;
+                }
+                
+                // Update polling progress
+                const pollProgress = Math.min((pollCount / maxPolls) * 100, 100);
+                progressFill.style.width = pollProgress + '%';
+                progressTime.textContent = pollCount + 's';
+                progressStatus.textContent = `Polling for completion... (${pollCount}/${maxPolls})`;
+                
+                // Poll the database to check if command has been executed
+                fetch('gs_DB/check_maintenance_commands.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        device_identity: deviceIdentity
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // If no command is returned, it means the command has been executed
+                    if (data.success && !data.command) {
+                        clearInterval(pollTimer);
+                        
+                        // Show success in floating progress
+                        progressStatus.textContent = 'Operation completed successfully!';
+                        progressFill.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+                        progressFill.classList.remove('animated');
+                        progressFill.style.width = '100%';
+                        
+                        // Re-enable control buttons
+                        controlButtons.forEach(btn => {
+                            btn.disabled = false;
+                        });
+                        currentServoOperation = null;
+                        
+                        // Hide progress bar after success
+                        setTimeout(() => {
+                            floatingProgress.style.display = 'none';
+                        }, 2000);
+                    }
+                    // If command is still there, continue polling
+                    else if (data.success && data.command === command) {
+                        // Continue polling - progress already updated above
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling command status:', error);
+                    progressStatus.textContent = 'Network error - retrying...';
+                    // Continue polling even if there's an error
+                });
+            }, pollInterval);
+        }
+
+        // Function to show operation confirmation dialog
+        function confirmOperation(command, operationName) {
+            const operationModal = new bootstrap.Modal(document.getElementById('operationModal'));
+            document.getElementById('operationName').textContent = operationName;
+            
+            // Set up the confirm button to execute the operation
+            const confirmBtn = document.getElementById('confirmOperationBtn');
+            confirmBtn.onclick = function() {
+                operationModal.hide();
+                moveServo(command);
+            };
+            
+            operationModal.show();
+        }
+
         document.getElementById('shutdownBtn').addEventListener('click', function() {
+            // Disable shutdown button if operation is in progress
+            if (currentServoOperation) {
+                alert('Please wait for the current operation to complete before shutting down.');
+                return;
+            }
+            
             var shutdownModal = new bootstrap.Modal(document.getElementById('shutdownModal'));
             shutdownModal.show();
         });
@@ -576,10 +868,29 @@ if (!$result) {
             var shutdownModalEl = document.getElementById('shutdownModal');
             var shutdownModal = bootstrap.Modal.getInstance(shutdownModalEl);
             shutdownModal.hide();
-            const statusDiv = document.getElementById('status');
-            statusDiv.style.display = 'block';
-            statusDiv.className = 'alert mt-3 alert-info';
-            statusDiv.textContent = 'Sending shutdown command...';
+            
+            // Disable all buttons during shutdown
+            const allButtons = document.querySelectorAll('.card-body .btn, .servo-position button, .btn-group-vertical .btn, .control-section .btn, .d-grid .btn');
+            allButtons.forEach(btn => {
+                btn.disabled = true;
+            });
+            
+            // Show floating progress for shutdown
+            const floatingProgress = document.getElementById('floatingProgress');
+            const progressTitle = document.getElementById('progressTitle');
+            const progressTime = document.getElementById('progressTime');
+            const progressFill = document.getElementById('progressFill');
+            const progressStatus = document.getElementById('progressStatus');
+            
+            progressTitle.textContent = 'Shutting Down Device';
+            progressTime.textContent = '0s';
+            progressStatus.textContent = 'Sending shutdown command...';
+            progressFill.style.width = '0%';
+            progressFill.classList.add('animated');
+            progressFill.style.background = 'linear-gradient(90deg, #dc3545, #c82333)';
+            
+            floatingProgress.style.display = 'block';
+            
             const urlParams = new URLSearchParams(window.location.search);
             const deviceIdentity = urlParams.get('identity');
             fetch('gs_DB/save_maintenance_command.php', {
@@ -595,17 +906,49 @@ if (!$result) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    statusDiv.className = 'alert mt-3 alert-success';
-                    statusDiv.textContent = '✅ Shutdown command sent. The device will shut down shortly.';
+                    progressStatus.textContent = '✅ Shutdown command sent. The device will shut down shortly.';
+                    progressFill.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+                    progressFill.classList.remove('animated');
+                    progressFill.style.width = '100%';
+                    
+                    // Re-enable buttons after shutdown command is sent
+                    setTimeout(() => {
+                        allButtons.forEach(btn => {
+                            btn.disabled = false;
+                        });
+                        floatingProgress.style.display = 'none';
+                    }, 3000);
                 } else {
-                    statusDiv.className = 'alert mt-3 alert-danger';
-                    statusDiv.textContent = '❌ Failed to send shutdown command: ' + data.message;
+                    progressStatus.textContent = '❌ Failed to send shutdown command: ' + data.message;
+                    progressFill.style.background = 'linear-gradient(90deg, #dc3545, #c82333)';
+                    progressFill.classList.remove('animated');
+                    
+                    // Re-enable buttons on error
+                    allButtons.forEach(btn => {
+                        btn.disabled = false;
+                    });
+                    
+                    // Hide progress bar after error
+                    setTimeout(() => {
+                        floatingProgress.style.display = 'none';
+                    }, 3000);
                 }
             })
             .catch(error => {
-                statusDiv.className = 'alert mt-3 alert-danger';
-                statusDiv.textContent = '❌ Error sending shutdown command: ' + error.message;
+                progressStatus.textContent = '❌ Error sending shutdown command: ' + error.message;
+                progressFill.style.background = 'linear-gradient(90deg, #dc3545, #c82333)';
+                progressFill.classList.remove('animated');
                 console.error('Error:', error);
+                
+                // Re-enable buttons on error
+                allButtons.forEach(btn => {
+                    btn.disabled = false;
+                });
+                
+                // Hide progress bar after error
+                setTimeout(() => {
+                    floatingProgress.style.display = 'none';
+                }, 3000);
             });
         });
     </script>
@@ -653,7 +996,7 @@ if (!$result) {
                 }
             }
             if (mappedServo) {
-                html += `<button class="btn ${mapToClass[trashType] || 'btn-secondary'} btn-lg mb-2" onclick="moveServo('${mappedServo}')">${mapToLabel[trashType]}</button>`;
+                html += `<button class="btn ${mapToClass[trashType] || 'btn-secondary'} btn-lg mb-2" onclick="confirmOperation('${mappedServo}', '${mapToLabel[trashType]}')">${mapToLabel[trashType]}</button>`;
             }
         }
         document.getElementById('dynamic-servo-controls').innerHTML = html;
@@ -703,6 +1046,12 @@ if (!$result) {
     document.getElementById('btn-odeg').onclick = () => showQuadrantSelect('odeg');
     // Save mapping to backend
     function saveQuadrantMapping() {
+        // Check if operation is in progress
+        if (currentServoOperation) {
+            alert('Please wait for the current operation to complete before saving mapping.');
+            return;
+        }
+        
         const urlParams = new URLSearchParams(window.location.search);
         const deviceIdentity = urlParams.get('identity');
         // Check for duplicate trash types
@@ -712,6 +1061,14 @@ if (!$result) {
             alert('Same Trash types are not allowed');
             return;
         }
+        
+        // Disable save button during save operation
+        const saveBtn = document.querySelector('button[onclick="saveQuadrantMapping()"]');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        }
+        
         fetch('gs_DB/save_sorter_mapping.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -730,7 +1087,14 @@ if (!$result) {
                 alert('Error saving mapping: ' + (data.message || 'Unknown error'));
             }
         })
-        .catch(err => alert('Error saving mapping: ' + err));
+        .catch(err => alert('Error saving mapping: ' + err))
+        .finally(() => {
+            // Re-enable save button
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Mapping';
+            }
+        });
     }
     // Initial
     updateQuadrantButtons();

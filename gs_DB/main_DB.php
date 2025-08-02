@@ -85,7 +85,7 @@ try {
     // Enable event scheduler
     $conn->query("SET GLOBAL event_scheduler = ON");
 
-    // Drop existing event if it exists
+    // Drop existing events if they exist
     $conn->query("DROP EVENT IF EXISTS check_inactive_sorters");
 
     // Create event to automatically set sorters as offline if inactive
@@ -99,6 +99,9 @@ try {
         AND maintenance_mode = 0
         AND last_active < NOW() - INTERVAL 60 SECOND
     ");
+
+    // Create event to automatically exit maintenance mode if device loses connection for 5 seconds
+
 
     $conn->close();
 } catch (Exception $e) {
