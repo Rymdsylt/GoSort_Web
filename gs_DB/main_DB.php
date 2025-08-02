@@ -88,16 +88,16 @@ try {
     // Drop existing events if they exist
     $conn->query("DROP EVENT IF EXISTS check_inactive_sorters");
 
-    // Create event to automatically set sorters as offline if inactive
+    // Create event to automatically set sorters as offline if inactive (much faster for immediate detection)
     $conn->query("
         CREATE EVENT check_inactive_sorters
-        ON SCHEDULE EVERY 30 SECOND
+        ON SCHEDULE EVERY 5 SECOND
         DO
         UPDATE sorters 
         SET status = 'offline'
         WHERE status = 'online' 
         AND maintenance_mode = 0
-        AND last_active < NOW() - INTERVAL 60 SECOND
+        AND last_active < NOW() - INTERVAL 10 SECOND
     ");
 
     // Create event to automatically exit maintenance mode if device loses connection for 5 seconds

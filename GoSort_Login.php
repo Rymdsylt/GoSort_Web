@@ -1,11 +1,11 @@
 <?php
 session_start();
+require_once 'gs_DB/main_DB.php';
+require_once 'gs_DB/connection.php';
 if(isset($_SESSION['user_id'])) {
     header("Location: GoSort_Sorters.php");
     exit();
 }
-
-require_once 'gs_DB/connection.php';
 
 $error = '';
 

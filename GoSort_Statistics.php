@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'gs_DB/main_DB.php';
 require_once 'gs_DB/connection.php';
 
 if (isset($_GET['logout'])) {

@@ -1,11 +1,11 @@
 <?php
 session_start();
+require_once 'gs_DB/main_DB.php';
+require_once 'gs_DB/connection.php';
 if (!isset($_SESSION['user_id'])) {
     header("Location: GoSort_Login.php");
     exit();
 }
-
-require_once __DIR__ . '/gs_DB/connection.php';
 
 // Get device info from URL parameters
 $device_id = $_GET['device'] ?? null;

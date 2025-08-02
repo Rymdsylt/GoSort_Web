@@ -1,4 +1,5 @@
 <?php
+require_once 'main_DB.php';
 require_once 'connection.php';
 
 // Set maintenance mode flag in a file that GoSort.py will check

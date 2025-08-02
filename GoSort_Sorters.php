@@ -1,8 +1,8 @@
 <?php
 session_start();
+require_once 'gs_DB/main_DB.php';
 require_once 'gs_DB/connection.php';
 require_once 'gs_DB/sorters_DB.php';
-require_once 'gs_DB/main_DB.php';
 
 // Handle logout
 if (isset($_GET['logout'])) {
@@ -412,7 +412,7 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
     }
 
-    // Update device statuses every 5 seconds
+    // Update device statuses every 100ms for immediate offline detection
     setInterval(() => {
         fetch('gs_DB/connection_status.php')
             .then(response => {
@@ -476,7 +476,7 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
             .catch(error => {
                 console.error('Error updating device statuses:', error);
             });
-    }, 500);
+    }, 100);
     </script>
 </body>
 </html>
