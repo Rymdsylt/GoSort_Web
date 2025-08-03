@@ -81,6 +81,17 @@ try {
         )
     ");
 
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS maintenance_mode (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            active BOOLEAN DEFAULT TRUE,
+            start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            end_time TIMESTAMP NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ");
+
     // Enable event scheduler
     $conn->query("SET GLOBAL event_scheduler = ON");
 
