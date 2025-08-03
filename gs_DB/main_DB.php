@@ -37,6 +37,20 @@ try {
     ");
 
     $conn->query("
+        CREATE TABLE IF NOT EXISTS sorters (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            device_name VARCHAR(100) NOT NULL,
+            location VARCHAR(255),
+            status ENUM('online', 'offline') DEFAULT 'offline',
+            registration_token VARCHAR(64) UNIQUE,
+            device_identity VARCHAR(100) UNIQUE,
+            maintenance_mode TINYINT(1) DEFAULT 0,
+            last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    $conn->query("
         CREATE TABLE IF NOT EXISTS maintenance_commands (
             id INT AUTO_INCREMENT PRIMARY KEY,
             device_identity VARCHAR(100) NOT NULL,
@@ -47,21 +61,6 @@ try {
             FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
         )
     ");
-
-   $conn->query("
-    CREATE TABLE IF NOT EXISTS sorters (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        device_name VARCHAR(100) NOT NULL,
-        location VARCHAR(255),
-        status ENUM('online', 'offline') DEFAULT 'offline',
-        registration_token VARCHAR(64) UNIQUE,
-        device_identity VARCHAR(100) UNIQUE,
-        maintenance_mode TINYINT(1) DEFAULT 0,
-        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-");
-
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS waiting_devices (
