@@ -67,8 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .login-container {
             width: 100%;
             max-width:500px;
-            padding: 3rem;
-            margin: 100px;
+            padding: 4rem;
+            margin: 50px;
         }
 
         .form-control {
@@ -80,12 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 14px;
             position: relative;
             z-index: 1;
-            border-width: 2px;
+            border-width: 1.5px;
         }
         .form-control:focus {
             box-shadow: none;
             border-color: #58C542;
-            border-width: 2px;
+            border-width: 1.5px;
         }
         .btn-login{
             font-family: 'Kay Pho Du', sans-serif;
