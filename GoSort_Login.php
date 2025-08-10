@@ -39,6 +39,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>GoSort - Login</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <style>
+        .splash-logo {
+            max-width: 440px;
+            width: 90%;
+            height: auto;
+            display: block;
+            margin-bottom: 2rem;
+            transition: transform 0.2s;
+        }
+        .splash-logo:hover {
+            transform: scale(1.08);
+        }
         @font-face {
          font-family: 'Kay Pho Du';
          src: url('fonts/KayPhoDu-Regular.ttf') format('truetype');
@@ -55,16 +66,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         .login-container {
             width: 100%;
-            max-width:330px;
+            max-width:500px;
+            padding: 3rem;
+            margin: 100px;
         }
-        .login-container img{
-            max-width: 330px;
-            position: relative;
-            z-index: 0;
-            transform: scale(1.3);
-            user-select:none;
-            -webkit-user-select:none;
-        }
+
         .form-control {
             font-family: 'Kay Pho Du', sans-serif;
             border: 1px solid #333;
@@ -74,10 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 14px;
             position: relative;
             z-index: 1;
+            border-width: 2px;
         }
         .form-control:focus {
             box-shadow: none;
-            border-color: #28a745;
+            border-color: #58C542;
+            border-width: 2px;
         }
         .btn-login{
             font-family: 'Kay Pho Du', sans-serif;
@@ -92,29 +100,116 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .btn-login:hover {
             background-color: #14AE31;
         }
+        #splash-screen {
+            position: fixed;
+            z-index: 9999;
+            inset: 0;
+            background: #F3F3EF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.7s, visibility 0.7s;
+        }
 
+        #main-content {
+            transition: opacity 0.7s;
+        }
     </style>
 </head>
 <body>
-    <div class="login-container">
-            <img src="images/logos/5.svg" alt="GoSort Logo" oncontextmenu="return false" ondragstart="return false" onselectstart="return false;">
+    <?php if ($_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
+    <div id="splash-screen" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100vh;width:100vw;">
+        <div id="splash-anim-group" style="display:flex;flex-direction:column;align-items:center;">
+            <img src="images/logos/splashlogo.svg" alt="GoSort Logo" id="splash-logo" style="max-width:440px;width:90%;height:auto;display:block;margin-bottom:2rem;opacity:0;transform:scale(0.7);transition:opacity 0.7s,transform 0.7s;" oncontextmenu="return false" ondragstart="return false" onselectstart="return false;">
+            <div id="splash-text" style="font-size:1.0rem;color:#333;font-family:'Kay Pho Du',sans-serif;opacity:0;transform:scale(0.7);transition:opacity 0.7s,transform 0.7s;">
+                <em>A Smart Waste Management System in partnership with Pateros Catholic School</em>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    <div class="text-center mb-4">
+        <img src="images/logos/splashlogo.svg" alt="GoSort Logo" class="splash-logo d-block mx-auto" oncontextmenu="return false" ondragstart="return false" onselectstart="return false;">
+        <div style="font-size:1.0rem;color:#333;font-family:'Kay Pho Du',sans-serif;">
+            <em>A Smart Waste Management System in partnership with Pateros Catholic School</em>
+        </div>
+    </div>
+
+    <div class="login-container bg-white rounded shadow">
             <?php if ($error): ?>
                 <div class="alert alert-danger mt-3"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
-
             <form method="POST">
                 <div class="mb-3">
                     <input type="text" class="form-control" id="username" name="username" placeholder="Username">
-
                 </div>
                 <div class="mb-3">
                     <input type="password" class="form-control" id="password" name="password" placeholder="Password">
-                    
                 </div>
                 <button class="w-100 btn btn-login" type="submit">Sign in</button>
             </form>
         </div>
     </div>
     <script src="js/bootstrap.bundle.min.js"></script>
+    <?php if ($_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
+    <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      const splash = document.getElementById('splash-screen');
+      const splashLogo = document.getElementById('splash-logo');
+      const splashText = document.getElementById('splash-text');
+      const splashGroup = document.getElementById('splash-anim-group');
+      const loginLogo = document.querySelector('.splash-logo.d-block');
+      const loginText = document.querySelector('.text-center.mb-4 em').parentElement;
+      function getLogoTargetRect() {
+        const rect = loginLogo.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height
+        };
+      }
+      function getTextTargetRect() {
+        const rect = loginText.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height
+        };
+      }
+      // Fade in and scale up both logo and text
+      setTimeout(() => {
+        splashLogo.style.opacity = 1;
+        splashLogo.style.transform = 'scale(1)';
+        splashText.style.opacity = 1;
+        splashText.style.transform = 'scale(1)';
+      }, 200);
+      // Wait about 1 second before sliding
+      setTimeout(() => {
+        const logoTarget = getLogoTargetRect();
+        const textTarget = getTextTargetRect();
+        const splashLogoRect = splashLogo.getBoundingClientRect();
+        const splashTextRect = splashText.getBoundingClientRect();
+        const dxLogo = logoTarget.left - splashLogoRect.left;
+        const dyLogo = logoTarget.top - splashLogoRect.top;
+        const scaleLogo = logoTarget.width / splashLogoRect.width;
+        const dxText = textTarget.left - splashTextRect.left;
+        const dyText = textTarget.top - splashTextRect.top;
+        const scaleText = textTarget.width / splashTextRect.width;
+        splashLogo.style.transition = 'transform 0.8s cubic-bezier(.77,0,.18,1)';
+        splashLogo.style.transform = `translate(${dxLogo}px, ${dyLogo}px) scale(${scaleLogo})`;
+        splashText.style.transition = 'transform 0.8s cubic-bezier(.77,0,.18,1)';
+        splashText.style.transform = `translate(${dxText}px, ${dyText}px) scale(${scaleText})`;
+      }, 1200);
+      setTimeout(() => {
+        splash.style.opacity = 0;
+        splash.style.pointerEvents = 'none';
+      }, 2000);
+      setTimeout(() => {
+        splash.remove();
+      }, 2600);
+    });
+    </script>
+    <?php endif; ?>
 </body>
 </html>
