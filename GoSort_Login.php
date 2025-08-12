@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php if ($_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
     <div id="splash-screen" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100vh;width:100vw;">
         <div id="splash-anim-group" style="display:flex;flex-direction:column;align-items:center;">
-            <img src="images/logos/splashlogo.svg" alt="GoSort Logo" id="splash-logo" style="max-width:440px;width:90%;height:auto;display:block;margin-bottom:2rem;opacity:0;transform:scale(0.7);transition:opacity 0.7s,transform 0.7s;" oncontextmenu="return false" ondragstart="return false" onselectstart="return false;">
+            <img src="images/logos/splashlogo2.svg" alt="GoSort Logo" id="splash-logo" style="max-width:440px;width:90%;height:auto;display:block;margin-bottom:2rem;opacity:0;transform:scale(0.7);transition:opacity 0.7s,transform 0.7s;" oncontextmenu="return false" ondragstart="return false" onselectstart="return false;">
             <div id="splash-text" style="font-size:1.0rem;color:#333;font-family:'Kay Pho Du',sans-serif;opacity:0;transform:scale(0.7);transition:opacity 0.7s,transform 0.7s;">
                 <em>A Smart Waste Management System in partnership with Pateros Catholic School</em>
             </div>
@@ -128,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <?php endif; ?>
     <div class="text-center mb-4">
-        <img src="images/logos/splashlogo.svg" alt="GoSort Logo" class="splash-logo d-block mx-auto" oncontextmenu="return false" ondragstart="return false" onselectstart="return false;">
+        <img src="images/logos/splashlogo2.svg" alt="GoSort Logo" class="splash-logo d-block mx-auto" oncontextmenu="return false" ondragstart="return false" onselectstart="return false;">
         <div style="font-size:1.0rem;color:#333;font-family:'Kay Pho Du',sans-serif;">
             <em>A Smart Waste Management System in partnership with Pateros Catholic School</em>
         </div>
