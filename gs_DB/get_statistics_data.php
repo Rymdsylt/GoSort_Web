@@ -42,7 +42,8 @@ $sorting_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $dates = array();
 $bio_counts = array();
 $nbio_counts = array();
-$recyc_counts = array();
+$hazardous_counts = array();
+$mixed_counts = array();
 $maintenance_counts = array();
 
 foreach ($sorting_data as $record) {
@@ -65,8 +66,11 @@ foreach ($sorting_data as $record) {
             case 'nbio':
                 $nbio_counts[$date] = ($nbio_counts[$date] ?? 0) + $count;
                 break;
-            case 'recyc':
-                $recyc_counts[$date] = ($recyc_counts[$date] ?? 0) + $count;
+            case 'hazardous':
+                $hazardous_counts[$date] = ($hazardous_counts[$date] ?? 0) + $count;
+                break;
+            case 'mixed':
+                $mixed_counts[$date] = ($mixed_counts[$date] ?? 0) + $count;
                 break;
         }
     }
@@ -75,17 +79,20 @@ foreach ($sorting_data as $record) {
 // Calculate totals
 $total_bio = array_sum($bio_counts);
 $total_nbio = array_sum($nbio_counts);
-$total_recyc = array_sum($recyc_counts);
+$total_hazardous = array_sum($hazardous_counts);
+$total_mixed = array_sum($mixed_counts);
 
 // Calculate maintenance totals
 $maintenance_bio = 0;
 $maintenance_nbio = 0;
-$maintenance_recyc = 0;
+$maintenance_hazardous = 0;
+$maintenance_mixed = 0;
 
 foreach ($maintenance_counts as $date_counts) {
     $maintenance_bio += isset($date_counts['bio']) ? $date_counts['bio'] : 0;
     $maintenance_nbio += isset($date_counts['nbio']) ? $date_counts['nbio'] : 0;
-    $maintenance_recyc += isset($date_counts['recyc']) ? $date_counts['recyc'] : 0;
+    $maintenance_hazardous += isset($date_counts['hazardous']) ? $date_counts['hazardous'] : 0;
+    $maintenance_mixed += isset($date_counts['mixed']) ? $date_counts['mixed'] : 0;
 }
 
 // Prepare response data
@@ -94,23 +101,27 @@ $response = [
     'totals' => [
         'bio' => $total_bio,
         'nbio' => $total_nbio,
-        'recyc' => $total_recyc
+        'hazardous' => $total_hazardous,
+        'mixed' => $total_mixed
     ],
     'trends' => [
         'bio' => array_map(function($date) use ($bio_counts) { return $bio_counts[$date] ?? 0; }, $dates),
         'nbio' => array_map(function($date) use ($nbio_counts) { return $nbio_counts[$date] ?? 0; }, $dates),
-        'recyc' => array_map(function($date) use ($recyc_counts) { return $recyc_counts[$date] ?? 0; }, $dates)
+        'hazardous' => array_map(function($date) use ($hazardous_counts) { return $hazardous_counts[$date] ?? 0; }, $dates),
+        'mixed' => array_map(function($date) use ($mixed_counts) { return $mixed_counts[$date] ?? 0; }, $dates)
     ],
     'maintenance' => [
         'normal' => [
             'bio' => $total_bio - $maintenance_bio,
             'nbio' => $total_nbio - $maintenance_nbio,
-            'recyc' => $total_recyc - $maintenance_recyc
+            'hazardous' => $total_hazardous - $maintenance_hazardous,
+            'mixed' => $total_mixed - $maintenance_mixed
         ],
         'maintenance' => [
             'bio' => $maintenance_bio,
             'nbio' => $maintenance_nbio,
-            'recyc' => $maintenance_recyc
+            'hazardous' => $maintenance_hazardous,
+            'mixed' => $maintenance_mixed
         ]
     ]
 ];

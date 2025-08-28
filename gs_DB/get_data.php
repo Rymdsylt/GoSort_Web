@@ -13,7 +13,7 @@ $stmt = $pdo->query("SELECT
     CASE 
         WHEN sorted = 'biodegradable' THEN 'Bio'
         WHEN sorted = 'non-biodegradable' THEN 'Non-Bio'
-        WHEN sorted = 'recyclable' THEN 'Recyclables'
+        WHEN sorted = 'hazardous' THEN 'Hazardous'
     END as category,
     COUNT(*) as total_count 
     FROM trash_sorted 

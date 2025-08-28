@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode(['success' => true, 'mapping' => [
             'zdeg' => 'bio',
             'ndeg' => 'nbio',
-            'odeg' => 'recyc',
+            'odeg' => 'hazardous',
         ]]);
     }
     exit;

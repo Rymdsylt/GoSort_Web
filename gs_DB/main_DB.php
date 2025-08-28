@@ -27,7 +27,7 @@ try {
     $conn->query("
         CREATE TABLE IF NOT EXISTS trash_sorted (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            sorted ENUM('biodegradable', 'non-biodegradable', 'recyclable') NOT NULL,
+            sorted ENUM('biodegradable', 'non-biodegradable', 'hazardous', 'mixed') NOT NULL,
             confidence FLOAT DEFAULT NULL,
             bin_location VARCHAR(100) DEFAULT NULL,
             user_id INT DEFAULT NULL,
@@ -74,7 +74,7 @@ try {
         CREATE TABLE IF NOT EXISTS sorting_history (
             id INT AUTO_INCREMENT PRIMARY KEY,
             device_identity VARCHAR(100) NOT NULL,
-            trash_type ENUM('bio', 'nbio', 'recyc') NOT NULL,
+            trash_type ENUM('bio', 'nbio', 'hazardous', 'mixed') NOT NULL,
             is_maintenance BOOLEAN DEFAULT FALSE,
             sorted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE

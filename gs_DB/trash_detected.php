@@ -9,14 +9,15 @@ if (!empty($trash_type)) {
     $type_map = [
         'nbio' => 'non-biodegradable',
         'bio' => 'biodegradable',
-        'recyc' => 'recyclable'
+        'hazardous' => 'hazardous',
+        'mixed' => 'mixed'
     ];
 
 
     $readable_type = isset($type_map[$trash_type]) ? $type_map[$trash_type] : $trash_type;
 
 
-    if (!in_array($readable_type, ['biodegradable', 'non-biodegradable', 'recyclable'])) {
+    if (!in_array($readable_type, ['biodegradable', 'non-biodegradable', 'hazardous', 'mixed'])) {
         http_response_code(400);
         echo "Error: Invalid trash type";
         exit;

@@ -61,7 +61,7 @@ $sorting_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $dates = array();
 $bio_counts = array();
 $nbio_counts = array();
-$recyc_counts = array();
+$hazardous_counts = array();
 $maintenance_counts = array();
 
 foreach ($sorting_data as $record) {
@@ -84,8 +84,8 @@ foreach ($sorting_data as $record) {
             case 'nbio':
                 $nbio_counts[$date] = ($nbio_counts[$date] ?? 0) + $count;
                 break;
-            case 'recyc':
-                $recyc_counts[$date] = ($recyc_counts[$date] ?? 0) + $count;
+            case 'hazardous':
+                $hazardous_counts[$date] = ($hazardous_counts[$date] ?? 0) + $count;
                 break;
         }
     }
@@ -94,17 +94,17 @@ foreach ($sorting_data as $record) {
 // Get total counts
 $total_bio = array_sum($bio_counts);
 $total_nbio = array_sum($nbio_counts);
-$total_recyc = array_sum($recyc_counts);
+$total_hazardous = array_sum($hazardous_counts);
 
 // Calculate maintenance percentages
 $maintenance_bio = 0;
 $maintenance_nbio = 0;
-$maintenance_recyc = 0;
+$maintenance_hazardous = 0;
 
 foreach ($maintenance_counts as $date_counts) {
     $maintenance_bio += isset($date_counts['bio']) ? $date_counts['bio'] : 0;
     $maintenance_nbio += isset($date_counts['nbio']) ? $date_counts['nbio'] : 0;
-        $maintenance_recyc += isset($date_counts['recyc']) ? $date_counts['recyc'] : 0;
+        $maintenance_hazardous += isset($date_counts['hazardous']) ? $date_counts['hazardous'] : 0;
     }?>
 <!DOCTYPE html>
 <html lang="en">
@@ -179,10 +179,10 @@ foreach ($maintenance_counts as $date_counts) {
                 let totalPieChart = new Chart(document.getElementById('totalPieChart'), {
                     type: 'pie',
                     data: {
-                        labels: ['Biodegradable', 'Non-Biodegradable', 'Recyclable'],
+                        labels: ['Biodegradable', 'Non-Biodegradable', 'Hazardous', 'Mixed'],
                         datasets: [{
-                            data: [0, 0, 0],
-                            backgroundColor: ['#28a745', '#dc3545', '#17a2b8']
+                            data: [0, 0, 0, 0],
+                            backgroundColor: ['#28a745', '#dc3545', '#17a2b8', '#6c757d']
                         }]
                     }
                 });
@@ -202,9 +202,14 @@ foreach ($maintenance_counts as $date_counts) {
                             borderColor: '#dc3545',
                             fill: false
                         }, {
-                            label: 'Recyclable',
+                            label: 'Hazardous',
                             data: [],
                             borderColor: '#17a2b8',
+                            fill: false
+                        }, {
+                            label: 'Mixed',
+                            data: [],
+                            borderColor: '#6c757d',
                             fill: false
                         }]
                     },
@@ -220,14 +225,14 @@ foreach ($maintenance_counts as $date_counts) {
                 let maintenanceBarChart = new Chart(document.getElementById('maintenanceBarChart'), {
                     type: 'bar',
                     data: {
-                        labels: ['Biodegradable', 'Non-Biodegradable', 'Recyclable'],
+                        labels: ['Biodegradable', 'Non-Biodegradable', 'Hazardous', 'Mixed'],
                         datasets: [{
                             label: 'Normal Operation',
-                            data: [0, 0, 0],
+                            data: [0, 0, 0, 0],
                             backgroundColor: '#28a745'
                         }, {
                             label: 'Maintenance Mode',
-                            data: [0, 0, 0],
+                            data: [0, 0, 0, 0],
                             backgroundColor: '#ffc107'
                         }]
                     },
@@ -262,7 +267,8 @@ foreach ($maintenance_counts as $date_counts) {
                             totalPieChart.data.datasets[0].data = [
                                 data.totals.bio,
                                 data.totals.nbio,
-                                data.totals.recyc
+                                data.totals.hazardous,
+                                data.totals.mixed
                             ];
                             totalPieChart.update();
 
@@ -270,19 +276,22 @@ foreach ($maintenance_counts as $date_counts) {
                             trendLineChart.data.labels = data.dates;
                             trendLineChart.data.datasets[0].data = data.trends.bio;
                             trendLineChart.data.datasets[1].data = data.trends.nbio;
-                            trendLineChart.data.datasets[2].data = data.trends.recyc;
+                            trendLineChart.data.datasets[2].data = data.trends.hazardous;
+                            trendLineChart.data.datasets[3].data = data.trends.mixed;
                             trendLineChart.update();
 
                             // Update Bar Chart
                             maintenanceBarChart.data.datasets[0].data = [
                                 data.maintenance.normal.bio,
                                 data.maintenance.normal.nbio,
-                                data.maintenance.normal.recyc
+                                data.maintenance.normal.hazardous,
+                                data.maintenance.normal.mixed
                             ];
                             maintenanceBarChart.data.datasets[1].data = [
                                 data.maintenance.maintenance.bio,
                                 data.maintenance.maintenance.nbio,
-                                data.maintenance.maintenance.recyc
+                                data.maintenance.maintenance.hazardous,
+                                data.maintenance.maintenance.mixed
                             ];
                             maintenanceBarChart.update();
                         })

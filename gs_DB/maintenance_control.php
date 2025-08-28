@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $action = $_POST['action'] ?? '';
-$validActions = ['bio', 'nbio', 'recyc', 'maintenance_start', 'maintenance_end', 'maintenance_keep', 'sweep1', 'sweep2', 'unclog'];
+$validActions = ['bio', 'nbio', 'hazardous', 'mixed', 'maintenance_start', 'maintenance_end', 'maintenance_keep', 'sweep1', 'sweep2', 'unclog'];
 
 if (!in_array($action, $validActions)) {
     http_response_code(400);

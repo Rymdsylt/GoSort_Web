@@ -307,7 +307,7 @@ if (!$device_id || !$device_identity) {
                             <div class="servo-mapping-container">
                                 <div class="servo-position" style="border: 2px solid #ffc107; border-radius: 10px; padding: 15px; background: #fff3cd;">
                                     <h6 style="color: #ffc107; margin: 0;">Left</h6>
-                                    <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Recyc</button>
+                                    <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Hazardous</button>
                                 </div>
                                 <div class="servo-position" style="border: 2px solid #6c757d; border-radius: 10px; padding: 15px; background: #f8f9fa;">
                                     <h6 style="color: #6c757d; margin: 0;">Center</h6>
@@ -672,6 +672,7 @@ if (!$device_id || !$device_identity) {
             'zdeg': 2000,    // 4 × 500ms delays = 2000ms
             'ndeg': 2000,    // 4 × 500ms delays = 2000ms  
             'odeg': 2000,    // 4 × 500ms delays = 2000ms
+            'mixed': 1000,   // Tilt-only quick action
             'unclog': 3500,  // 3000ms hold + 500ms movement = 3500ms
             'sweep1': 4000,  // 4 × 1000ms delays = 4000ms
             'sweep2': 5000   // 4 × 1000ms + 1000ms setup = 5000ms
@@ -710,7 +711,8 @@ if (!$device_id || !$device_identity) {
             const operationNames = {
                 'zdeg': 'Moving to Bio',
                 'ndeg': 'Moving to Non-Bio', 
-                'odeg': 'Moving to Recyclable',
+                'odeg': 'Moving to Hazardous',
+                'mixed': 'Mixed',
                 'unclog': 'Unclogging Section',
                 'sweep1': 'Testing Pan Sweep',
                 'sweep2': 'Testing Full Sweep'
@@ -995,11 +997,11 @@ if (!$device_id || !$device_identity) {
     </script>
     <script>
     // Quadrant mapping logic
-    let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'recyc'};
+    let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'hazardous'};
     // Update button labels/colors
     function updateQuadrantButtons() {
-        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', recyc: 'Recyclable'};
-        const mapToClass = {bio: 'btn-outline-primary', nbio: 'btn-outline-secondary', recyc: 'btn-outline-warning'};
+        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', hazardous: 'Hazardous', mixed: 'Mixed'};
+        const mapToClass = {bio: 'btn-outline-primary', nbio: 'btn-outline-secondary', hazardous: 'btn-outline-warning', mixed: 'btn-outline-dark'};
         ['zdeg','ndeg','odeg'].forEach(q => {
             const btn = document.getElementById('btn-' + q);
             btn.textContent = mapToLabel[quadrantMap[q]];
@@ -1013,7 +1015,7 @@ if (!$device_id || !$device_identity) {
         const previewContent = document.getElementById('mapping-preview-content');
         if (!previewContent) return;
         
-        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', recyc: 'Recyclable'};
+        const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', hazardous: 'Hazardous', mixed: 'Mixed'};
         const servoLabels = {zdeg: 'Right', ndeg: 'Center', odeg: 'Left'};
         
         let preview = '';
@@ -1023,9 +1025,9 @@ if (!$device_id || !$device_identity) {
         previewContent.innerHTML = preview;
     }
     function renderServoControls() {
-        const trashTypes = ['bio', 'nbio', 'recyc'];
-        const mapToLabel = {bio: 'Move to Bio', nbio: 'Move to Non-Bio', recyc: 'Move to Recyclable'};
-        const mapToClass = {bio: 'btn-success', nbio: 'btn-success', recyc: 'btn-success'};
+        const trashTypes = ['bio', 'nbio', 'hazardous', 'mixed'];
+        const mapToLabel = {bio: 'Move to Bio', nbio: 'Move to Non-Bio', hazardous: 'Move to Hazardous', mixed: 'Mixed'};
+        const mapToClass = {bio: 'btn-success', nbio: 'btn-success', hazardous: 'btn-success', mixed: 'btn-secondary'};
         let html = '';
         for (const trashType of trashTypes) {
             // Find which servo position is mapped to this trash type
@@ -1037,7 +1039,11 @@ if (!$device_id || !$device_identity) {
                 }
             }
             if (mappedServo) {
-                html += `<button class="btn ${mapToClass[trashType] || 'btn-secondary'} btn-lg mb-2" onclick="confirmOperation('${mappedServo}', '${mapToLabel[trashType]}')">${mapToLabel[trashType]}</button>`;
+                if (trashType === 'mixed') {
+                    html += `<button class="btn ${mapToClass[trashType]} btn-lg mb-2" onclick="confirmOperation('mixed', 'Mixed')">Mixed</button>`;
+                } else {
+                    html += `<button class="btn ${mapToClass[trashType]} btn-lg mb-2" onclick="confirmOperation('${mappedServo}', '${mapToLabel[trashType]}')">${mapToLabel[trashType]}</button>`;
+                }
             }
         }
         document.getElementById('dynamic-servo-controls').innerHTML = html;
@@ -1064,7 +1070,8 @@ if (!$device_id || !$device_identity) {
         const options = [
             {val:'bio', label:'Bio'},
             {val:'nbio', label:'Non-Bio'},
-            {val:'recyc', label:'Recyc'}
+            {val:'hazardous', label:'Hazardous'},
+            {val:'mixed', label:'Mixed'}
         ];
         let html = '<div id="quadrant-select-modal" class="modal" tabindex="-1" style="display:block;background:rgba(0,0,0,0.3)"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Select Trash Type</h5><button type="button" class="btn-close" onclick="closeQuadrantSelect()"></button></div><div class="modal-body">';
         options.forEach(opt => {
