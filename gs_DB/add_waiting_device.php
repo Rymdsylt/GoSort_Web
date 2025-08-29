@@ -19,7 +19,7 @@ try {
     $stmt->execute([$device_identity]);
     
     if ($stmt->rowCount() > 0) {
-        echo json_encode(['success' => false, 'error' => 'duplicate', 'message' => 'Device identity already exists in waiting list']);
+        echo json_encode(['success' => true, 'message' => 'Device already in waiting list']);
         exit;
     }
     

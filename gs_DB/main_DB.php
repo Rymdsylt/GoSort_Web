@@ -92,6 +92,17 @@ try {
         )
     ");
 
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS sorter_mapping (
+            device_identity VARCHAR(100) PRIMARY KEY,
+            zdeg VARCHAR(10) NOT NULL,
+            ndeg VARCHAR(10) NOT NULL,
+            odeg VARCHAR(10) NOT NULL,
+            tdeg VARCHAR(10) NOT NULL,
+            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
+        )
+    ");
+
     // Enable event scheduler
     $conn->query("SET GLOBAL event_scheduler = ON");
 

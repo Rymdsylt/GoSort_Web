@@ -304,19 +304,37 @@ if (!$device_id || !$device_identity) {
                             <h5 class="text-center mb-3">
                                 <i class="fas fa-cogs"></i> Servo Position Assignment
                             </h5>
-                            <div class="servo-mapping-container">
-                                <div class="servo-position" style="border: 2px solid #ffc107; border-radius: 10px; padding: 15px; background: #fff3cd;">
-                                    <h6 style="color: #ffc107; margin: 0;">Left</h6>
-                                    <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Hazardous</button>
-                                </div>
+                            <div class="servo-mapping-container" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; max-width: 600px; margin: 0 auto;">
+                                <!-- Empty cell for top-left -->
+                                <div></div>
+                                <!-- Front button -->
                                 <div class="servo-position" style="border: 2px solid #6c757d; border-radius: 10px; padding: 15px; background: #f8f9fa;">
-                                    <h6 style="color: #6c757d; margin: 0;">Center</h6>
+                                    <h6 style="color: #6c757d; margin: 0;">Front</h6>
                                     <button id="btn-ndeg" class="btn btn-outline-secondary quadrant-btn">Non-Bio</button>
                                 </div>
+                                <!-- Empty cell for top-right -->
+                                <div></div>
+                                <!-- Left button -->
                                 <div class="servo-position" style="border: 2px solid #0d6efd; border-radius: 10px; padding: 15px; background: #e7f1ff;">
-                                    <h6 style="color: #0d6efd; margin: 0;">Right</h6>
+                                    <h6 style="color: #0d6efd; margin: 0;">Left</h6>
                                     <button id="btn-zdeg" class="btn btn-outline-primary quadrant-btn">Bio</button>
                                 </div>
+                                <!-- Empty cell for center -->
+                                <div></div>
+                                <!-- Right button -->
+                                <div class="servo-position" style="border: 2px solid #ffc107; border-radius: 10px; padding: 15px; background: #fff3cd;">
+                                    <h6 style="color: #ffc107; margin: 0;">Right</h6>
+                                    <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Hazardous</button>
+                                </div>
+                                <!-- Empty cell for bottom-left -->
+                                <div></div>
+                                <!-- Back button -->
+                                <div class="servo-position" style="border: 2px solid #dc3545; border-radius: 10px; padding: 15px; background: #f8d7da;">
+                                    <h6 style="color: #dc3545; margin: 0;">Back</h6>
+                                    <button id="btn-tdeg" class="btn btn-outline-danger quadrant-btn">Mixed</button>
+                                </div>
+                                <!-- Empty cell for bottom-right -->
+                                <div></div>
                             </div>
                                 <div class="text-center mt-3">
                                     <small class="text-muted">Click each position to assign a trash type</small>
@@ -672,7 +690,7 @@ if (!$device_id || !$device_identity) {
             'zdeg': 2000,    // 4 × 500ms delays = 2000ms
             'ndeg': 2000,    // 4 × 500ms delays = 2000ms  
             'odeg': 2000,    // 4 × 500ms delays = 2000ms
-            'mixed': 1000,   // Tilt-only quick action
+            'tdeg': 2000,    // 4 × 500ms delays = 2000ms
             'unclog': 3500,  // 3000ms hold + 500ms movement = 3500ms
             'sweep1': 4000,  // 4 × 1000ms delays = 4000ms
             'sweep2': 5000   // 4 × 1000ms + 1000ms setup = 5000ms
@@ -712,7 +730,7 @@ if (!$device_id || !$device_identity) {
                 'zdeg': 'Moving to Bio',
                 'ndeg': 'Moving to Non-Bio', 
                 'odeg': 'Moving to Hazardous',
-                'mixed': 'Mixed',
+                'tdeg': 'Moving to Mixed',
                 'unclog': 'Unclogging Section',
                 'sweep1': 'Testing Pan Sweep',
                 'sweep2': 'Testing Full Sweep'
@@ -997,15 +1015,18 @@ if (!$device_id || !$device_identity) {
     </script>
     <script>
     // Quadrant mapping logic
-    let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'hazardous'};
+    let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'hazardous', tdeg: 'mixed'};
     // Update button labels/colors
     function updateQuadrantButtons() {
         const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', hazardous: 'Hazardous', mixed: 'Mixed'};
         const mapToClass = {bio: 'btn-outline-primary', nbio: 'btn-outline-secondary', hazardous: 'btn-outline-warning', mixed: 'btn-outline-dark'};
-        ['zdeg','ndeg','odeg'].forEach(q => {
+        ['zdeg','ndeg','odeg','tdeg'].forEach(q => {
             const btn = document.getElementById('btn-' + q);
-            btn.textContent = mapToLabel[quadrantMap[q]];
-            btn.className = 'btn quadrant-btn mx-2 ' + mapToClass[quadrantMap[q]];
+            if (btn) {
+                const label = mapToLabel[quadrantMap[q]];
+                btn.textContent = label;
+                btn.className = 'btn quadrant-btn ' + (q === 'tdeg' ? '' : 'mx-2 ') + mapToClass[quadrantMap[q]];
+            }
         });
         renderServoControls();
         updateMappingPreview();
@@ -1016,11 +1037,13 @@ if (!$device_id || !$device_identity) {
         if (!previewContent) return;
         
         const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', hazardous: 'Hazardous', mixed: 'Mixed'};
-        const servoLabels = {zdeg: 'Right', ndeg: 'Center', odeg: 'Left'};
+        const servoLabels = {zdeg: 'Left', ndeg: 'Front', odeg: 'Right', tdeg: 'Back'};
+        const servoOrder = ['zdeg', 'ndeg', 'odeg', 'tdeg'];
         
         let preview = '';
-        for (const [servoKey, trashType] of Object.entries(quadrantMap)) {
-            preview += `<div class="mb-1"><strong>${servoLabels[servoKey]}:</strong> ${mapToLabel[trashType]}</div>`;
+        for (const servoKey of servoOrder) {
+            const trashType = quadrantMap[servoKey] || 'Not Set';
+            preview += `<div class="mb-1"><strong>${servoLabels[servoKey]}:</strong> ${mapToLabel[trashType] || trashType}</div>`;
         }
         previewContent.innerHTML = preview;
     }
@@ -1040,7 +1063,7 @@ if (!$device_id || !$device_identity) {
             }
             if (mappedServo) {
                 if (trashType === 'mixed') {
-                    html += `<button class="btn ${mapToClass[trashType]} btn-lg mb-2" onclick="confirmOperation('mixed', 'Mixed')">Mixed</button>`;
+                    html += `<button class="btn ${mapToClass[trashType]} btn-lg mb-2" onclick="confirmOperation('tdeg', 'Move to Mixed')">Move to Mixed</button>`;
                 } else {
                     html += `<button class="btn ${mapToClass[trashType]} btn-lg mb-2" onclick="confirmOperation('${mappedServo}', '${mapToLabel[trashType]}')">${mapToLabel[trashType]}</button>`;
                 }
@@ -1092,6 +1115,7 @@ if (!$device_id || !$device_identity) {
     document.getElementById('btn-zdeg').onclick = () => showQuadrantSelect('zdeg');
     document.getElementById('btn-ndeg').onclick = () => showQuadrantSelect('ndeg');
     document.getElementById('btn-odeg').onclick = () => showQuadrantSelect('odeg');
+    document.getElementById('btn-tdeg').onclick = () => showQuadrantSelect('tdeg');
     // Save mapping to backend
     function saveQuadrantMapping() {
         // Check if operation is in progress
@@ -1102,11 +1126,20 @@ if (!$device_id || !$device_identity) {
         
         const urlParams = new URLSearchParams(window.location.search);
         const deviceIdentity = urlParams.get('identity');
-        // Check for duplicate trash types
-        const values = [quadrantMap.zdeg, quadrantMap.ndeg, quadrantMap.odeg];
+        // Check for duplicate trash types across all positions
+        const values = [quadrantMap.zdeg, quadrantMap.ndeg, quadrantMap.odeg, quadrantMap.tdeg];
         const unique = new Set(values);
-        if (unique.size < 3) {
-            alert('Same Trash types are not allowed');
+        if (unique.size < values.length) {
+            // Find which types are duplicated for a more helpful message
+            const counts = {};
+            values.forEach(type => {
+                counts[type] = (counts[type] || 0) + 1;
+            });
+            const duplicates = Object.entries(counts)
+                .filter(([_, count]) => count > 1)
+                .map(([type, _]) => type)
+                .join(', ');
+            alert(`Duplicate trash types found: ${duplicates}\nEach position must have a unique trash type.`);
             return;
         }
         
@@ -1124,7 +1157,8 @@ if (!$device_id || !$device_identity) {
                 device_identity: deviceIdentity,
                 zdeg: quadrantMap.zdeg,
                 ndeg: quadrantMap.ndeg,
-                odeg: quadrantMap.odeg
+                odeg: quadrantMap.odeg,
+                tdeg: quadrantMap.tdeg || 'mixed'
             })
         })
         .then(res => res.json())

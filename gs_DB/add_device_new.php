@@ -59,9 +59,16 @@ try {
         $stmt = $pdo->prepare("DELETE FROM waiting_devices WHERE device_identity = ?");
         $stmt->execute([$data['deviceIdentity']]);
         
+        // Set default mapping for the new device
+        $stmt = $pdo->prepare("
+            INSERT INTO sorter_mapping (device_identity, zdeg, ndeg, odeg, tdeg) 
+            VALUES (?, 'bio', 'nbio', 'hazardous', 'mixed')
+        ");
+        $stmt->execute([$data['deviceIdentity']]);
+        
         echo json_encode([
             'success' => true,
-            'message' => 'Device added successfully!'
+            'message' => 'Device added successfully with default mapping!'
         ]);
     } else {
         echo json_encode([
