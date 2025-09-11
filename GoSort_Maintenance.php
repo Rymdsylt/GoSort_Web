@@ -22,6 +22,12 @@ if (!$device_id || !$device_identity) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script>
+    // Redirect to GoSort_Sorters.php after 1 minute
+    setTimeout(function() {
+        window.location.href = 'GoSort_Sorters.php';
+    }, 60000);
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GoSort - Maintenance</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
