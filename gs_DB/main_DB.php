@@ -11,9 +11,9 @@ try {
 
     $conn->query("CREATE DATABASE IF NOT EXISTS gosort_db");
     $conn->select_db("gosort_db");
-
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS users (
+    //users should have role, name, username, profilepic, email, and password columns.
+    $conn->query(" 
+        CREATE TABLE IF NOT EXISTS users ( 
             id INT AUTO_INCREMENT PRIMARY KEY,
             isAdmin BOOLEAN DEFAULT FALSE,
             userName VARCHAR(50) NOT NULL,

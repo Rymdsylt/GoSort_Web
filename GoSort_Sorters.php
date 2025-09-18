@@ -37,128 +37,239 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
 </head>
+<style>
+        body {
+            position: relative;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            transition: margin-left 0.3s ease;
+            background-color: #F3F3EF !important;
+            font-family: 'inter', sans-serif !important;
+        }
+
+        .border-dashed {
+            border-style: dashed !important;
+            border-width: 2px !important;
+            background-color: rgba(0,0,0,0.01);
+        }
+        #main-content-wrapper {
+            margin-left: 260px; 
+            transition: margin-left 0.3s ease;
+            padding: 20px; 
+        }
+        #main-content-wrapper.collapsed {
+            margin-left: 80px; 
+        }
+
+        .shadow-dark {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        }
+
+        .badge-online {
+        background-color: #CDFFB7 !important; 
+        color: #14AE31 !important;
+        padding: 6px 10px !important
+        }
+
+        .badge-maintenance {
+        background-color: #eff5a3ff !important; 
+        color: #212529 !important; 
+        padding: 6px 10px !important
+        }
+
+        .badge-offline {
+        background-color: #FFA6A7 !important; 
+        color: #FF1E1E !important;
+        padding: 6px 10px !important;
+        }
+        .add-device-card {
+        border: 3px dashed #368137 !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        background-color: #fff;
+        }
+
+        .add-device-card:hover {
+        background-color: #f9fff5;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .add-device-icon {
+        font-size: 3rem;
+        color: #368137;
+        margin-bottom: 0.5rem;
+        }
+
+        .add-device-text {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #000;
+        }
+        .image {
+            width: 30px;
+            height: 30px;
+            margin-right: 5px;
+        }
+        .card-title{
+            display: flex;
+            align-items: center;
+        }
+        .d-flex
+        {
+            margin: 0px 5px;
+        }
+        .badge {
+            margin:0px 5px;
+        }
+        .bi {
+            margin-right: 5px;
+        }
+
+        .custom-drive-dropdown {
+            border-radius: 14px !important;
+            box-shadow: 0 4px 24px rgba(60,64,67,0.15), 0 1.5px 4px rgba(60,64,67,0.15);
+            border: none;
+            padding: 8px !important;
+            min-width: 180px !important;
+            background: #fff;
+        }
+        .custom-drive-dropdown .dropdown-item {
+            border-radius: 8px;
+            margin: 0px;
+            padding: 8px 5px;
+            color: #202124;
+            font-size: 15px;
+            box-sizing: border-box;
+        }
+        .custom-drive-dropdown .dropdown-item:hover, .custom-drive-dropdown .dropdown-item:focus {
+            background: #f1f3f4;
+            color: #202124;
+        
+        }
+        .custom-drive-dropdown .dropdown-item.text-danger {
+            color: #d93025 !important;
+        }
+        .custom-drive-dropdown .dropdown-item.text-danger:hover {
+            background: #fce8e6;
+            color: #a50e0e !important;
+        }
+        .custom-drive-dropdown .dropdown-divider {
+            margin: 4px 0;
+        }
+
+</style>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="GoSort_Sorters.php">GoSort Devices</a>
-            <div class="navbar-nav me-auto">
-                <a class="nav-link active" href="GoSort_Sorters.php">Sorters</a>
-                <a class="nav-link" href="GoSort_Statistics.php">Overall Statistics</a>
-            </div>
-            <div>
-                <a href="GoSort_Sorters.php?logout=1" class="btn btn-light">Logout</a>
-            </div>
-        </div>
-    </nav>
+    <?php include 'sidebar.php'; ?>
 
-    <div class="container">
-        <!-- Status Alert Container for AJAX messages -->
-        <div id="statusAlertContainer"></div>
+   <div id="main-content-wrapper">
+  <div class="container">
 
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
-            <?php foreach ($sorters as $sorter): ?>
-            <div class="col">
-                <div class="card h-100" data-device="<?php echo htmlspecialchars($sorter['device_name']); ?>">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0"><?php echo htmlspecialchars($sorter['device_name']); ?></h5>
-                        <span class="badge <?php 
-                            echo match($sorter['status']) {
-                                'online' => 'bg-success',
-                                'maintenance' => 'bg-warning',
-                                default => 'bg-danger'
-                            };
-                        ?>">
-                            <?php echo ucfirst(htmlspecialchars($sorter['status'])); ?>
-                        </span>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">
-                            <i class="bi bi-geo-alt-fill"></i> 
-                            Location: <?php echo htmlspecialchars($sorter['location']); ?>
-                        </p>
-                        <p class="card-text">
-                            <i class="bi bi-clock"></i>
-                            Last Active: <span class="last-active"><?php echo date('M j, Y g:i A', strtotime($sorter['last_active'])); ?></span>
-                        </p>
-                    </div>
-                    <div class="card-footer">
-                        <div class="d-flex justify-content-between">
-                            <a href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>" class="btn btn-primary btn-sm stats-btn">
-                                View Statistics
-                            </a>
-                            <button class="btn btn-warning btn-sm maintenance-btn" 
-                                    onclick="checkMaintenanceStatus(<?php echo $sorter['id']; ?>, '<?php echo htmlspecialchars($sorter['device_name']); ?>', '<?php echo htmlspecialchars($sorter['device_identity']); ?>')">
-                                Maintenance
-                            </button>
-                            <button class="btn btn-danger btn-sm delete-btn" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
-                                Delete
-                            </button>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="fw-bold mb-0 mt-3">Devices</h2>
+            <!-- Search bar -->
+            <div class="input-group mt-3" style="max-width: 300px;">
+            <input type="text" class="form-control" placeholder="Search Device">
+            <button class="btn btn-outline-secondary" type="button">
+                <i class="bi bi-search"></i>
+            </button>
+            </div>
+
+            </div>
+            <hr style="height: 1.5px; background-color: #000; opacity: 1; margin-left:6.5px;" class="mb-2">
+            <div class="d-flex justify-content-end mb-2">
+            <div class="dropdown">
+                <button class="btn btn-link text-dark dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                Sort by
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sortDropdown">
+                <li><a class="dropdown-item" href="#">Last Active</a></li>
+                <li><a class="dropdown-item" href="#">Name (A-Z)</a></li>
+                <li><a class="dropdown-item" href="#">Status</a></li>
+                </ul>
+            </div>
+            </div>
+
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
+                 <div class="col">
+                    <div class="card h-100 add-device-card" 
+                        data-bs-toggle="modal" 
+                        data-bs-target="#addDeviceModal">
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center text-center">
+                        <div class="add-device-icon">
+                            <i class="bi bi-plus-square"></i>
+                        </div>
+                        <div class="add-device-text">
+                            Add New Device
+                        </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            <?php endforeach; ?>
-
-            <!-- Add New Device Card -->
-            <div class="col">
-                <div class="card h-100 border-dashed">
-                    <div class="card-body d-flex align-items-center justify-content-center">
-                        <button class="btn btn-outline-success btn-lg" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
-                            <i class="bi bi-plus-lg"></i> Add New Device
-                        </button>
                     </div>
-                </div>
+
+                <?php foreach ($sorters as $sorter): ?>
+                    <div class="col">
+                        <div class="card h-100 shadow-dark border-success border-2 rounded-4" data-device="<?php echo htmlspecialchars($sorter['device_name']); ?>">
+                            <div class="card-body">
+                                <!-- Header: Device Name + Menu -->
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h5 class="card-title fw-bold mb-0">
+                                        <img class="image" src="images/icons/devices.svg" alt="Sorter Icon">
+                                        <?php echo htmlspecialchars($sorter['device_name']); ?>
+                                    </h5>
+                                    <!-- Kebab menu -->
+                                    <div class="dropdown">
+                                        <button class="btn btn-link text-dark p-0" type="button" id="dropdownMenu<?php echo $sorter['id']; ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-three-dots-vertical fs-5"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown" aria-labelledby="dropdownMenu<?php echo $sorter['id']; ?>">
+                                            <li>
+                                                <a class="dropdown-item d-flex" href="#" >
+                                                    <i class="bi bi-info-circle me-2"></i> Details
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item d-flex" href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>">
+                                                    <i class="bi bi-bar-chart me-2"></i> Statistics
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <button class="dropdown-item d-flex text-danger delete-btn" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
+                                                    <i class="bi bi-trash me-2"></i> Delete
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex flex-column">
+                                        <small class="text-muted mb-1">
+                                            <i class="bi bi-geo-alt-fill"></i>
+                                            <?php echo htmlspecialchars($sorter['location']); ?>
+                                        </small>
+                                        <small class="text-muted">
+                                            <i class="bi bi-clock"></i>
+                                            <?php echo date('M j, Y', strtotime($sorter['last_active'])); ?>
+                                        </small>
+                                    </div>
+                                   <span class="badge rounded-pill <?php 
+                                        echo match($sorter['status']) {
+                                            'online' => 'badge-online',
+                                            'maintenance' => 'badge-maintenance',
+                                            default => 'badge-offline'
+                                        };
+                                    ?>">
+                                        <?php echo ucfirst(htmlspecialchars($sorter['status'])); ?>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>
-
-    <!-- Add Device Modal -->
-    <div class="modal fade" id="addDeviceModal" tabindex="-1" aria-labelledby="addDeviceModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addDeviceModalLabel">Add New Sorter Device</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form id="addDeviceForm" method="POST">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="deviceName" class="form-label">Device Name</label>
-                            <input type="text" class="form-control" id="deviceName" name="deviceName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="location" class="form-label">Location</label>
-                            <input type="text" class="form-control" id="location" name="location" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="deviceIdentity" class="form-label">Device Identity</label>
-                            <input type="text" class="form-control" id="deviceIdentity" name="deviceIdentity" 
-                                   pattern="[A-Za-z0-9]+" 
-                                   title="Only letters and numbers allowed"
-                                   placeholder="e.g., Sorter1" required>
-                            <div class="form-text text-danger">Important: The device must be running and attempting to connect before you can add it here.</div>
-                            <div class="form-text">Enter the identity exactly as configured in the device.</div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success">Add Device</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <style>
-    .border-dashed {
-        border-style: dashed !important;
-        border-width: 2px !important;
-        background-color: rgba(0,0,0,0.01);
-    }
-    </style>
-
-    <script src="js/bootstrap.bundle.min.js"></script>
-
 
     <div id="statusModal" class="modal fade" tabindex="-1">
         <div class="modal-dialog">
@@ -180,6 +291,37 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+<div class="modal fade" id="addDeviceModal" tabindex="-1" aria-labelledby="addDeviceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addDeviceModalLabel">Add New Device</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addDeviceForm">
+                    <div class="mb-3">
+                        <label for="deviceName" class="form-label">Device Name</label>
+                        <input type="text" class="form-control" id="deviceName" name="deviceName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location</label>
+                        <input type="text" class="form-control" id="location" name="location" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="deviceIdentity" class="form-label">Device Identity</label>
+                        <input type="text" class="form-control" id="deviceIdentity" name="deviceIdentity" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addDeviceForm" class="btn btn-primary">Add Device</button>
+            </div>
+        </div>
+    </div>
+</div>
+
     <!-- Delete Confirmation Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1">
         <div class="modal-dialog">
@@ -200,11 +342,19 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+    <script src="js/bootstrap.bundle.min.js"></script>
     <script>
     const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
     const statusMessage = document.getElementById('statusMessage');
     const progressBar = document.querySelector('#statusModal .progress');
-
+    const addDeviceModal = document.getElementById('addDeviceModal');
+    
+    addDeviceModal.addEventListener('show.bs.modal', function (event) {
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.style.backgroundColor = 'rgba(124, 124, 124, 0.15)';
+        }
+    });
     // Function to show status alerts
     function showStatusAlert(message, type = 'danger', dismissible = true) {
         const alertContainer = document.getElementById('statusAlertContainer');
@@ -319,17 +469,25 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
             return response.json();
         })
-        .then(data => {
-            if (data.success) {
-                showStatus(`✅ ${data.message}`, false, false);
-                // Reload the page to show the newly added device
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
-            } else {
-                showStatus(`❌ ${data.message}`, true, false);
-            }
-        })
+       .then(data => {
+    if (data.success) {
+        // Close the Add Device Modal first
+        const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
+        if (addModal) {
+            addModal.hide();
+        }
+        
+        // Then show success message
+        showStatus(`✅ ${data.message}`, false, false);
+        
+        // Reload the page to show the newly added device
+        setTimeout(() => {
+            location.reload();
+        }, 2000);
+    } else {
+        showStatus(`❌ ${data.message}`, true, false);
+    }
+})
         .catch(error => {
             showStatus(`❌ Server error: ${error.message}. Please try again or contact support.`, true, false);
             console.error('Error:', error);
@@ -339,7 +497,7 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
     // Pre-fill device name based on identity
     document.getElementById('deviceIdentity').addEventListener('input', function(e) {
         const identity = e.target.value;
-        document.getElementById('deviceName').value = 'GoSort-' + identity;
+        document.getElementById('deviceName').value = 'GS-' + identity;
     });
 
     // Delete device functionality
@@ -429,13 +587,12 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         if (deviceCard) {
                             const badge = deviceCard.querySelector('.badge');
                             const statusClass = {
-                                'online': 'bg-success',
-                                'offline': 'bg-danger',
-                                'maintenance': 'bg-warning'
-                            }[device.status] || 'bg-danger';
+                                'online': 'badge-online',
+                                'offline': 'badge-offline',
+                                'maintenance': 'badge-maintenance'
+                            }[device.status] || 'badge-offline';
 
-                            // Update badge
-                            badge.className = `badge ${statusClass}`;
+                            badge.className = `badge rounded-pill ${statusClass}`;
                             badge.textContent = device.status.charAt(0).toUpperCase() + device.status.slice(1);
 
                             // Update last active time
@@ -478,5 +635,6 @@ $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
     }, 100);
     </script>
+    <script src="js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

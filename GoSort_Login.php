@@ -52,12 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         @font-face {
          font-family: 'Kay Pho Du';
-         src: url('fonts/KayPhoDu-Regular.ttf') format('truetype');
+         src: url('fonts/inter.ttf') format('truetype');
          font-weight: normal;
          font-style: normal;
         }
         body {
-            font-family: 'Kay Pho Du', sans-serif;
+            font-family: 'inter', sans-serif;
             height: 100vh;
             display: flex;
             align-items: center;
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         .form-control {
-            font-family: 'Kay Pho Du', sans-serif;
+            font-family: 'inter', sans-serif;
             border: 1px solid #333;
             border-radius: 5px;
             background-color: transparent;
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             border-width: 1.5px;
         }
         .btn-login{
-            font-family: 'Kay Pho Du', sans-serif;
+            font-family: 'inter', sans-serif;
             background-color: #58C542;
             color: black;
             border: none;
