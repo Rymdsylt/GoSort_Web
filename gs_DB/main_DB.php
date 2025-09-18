@@ -121,7 +121,18 @@ try {
         AND last_active < NOW() - INTERVAL 10 SECOND
     ");
 
-    // Create event to automatically exit maintenance mode if device loses connection for 5 seconds
+    // Drop existing event if it exists
+    $conn->query("DROP EVENT IF EXISTS end_maintenance_mode_after_1_minute");
+
+    // Create event to automatically end maintenance mode after 1 minute
+    $conn->query("
+        CREATE EVENT end_maintenance_mode_after_1_minute
+        ON SCHEDULE EVERY 1 MINUTE
+        DO
+        UPDATE maintenance_mode
+        SET active = FALSE, end_time = NOW()
+        WHERE active = TRUE AND start_time < NOW() - INTERVAL 1 MINUTE
+    ");
 
 
     $conn->close();
