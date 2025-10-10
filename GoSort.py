@@ -234,8 +234,11 @@ def request_registration(ip_address, identity):
                     if response.status_code == 200:
                         data = response.json()
                         if data.get('success'):
+<<<<<<< Updated upstream
                             if 'already in waiting list' in data.get('message', ''):
                                 return False, "duplicate"
+=======
+>>>>>>> Stashed changes
                             print("\n✅ Added to waiting devices list")
                             return False, None
                     return False, None
@@ -250,6 +253,7 @@ def restart_program():
     python = sys.executable
     os.execl(python, python, *sys.argv)
 
+<<<<<<< Updated upstream
 def is_identity_duplicate(ip_address, identity):
     try:
         print("Checking for identical identity...")
@@ -268,6 +272,8 @@ def is_identity_duplicate(ip_address, identity):
         print(f"Error checking duplicate identity: {e}")
         return False, None
 
+=======
+>>>>>>> Stashed changes
 def remove_from_waiting_devices(ip_address, device_identity):
     try:
         url = f"http://{ip_address}/GoSort_Web/gs_DB/remove_waiting_device.php"
@@ -292,6 +298,7 @@ def main():
     config = load_config()
     if config.get('sorter_id') is None:
         print("\nFirst time setup - Sorter Identity Configuration")
+<<<<<<< Updated upstream
         while True:
             sorter_id = input("Enter Sorter Identity (e.g., Sorter1): ")
             is_duplicate, status = is_identity_duplicate(ip_address, sorter_id)
@@ -304,11 +311,17 @@ def main():
             config['sorter_id'] = sorter_id
             save_config(config)
             break
+=======
+        sorter_id = input("Enter Sorter Identity (e.g., Sorter1): ")
+        config['sorter_id'] = sorter_id
+        save_config(config)
+>>>>>>> Stashed changes
     
     # Fetch mapping from backend
     mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
     try:
         resp = requests.get(mapping_url)
+<<<<<<< Updated upstream
         mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'})
     except Exception as e:
         print(f"Warning: Could not fetch mapping, using default. {e}")
@@ -316,6 +329,15 @@ def main():
     # For menu display: get the order and labels
     menu_order = [('zdeg', mapping['zdeg']), ('ndeg', mapping['ndeg']), ('odeg', mapping['odeg'])]
     trash_labels = {'bio': 'Biodegradable', 'nbio': 'Non-Biodegradable', 'recyc': 'Recyclable'}
+=======
+        mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc', 'mdeg': 'mixed'})
+    except Exception as e:
+        print(f"Warning: Could not fetch mapping, using default. {e}")
+        mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc', 'mdeg': 'mixed'}
+    # For menu display: get the order and labels
+    menu_order = [('zdeg', mapping['zdeg']), ('ndeg', mapping['ndeg']), ('odeg', mapping['odeg'])]
+    trash_labels = {'bio': 'Biodegradable', 'nbio': 'Non-Biodegradable', 'recyc': 'Recyclable', 'mixed': 'Mixed Waste'}
+>>>>>>> Stashed changes
 
     print("\nRequesting device registration with the server...")
     dots_thread = None
@@ -341,6 +363,7 @@ def main():
         if registered:
             print("\n✅ Device registration confirmed!")
             break
+<<<<<<< Updated upstream
         elif status == "duplicate":
             print("\n❌ This identity is already in the waiting list")
             sorter_id = input("Please enter a different Sorter Identity: ")
@@ -348,6 +371,8 @@ def main():
             save_config(config)
             first_request = True
             continue
+=======
+>>>>>>> Stashed changes
         elif first_request:
             print("\n⏳ Waiting for admin approval in the GoSort web interface")
             print(f"    Device Identity: {config['sorter_id']}")
@@ -419,11 +444,39 @@ def main():
     
     print("\n✅ Connected to Arduino Mega 2560")
     
+<<<<<<< Updated upstream
+=======
+    # Track Arduino connection status
+    arduino_connected = True
+    
+    def check_arduino_connection():
+        """Check if Arduino is still connected"""
+        nonlocal arduino_connected
+        try:
+            # Try to get port info to check if Arduino is still connected
+            if not ser.is_open:
+                arduino_connected = False
+                return False
+            
+            # Try a simple write operation to test connection
+            ser.write(b'ping\n')
+            time.sleep(0.1)
+            return True
+        except (serial.SerialException, OSError, Exception) as e:
+            print(f"\n❌ Arduino connection lost: {e}")
+            arduino_connected = False
+            return False
+
+>>>>>>> Stashed changes
     def print_menu():
         print("\nTrash Selection Menu:")
         for idx, (deg, ttype) in enumerate(menu_order, 1):
             label = trash_labels.get(ttype, ttype)
             print(f"{idx}. {label}")
+<<<<<<< Updated upstream
+=======
+        print("4. Mixed")
+>>>>>>> Stashed changes
         print("r. Reconfigure IP")
         print("i. Reconfigure Identity")
         print("c. Clear All Configuration")
@@ -440,6 +493,7 @@ def main():
         # Send heartbeat periodically to keep device online
         current_time = time.time()
         if current_time - last_heartbeat >= heartbeat_interval:
+<<<<<<< Updated upstream
             try:
                 # Send heartbeat to update last_active
                 requests.post(
@@ -452,6 +506,58 @@ def main():
                 print(f"\n⚠️ Heartbeat error: {e}")
                 # Remove from waiting devices if heartbeat fails
                 remove_from_waiting_devices(ip_address, config['sorter_id'])
+=======
+            # Only send heartbeat if Arduino is still connected
+            if arduino_connected and check_arduino_connection():
+                try:
+                    # Send heartbeat to update last_active
+                    requests.post(
+                        f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php",
+                        json={'identity': config['sorter_id']},
+                        headers={'Content-Type': 'application/json'}
+                    )
+                    last_heartbeat = current_time
+                except Exception as e:
+                    print(f"\n⚠️ Heartbeat error: {e}")
+                    # Remove from waiting devices if heartbeat fails
+                    remove_from_waiting_devices(ip_address, config['sorter_id'])
+            else:
+                # Arduino disconnected, stop sending heartbeats
+                print("\n⚠️ Arduino disconnected - stopping heartbeats")
+                # Remove from waiting devices since Arduino is disconnected
+                remove_from_waiting_devices(ip_address, config['sorter_id'])
+                break
+
+        # Process any incoming serial data from Arduino
+        while ser.in_waiting > 0:
+            try:
+                line = ser.readline().decode().strip()
+                if line.startswith('bin_fullness:'):
+                    # Parse bin fullness data
+                    _, bin_name, distance = line.split(':')
+                    distance = int(distance)
+                    
+                    # Send bin fullness data to server
+                    try:
+                        response = requests.post(
+                            f"http://{ip_address}/GoSort_Web/gs_DB/update_bin_fullness.php",
+                            json={
+                                'device_identity': config['sorter_id'],
+                                'bin_name': bin_name,
+                                'distance': distance
+                            },
+                            headers={'Content-Type': 'application/json'}
+                        )
+                        if response.status_code != 200:
+                            print(f"\n⚠️ Failed to update bin fullness for {bin_name}")
+                    except Exception as e:
+                        print(f"\n❌ Error sending bin fullness data: {e}")
+            except UnicodeDecodeError:
+                # Ignore malformed serial data
+                continue
+            except Exception as e:
+                print(f"\n❌ Error processing serial data: {e}")
+>>>>>>> Stashed changes
 
         # Check maintenance mode periodically
         current_maintenance = check_maintenance_mode(ip_address, config['sorter_id'])
@@ -476,6 +582,15 @@ def main():
 
         # If in maintenance mode, check for and execute maintenance commands
         if current_maintenance:
+<<<<<<< Updated upstream
+=======
+            # Check Arduino connection before processing maintenance commands
+            if not arduino_connected or not check_arduino_connection():
+                print("\n⚠️ Arduino disconnected - cannot execute maintenance commands")
+                time.sleep(check_interval)
+                continue
+                
+>>>>>>> Stashed changes
             try:
                 response = requests.post(
                     f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance_commands.php",
@@ -595,12 +710,25 @@ def main():
                     os.remove('gosort_config.json')
                 print("✅ All configuration cleared. Please restart the application.")
                 break
+<<<<<<< Updated upstream
             elif choice in ['1', '2', '3']:
                  idx = int(choice) - 1
                  if idx < 0 or idx >= len(menu_order):
                      print("Invalid choice.")
                      continue
                  trash_type = menu_order[idx][1]
+=======
+            elif choice in ['1', '2', '3', '4']:
+                 idx = int(choice) - 1
+                 if choice == '4':
+                     command = 'mdeg'  # Special case for mixed
+                     trash_type = 'mixed'
+                 else:
+                     if idx >= len(menu_order):
+                         print("Invalid choice.")
+                         continue
+                     trash_type = menu_order[idx][1]
+>>>>>>> Stashed changes
                  # Find the servo command for this trash type
                  command = None
                  for servo_key, ttype in mapping.items():

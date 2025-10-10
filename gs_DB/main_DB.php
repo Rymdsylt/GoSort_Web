@@ -82,6 +82,43 @@ try {
         )
     ");
 
+<<<<<<< Updated upstream
+=======
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS maintenance_mode (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            active BOOLEAN DEFAULT TRUE,
+            start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            end_time TIMESTAMP NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS sorter_mapping (
+            device_identity VARCHAR(100) PRIMARY KEY,
+            zdeg VARCHAR(10) NOT NULL,
+            ndeg VARCHAR(10) NOT NULL,
+            odeg VARCHAR(10) NOT NULL,
+            tdeg VARCHAR(10) NOT NULL,
+            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS bin_fullness (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            device_id INT NOT NULL,
+            bin_name VARCHAR(50) NOT NULL,
+            distance INT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY device_bin (device_id, bin_name),
+            FOREIGN KEY (device_id) REFERENCES sorters(id) ON DELETE CASCADE
+        )
+    ");
+
+>>>>>>> Stashed changes
     // Enable event scheduler
     $conn->query("SET GLOBAL event_scheduler = ON");
 

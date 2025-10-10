@@ -19,6 +19,16 @@ import cpuinfo
 def is_maintenance_mode():
     return os.path.exists('python_maintenance_mode.txt')
 
+<<<<<<< Updated upstream
+=======
+def load_categories():
+    categories_file = 'categories.json'
+    if os.path.exists(categories_file):
+        with open(categories_file, 'r') as f:
+            return json.load(f)
+    return {}
+
+>>>>>>> Stashed changes
 def load_config():
     config_file = 'gosort_config.json'
     if os.path.exists(config_file):
@@ -161,6 +171,7 @@ class ArduinoCommand:
         self.command = command
         self.done = False
 
+<<<<<<< Updated upstream
 class CommandHandler:
     def __init__(self, arduino):
         self.arduino = arduino
@@ -168,6 +179,49 @@ class CommandHandler:
         self.running = True
         self.thread = Thread(target=self._process_commands, daemon=True)
         self.thread.start()
+=======
+
+class SensorReader(Thread):
+    """
+    Thread to read bin fullness data from Arduino serial and store in a shared dictionary.
+    """
+    def __init__(self, arduino_serial, bin_status, lock):
+        super().__init__(daemon=True)
+        self.arduino_serial = arduino_serial
+        self.bin_status = bin_status
+        self.lock = lock
+        self.running = True
+
+    def run(self):
+        buffer = b""
+        while self.running:
+            try:
+                if self.arduino_serial.in_waiting:
+                    data = self.arduino_serial.read(self.arduino_serial.in_waiting)
+                    buffer += data
+                    while b'\n' in buffer:
+                        line, buffer = buffer.split(b'\n', 1)
+                        line = line.decode(errors='ignore').strip()
+                        if line.startswith('bin_fullness:'):
+                            # Format: bin_fullness:BinName:Distance
+                            parts = line.split(':')
+                            if len(parts) == 3:
+                                bin_name = parts[1].strip()
+                                try:
+                                    distance = int(parts[2].strip())
+                                except ValueError:
+                                    distance = None
+                                with self.lock:
+                                    self.bin_status[bin_name] = distance
+            except Exception as e:
+                pass  # Optionally log error
+            # Small sleep to avoid busy loop
+            import time
+            time.sleep(0.05)
+
+    def stop(self):
+        self.running = False
+>>>>>>> Stashed changes
 
     def send_command(self, command):
         self.command_queue.put(ArduinoCommand(command))
@@ -290,6 +344,35 @@ def check_server_connection(ip_address):
     except:
         return False
 
+<<<<<<< Updated upstream
+=======
+def map_category_to_command(category, mapping):
+    # Map categories to the standard waste types used in the mapping
+    category_to_type = {
+        'bio': 'bio',
+        'hazardous': 'nbio',  # Hazardous waste goes to non-bio bin
+        'recyclable': 'recyc',
+        'non_bio': 'nbio',
+        'mixed': 'mixed'
+    }
+    
+    waste_type = category_to_type.get(category, 'nbio')  # Default to non-bio if category not found
+    
+    # Find the servo command for this waste type
+    for cmd, typ in mapping.items():
+        if typ == waste_type:
+            return cmd
+    
+    # Default commands if not found in mapping
+    default_commands = {
+        'bio': 'zdeg',
+        'nbio': 'ndeg',
+        'recyc': 'odeg',
+        'mixed': 'mdeg'
+    }
+    return default_commands.get(waste_type, 'ndeg')  # Default to ndeg if no mapping found
+
+>>>>>>> Stashed changes
 def check_maintenance_mode(ip_address, device_identity):
     try:
         url = f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance.php"
@@ -371,6 +454,7 @@ def restart_program():
     python = sys.executable
     os.execl(python, python, *sys.argv)
 
+<<<<<<< Updated upstream
 def is_identity_duplicate(ip_address, identity):
     try:
         print("Checking for identical identity...")
@@ -389,6 +473,8 @@ def is_identity_duplicate(ip_address, identity):
         print(f"Error checking duplicate identity: {e}")
         return False, None
 
+=======
+>>>>>>> Stashed changes
 def remove_from_waiting_devices(ip_address, device_identity):
     try:
         url = f"http://{ip_address}/GoSort_Web/gs_DB/remove_waiting_device.php"
@@ -407,11 +493,17 @@ def main():
     config = load_config()
     # First get IP address
     ip_address = get_ip_address()
+<<<<<<< Updated upstream
+=======
+    config['ip_address'] = ip_address
+    save_config(config)
+>>>>>>> Stashed changes
     print(f"\nUsing GoSort server at: {ip_address}")
 
     # Then get identity configuration
     if config.get('sorter_id') is None:
         print("\nFirst time setup - Sorter Identity Configuration")
+<<<<<<< Updated upstream
         while True:
             sorter_id = input("Enter Sorter Identity (e.g., Sorter1): ")
             is_duplicate, status = is_identity_duplicate(ip_address, sorter_id)
@@ -424,12 +516,18 @@ def main():
             config['sorter_id'] = sorter_id
             save_config(config)
             break
+=======
+        sorter_id = input("Enter Sorter Identity (e.g., Sorter1): ")
+        config['sorter_id'] = sorter_id
+        save_config(config)
+>>>>>>> Stashed changes
     sorter_id = config.get('sorter_id')
     print(f"Using Sorter Identity: {sorter_id}")
     
     print("\nVerifying server connection...")
     if not check_server_connection(ip_address):
         print("❌ Failed to connect to the server")
+<<<<<<< Updated upstream
         return
 
     print("\nRequesting device registration with the server...")
@@ -457,6 +555,20 @@ def main():
             save_config(config)
             first_request = True
             continue
+=======
+
+        # ...existing code for Arduino connection...
+        # After connecting to Arduino and getting 'ser' (serial.Serial instance):
+        # Set up bin fullness sensor reading
+        bin_status = {}  # e.g., {'Non-Bio': 23, 'Bio': 40, ...}
+        bin_status_lock = Lock()
+        sensor_reader = None
+        if 'ser' in locals() and ser:
+            sensor_reader = SensorReader(ser, bin_status, bin_status_lock)
+            sensor_reader.start()
+            print("\n✅ Device registration confirmed!")
+            break
+>>>>>>> Stashed changes
         elif first_request:
             print("\n⏳ Waiting for admin approval in the GoSort web interface")
             print(f"    Device Identity: {sorter_id}")
@@ -496,6 +608,7 @@ def main():
         if not first_request:
             print(".", end="", flush=True)
 
+<<<<<<< Updated upstream
     # Set up last heartbeat time
     last_heartbeat = 0
     heartbeat_interval = 5  # Send heartbeat every 5 seconds
@@ -544,6 +657,87 @@ def main():
         print(f"Failed to connect to Arduino: {e}")
         arduino = None
         command_handler = None
+=======
+
+    while True:
+        frame = stream.read()
+        frame_count += 1
+
+        # ...existing code for heartbeat, maintenance, detection, UI...
+
+        # Example: Access latest bin fullness data
+        with bin_status_lock:
+            bin_status_copy = dict(bin_status)
+        # You can now use bin_status_copy in your UI, logs, or send to server
+        # For demonstration, print every 100 frames
+        if frame_count % 100 == 0:
+            print("[Sensor] Bin fullness:", bin_status_copy)
+
+        # ...existing code for UI and OpenCV display...
+
+        # Show the result
+        # ...existing code...
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Release resources
+    stream.stop()
+    if sensor_reader:
+        sensor_reader.stop()
+    if command_handler:
+        command_handler.stop()
+    cv2.destroyAllWindows()
+        command_handler = None
+        arduino_connected = False
+        candidate_ports = list(serial.tools.list_ports.comports())
+        for port in candidate_ports:
+            if 'Arduino' in port.description or '2560' in port.description or True: 
+                try:
+                    arduino = serial.Serial(port.device, 19200, timeout=1)
+                    time.sleep(2)  
+                    print(f"Connected to Arduino on {port.device} ({port.description})")
+
+                    arduino.write(b'gosort_ready\n')
+                    print("Sent gosort_ready signal")
+ 
+                    while arduino.in_waiting:
+                        response = arduino.readline().decode().strip()
+                        print(f"Arduino: {response}")
+            
+                    command_handler = CommandHandler(arduino)
+                    arduino_connected = True
+                    def check_arduino_connection():
+                        nonlocal arduino_connected
+                        try:
+                            if not arduino.is_open:
+                                arduino_connected = False
+                                return False
+                            arduino.write(b'ping\n')
+                            time.sleep(0.1)
+                            return True
+                        except (serial.SerialException, OSError, Exception) as e:
+                            print(f"\n❌ Arduino connection lost: {e}")
+                            arduino_connected = False
+                            return False
+                    break  #
+                except Exception as e:
+                    print(f"Failed to connect to {port.device}: {e}")
+                    if arduino:
+                        arduino.close()
+                    arduino = None
+        if not arduino_connected:
+            print("No Arduino found on any COM port.")
+            def check_arduino_connection():
+                return False
+    except Exception as e:
+        print(f"Error during Arduino port search: {e}")
+        arduino = None
+        command_handler = None
+        arduino_connected = False
+        def check_arduino_connection():
+            return False
+>>>>>>> Stashed changes
 
     print("Searching for available cameras...")
 
@@ -567,7 +761,11 @@ def main():
     fps_time = time.time()
     frame_count = 0
 
+<<<<<<< Updated upstream
     # Fetch mapping from backend
+=======
+
+>>>>>>> Stashed changes
     mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
     try:
         resp = requests.get(mapping_url)
@@ -575,13 +773,18 @@ def main():
     except Exception as e:
         print(f"Warning: Could not fetch mapping, using default. {e}")
         mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'}
+<<<<<<< Updated upstream
     # Reverse mapping: trash type -> servo command
+=======
+
+>>>>>>> Stashed changes
     trash_to_cmd = {v: k for k, v in mapping.items()}
 
     while True:
         frame = stream.read()
         frame_count += 1
 
+<<<<<<< Updated upstream
         # Handle heartbeat
         current_time = time.time()
         if current_time - last_heartbeat >= heartbeat_interval:
@@ -603,12 +806,44 @@ def main():
             else:
                 print("\n✅ Exiting maintenance mode - Detection resumed")
                 # Re-fetch mapping after maintenance mode
+=======
+
+        current_time = time.time()
+        if current_time - last_heartbeat >= heartbeat_interval:
+
+            if arduino_connected and check_arduino_connection():
+                if send_heartbeat(ip_address, sorter_id):
+                    last_heartbeat = current_time
+                else:
+                    print("\n Failed to send heartbeat")
+                 
+                    remove_from_waiting_devices(ip_address, sorter_id)
+            else:
+          
+                print("\n Arduino disconnected - stopping heartbeats")
+
+                remove_from_waiting_devices(ip_address, sorter_id)
+                break
+
+
+        current_maintenance = check_maintenance_mode(ip_address, sorter_id)
+        
+
+        if current_maintenance != last_maintenance_status:
+            if current_maintenance:
+                print("\n Entering maintenance mode - Detection paused")
+                print("Listening for maintenance commands...")
+            else:
+                print("\n Exiting maintenance mode - Detection resumed")
+
+>>>>>>> Stashed changes
                 try:
                     resp = requests.get(mapping_url)
                     mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'})
                 except Exception as e:
                     print(f"Warning: Could not fetch mapping, using default. {e}")
                     mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'}
+<<<<<<< Updated upstream
                 # Update reverse mapping
                 trash_to_cmd = {v: k for k, v in mapping.items()}
             last_maintenance_status = current_maintenance
@@ -655,10 +890,80 @@ def main():
                                     print("Sending maintmode command to enable maintenance mode...")
                                     command_handler.arduino.write("maintmode\n".encode())
                                     time.sleep(0.5)  # Give Arduino time to process maintmode command
+=======
+
+                trash_to_cmd = {v: k for k, v in mapping.items()}
+            last_maintenance_status = current_maintenance
+
+        if current_maintenance:
+
+            cv2.putText(frame, "MAINTENANCE MODE - Detection Paused", (10, 110), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            
+
+            if not arduino_connected or not check_arduino_connection():
+                print("\n Arduino disconnected - cannot execute maintenance commands")
+
+                results = []
+            else:
+                try:
+                    response = requests.post(
+                        f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance_commands.php",
+                        json={'device_identity': sorter_id},
+                        headers={'Content-Type': 'application/json'}
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('success') and data.get('command'):
+                            command = data['command']
+                            print(f"\n📡 Received maintenance command from server: {command}")
+                            print(f"Current mapping: {mapping}")
+                            
+              
+                            if command == 'shutdown':
+                                print("\n⚠️ Shutdown command received. Shutting down computer...")
+            
+                                try:
+                                    requests.post(
+                                        f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
+                                        json={'device_identity': sorter_id, 'command': command}
+                                    )
+                                except Exception as e:
+                                    print(f"\n⚠️ Error marking shutdown command as executed: {e}")
+                                os.system('shutdown /s /t 1 /f')
+                                time.sleep(5)
+                                break
+                            
+              
+                            if command_handler is not None:
+                                if command_handler.command_queue.empty():
+
+                                    if command in ['unclog', 'sweep1', 'sweep2']:
+                                        print("Sending maintmode command to enable maintenance mode...")
+                                        command_handler.arduino.write("maintmode\n".encode())
+                                        time.sleep(0.5) 
+                                        
+                                        while command_handler.arduino.in_waiting:
+                                            response = command_handler.arduino.readline().decode().strip()
+                                            if response:
+                                                print(f" Arduino Response: {response}")
+                                
+                                    print(f"Sending to Arduino: {command}")
+                                    command_handler.arduino.write(f"{command}\n".encode())
+                                    
+                      
+                                    if command == 'unclog':
+                                        time.sleep(6) 
+                                    elif command in ['sweep1', 'sweep2']:
+                                        time.sleep(5)
+                                    else:
+                                        time.sleep(0.1)
+>>>>>>> Stashed changes
                                     
                                     while command_handler.arduino.in_waiting:
                                         response = command_handler.arduino.readline().decode().strip()
                                         if response:
+<<<<<<< Updated upstream
                                             print(f"🟢 Arduino Response: {response}")
                                 
                                 print(f"Sending to Arduino: {command}")
@@ -712,13 +1017,57 @@ def main():
                                 )
             except Exception as e:
                 print(f"\n❌ Error checking maintenance commands: {e}")
+=======
+                                            print(f"Arduino Response: {response}")
+                                    
+                             
+                                    if command in ['unclog', 'sweep1', 'sweep2']:
+                                        print("Sending maintend command to exit maintenance mode...")
+                                        command_handler.arduino.write("maintend\n".encode())
+                                        time.sleep(0.5) 
+                                        
+                                        while command_handler.arduino.in_waiting:
+                                            response = command_handler.arduino.readline().decode().strip()
+                                            if response:
+                                                print(f"🟢 Arduino Response: {response}")
+                                    
+                                 
+                                    if command in ['ndeg', 'zdeg', 'odeg']:
+                                        # Find the trash type for this servo command using mapping
+                                        trash_type = mapping.get(command)
+                                        if trash_type:
+                                            try:
+                                                requests.post(
+                                                    f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
+                                                    json={
+                                                        'device_identity': sorter_id,
+                                                        'trash_type': trash_type,
+                                                        'is_maintenance': True
+                                                    }
+                                                )
+                                            except Exception as e:
+                                                print(f"\n⚠️ Error recording sorting: {e}")
+                                    
+                                    # Mark command as executed
+                                    requests.post(
+                                        f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
+                                        json={'device_identity': sorter_id, 'command': command}
+                                    )
+                except Exception as e:
+                    print(f"\n❌ Error checking maintenance commands: {e}")
+>>>>>>> Stashed changes
             
             # Skip YOLOv8 inference during maintenance
             results = []
         else:
             # Only run YOLOv8 when not in maintenance mode
+<<<<<<< Updated upstream
             with torch.cuda.amp.autocast(), torch.inference_mode(): 
                 results = model(frame, stream=True)  
+=======
+            # Use model.predict(frame, stream=False) to avoid PyTorch version_counter errors
+            results = model.predict(frame, stream=False)
+>>>>>>> Stashed changes
 
         # Update FPS counter
         current_time = time.time()
@@ -734,6 +1083,7 @@ def main():
                     x1, y1, x2, y2 = box.xyxy[0].astype(int)
                     conf = box.conf[0]
                     class_id = int(box.cls[0])
+<<<<<<< Updated upstream
                     class_name = model.names[class_id]
 
                     # Draw bounding box and label (properly indented inside the box loop)
@@ -755,6 +1105,38 @@ def main():
                         
                         try:
                             print(f"✅ Detection: {class_name} ({conf:.2f})")
+=======
+                    detected_item = model.names[class_id]
+                    
+                    # Map the detected item to its category using categories.json
+                    categories = load_categories()
+                    class_name = None
+                    for category, items in categories.items():
+                        if detected_item.lower() in [item.lower() for item in items]:
+                            class_name = category
+                            break
+                    
+                    if class_name is None:
+                        class_name = "non_bio"  # Default category if not found
+
+                    # Draw bounding box and label with 75% opacity
+                    overlay = frame.copy()
+                    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(overlay, f"{detected_item} {conf:.2f}", (x1, y1 - 10),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    # Apply the overlay with 75% opacity
+                    cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+
+                    # Process detections with high confidence
+                    if conf > 0.50:  # 50% confidence threshold
+                        # Map the detected category to a servo command
+                        command = map_category_to_command(class_name, mapping)
+                        # Get the corresponding trash type from the mapping
+                        trash_type = mapping.get(command, 'nbio')
+                        
+                        try:
+                            print(f"✅ Detection: {detected_item} ({conf:.2f}) - Category: {class_name}")
+>>>>>>> Stashed changes
                             
                             # Record sorting operation
                             url = f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php"

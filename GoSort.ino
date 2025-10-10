@@ -2,8 +2,31 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+<<<<<<< Updated upstream
 Servo rotateServo;  // Servo for rotation (D8)
 Servo tiltServo;    // Servo for tilting (D9)
+=======
+// Servo pins
+Servo rotateServo;  // Servo for rotation (D8)
+Servo tiltServo;    // Servo for tilting (D9)
+
+// Ultrasonic sensor pins for bin fullness
+const int TRIG_PIN_1 = 2;  // Non-biodegradable bin sensor
+const int ECHO_PIN_1 = 3;
+const int TRIG_PIN_2 = 4;  // Biodegradable bin sensor
+const int ECHO_PIN_2 = 5;
+const int TRIG_PIN_3 = 6;  // Recyclable bin sensor
+const int ECHO_PIN_3 = 7;
+const int TRIG_PIN_4 = 10; // Extra bin sensor
+const int ECHO_PIN_4 = 11;
+
+// Variables for sensor timing
+const unsigned long SENSOR_INTERVAL = 700; // 0.7 seconds in milliseconds
+unsigned long lastSensorReadTime;  // Will be initialized after booting
+int currentSensor;                // Will be initialized after booting
+bool sensorsActive = false;       // Flag to control sensor activation
+
+>>>>>>> Stashed changes
 String inputString = "";
 bool isSorting = false;
 bool maintenanceMode = false;
@@ -29,6 +52,7 @@ const int NUM_JOKES = 8;
 
 // Servo positions (must be between 0 and 180)
 const int neutralPos = 90;    // D8 neutral position
+<<<<<<< Updated upstream
 const int zDegPos = 0;   // 0 degrees
 const int nDegPos = 90;  // 90 degrees
 const int oDegPos = 180; // 180 degrees
@@ -37,6 +61,28 @@ const int tiltNeutralPos = 97;  // D9 neutral position
 void setup() {
   rotateServo.attach(8);
   tiltServo.attach(9);
+=======
+const int nbioPos = 0;
+const int bioPos = 90;
+const int recycPos = 180;     // was 270 – corrected to valid servo range
+const int tiltNeutralPos = 97;  // D9 neutral position
+
+void setup() {
+  // Initialize servos
+  rotateServo.attach(8);
+  tiltServo.attach(9);
+  
+  // Initialize ultrasonic sensor pins
+  pinMode(TRIG_PIN_1, OUTPUT);
+  pinMode(ECHO_PIN_1, INPUT);
+  pinMode(TRIG_PIN_2, OUTPUT);
+  pinMode(ECHO_PIN_2, INPUT);
+  pinMode(TRIG_PIN_3, OUTPUT);
+  pinMode(ECHO_PIN_3, INPUT);
+  pinMode(TRIG_PIN_4, OUTPUT);
+  pinMode(ECHO_PIN_4, INPUT);
+  
+>>>>>>> Stashed changes
   Serial.begin(19200);
   lcd.begin(16, 2);  
   lcd.backlight();
@@ -124,7 +170,11 @@ void setup() {
   lcd.print("Initializing...");
 
   // Sweep test with LCD output
+<<<<<<< Updated upstream
   rotateServo.write(zDegPos);
+=======
+  rotateServo.write(nbioPos);
+>>>>>>> Stashed changes
   lcd.setCursor(0, 1);
   lcd.print("Non-Biodegradable");
   delay(1000);
@@ -134,12 +184,20 @@ void setup() {
   lcd.print("Neutral           ");
   delay(1000);
 
+<<<<<<< Updated upstream
   rotateServo.write(nDegPos);
+=======
+  rotateServo.write(bioPos);
+>>>>>>> Stashed changes
   lcd.setCursor(0, 1);
   lcd.print("Biodegradable     ");
   delay(1000);
 
+<<<<<<< Updated upstream
   rotateServo.write(oDegPos);
+=======
+  rotateServo.write(recycPos);
+>>>>>>> Stashed changes
   lcd.setCursor(0, 1);
   lcd.print("Recyclable        ");
   delay(1000);
@@ -162,15 +220,85 @@ void setup() {
   lcd.print("Awaiting Trash ");
 
   Serial.println("Initialization complete - Ready for sorting!");
+<<<<<<< Updated upstream
+=======
+  
+  // Initialize sensor variables after booting
+  lastSensorReadTime = millis();
+  currentSensor = 1;
+  sensorsActive = true;  // Activate sensors
+>>>>>>> Stashed changes
 }
 
 
 
 
+<<<<<<< Updated upstream
 void loop() {
   // Handle maintenance mode scrolling text
   if (maintenanceMode) {
     unsigned long currentTime = millis();
+=======
+// Function to measure distance from a specific sensor
+long measureDistance(int trigPin, int echoPin) {
+  // Clear the trigger pin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  
+  // Send 10µs pulse
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  
+  // Measure the response
+  long duration = pulseIn(echoPin, HIGH);
+  
+  // Calculate distance in centimeters
+  return duration * 0.034 / 2;
+}
+
+void loop() {
+  unsigned long currentTime = millis();
+  
+  // Check bin fullness every SENSOR_INTERVAL (0.7 seconds) only if sensors are active
+  if (sensorsActive && currentTime - lastSensorReadTime >= SENSOR_INTERVAL) {
+    int distance = 0;
+    String binName = "";
+    
+    // Select which sensor to read based on the current rotation
+    switch(currentSensor) {
+      case 1:
+        distance = measureDistance(TRIG_PIN_1, ECHO_PIN_1);
+        binName = "Non-Bio";
+        break;
+      case 2:
+        distance = measureDistance(TRIG_PIN_2, ECHO_PIN_2);
+        binName = "Bio";
+        break;
+      case 3:
+        distance = measureDistance(TRIG_PIN_3, ECHO_PIN_3);
+        binName = "Recyclable";
+        break;
+      case 4:
+        distance = measureDistance(TRIG_PIN_4, ECHO_PIN_4);
+        binName = "Extra";
+        break;
+    }
+    
+    // Send bin fullness data over Serial
+    Serial.print("bin_fullness:");
+    Serial.print(binName);
+    Serial.print(":");
+    Serial.println(distance);
+    
+    // Update timing and move to next sensor
+    lastSensorReadTime = currentTime;
+    currentSensor = (currentSensor % 4) + 1;
+  }
+
+  // Handle maintenance mode scrolling text
+  if (maintenanceMode) {
+>>>>>>> Stashed changes
     if (currentTime - lastMaintenanceScrollTime >= 300) { // Scroll every 300ms
       String maintText = "Maintenance Mode... Standby   ";
       lcd.setCursor(0, 0);
@@ -186,6 +314,7 @@ void loop() {
 
     if (inChar == '\n' || inChar == '\r') {
       inputString.trim();
+<<<<<<< Updated upstream
       // Normalize aliases for trash types
       if (inputString == "bio") inputString = "zdeg";
       else if (inputString == "nbio") inputString = "ndeg";
@@ -193,16 +322,29 @@ void loop() {
       isSorting = !maintenanceMode; // Only set sorting flag if not in maintenance mode
 
       if (inputString == "zdeg") {
+=======
+      isSorting = !maintenanceMode; // Only set sorting flag if not in maintenance mode
+
+      if (inputString == "nbio") {
+>>>>>>> Stashed changes
         lcd.setCursor(0, 0);
         lcd.print("Sorting:          ");
         lcd.setCursor(0, 1);
         lcd.print("Non-Biodegradable");
 
+<<<<<<< Updated upstream
         rotateServo.write(zDegPos);  // D8 rotate
         delay(500);
         tiltServo.write(150);    // D9 tilt
         delay(500);
         tiltServo.write(tiltNeutralPos);     // D9 back to neutral
+=======
+        rotateServo.write(nbioPos);  // D8 rotate
+        delay(500);
+        tiltServo.write(150);    // D9 tilt
+        delay(500);
+        tiltServo.write(tiltNeutralPos);     // D9 back to neutral (85 yung sweet spot, tsaka na pag nalangisan na yung tilter, stalling kasi baka masunog)
+>>>>>>> Stashed changes
         delay(500);
         rotateServo.write(neutralPos);  // D8 back to neutral
         delay(500);
@@ -210,17 +352,29 @@ void loop() {
         Serial.println("Moved to non-biodegradable position");
         Serial.println("ready");
       } 
+<<<<<<< Updated upstream
       else if (inputString == "ndeg") {
+=======
+      else if (inputString == "bio") {
+>>>>>>> Stashed changes
         lcd.setCursor(0, 0);
         lcd.print("Sorting:          ");
         lcd.setCursor(0, 1);
         lcd.print("Biodegradable     ");
 
+<<<<<<< Updated upstream
         rotateServo.write(nDegPos);   // D8 rotate
         delay(500);
         tiltServo.write(150);    // D9 tilt
         delay(500);
         tiltServo.write(tiltNeutralPos);     // D9 back to neutral
+=======
+        rotateServo.write(bioPos);   // D8 rotate
+        delay(500);
+        tiltServo.write(150);    // D9 tilt
+        delay(500);
+        tiltServo.write(tiltNeutralPos);     // D9 back to neutral (85 yung sweet spot, tsaka na pag nalangisan na yung tilter, stalling kasi baka masunog)
+>>>>>>> Stashed changes
         delay(500);
         rotateServo.write(neutralPos);  // D8 back to neutral
         delay(500);
@@ -228,17 +382,29 @@ void loop() {
         Serial.println("Moved to biodegradable position");
         Serial.println("ready");
       } 
+<<<<<<< Updated upstream
       else if (inputString == "odeg") {
+=======
+      else if (inputString == "recyc") {
+>>>>>>> Stashed changes
         lcd.setCursor(0, 0);
         lcd.print("Sorting:          ");
         lcd.setCursor(0, 1);
         lcd.print("Recyclable        ");
 
+<<<<<<< Updated upstream
         rotateServo.write(oDegPos); // D8 rotate
         delay(500);
         tiltServo.write(150);    // D9 tilt
         delay(500);
         tiltServo.write(tiltNeutralPos);     // D9 back to neutral
+=======
+        rotateServo.write(recycPos); // D8 rotate
+        delay(500);
+        tiltServo.write(150);    // D9 tilt
+        delay(500);
+        tiltServo.write(tiltNeutralPos);     // D9 back to neutral (85 yung sweet spot, tsaka na pag nalangisan na yung tilter, stalling kasi baka masunog)
+>>>>>>> Stashed changes
         delay(500);
         rotateServo.write(neutralPos);  // D8 back to neutral
         delay(500);
@@ -295,11 +461,19 @@ void loop() {
           lcd.print("Testing...       ");
 
           // Sweep D8 through all positions
+<<<<<<< Updated upstream
           rotateServo.write(zDegPos);    // Go to non-bio (0°)
           delay(1000);
           rotateServo.write(nDegPos);     // Go to bio (90°)
           delay(1000);
           rotateServo.write(oDegPos);   // Go to recyclable (180°)
+=======
+          rotateServo.write(nbioPos);    // Go to non-bio (0°)
+          delay(1000);
+          rotateServo.write(bioPos);     // Go to bio (90°)
+          delay(1000);
+          rotateServo.write(recycPos);   // Go to recyclable (180°)
+>>>>>>> Stashed changes
           delay(1000);
           rotateServo.write(neutralPos); // Return to neutral (90°)
           
@@ -318,11 +492,19 @@ void loop() {
           delay(1000);
 
           // Sweep D8 through all positions
+<<<<<<< Updated upstream
           rotateServo.write(zDegPos);    // Go to non-bio (0°)
           delay(1000);
           rotateServo.write(nDegPos);     // Go to bio (90°)
           delay(1000);
           rotateServo.write(oDegPos);   // Go to recyclable (180°)
+=======
+          rotateServo.write(nbioPos);    // Go to non-bio (0°)
+          delay(1000);
+          rotateServo.write(bioPos);     // Go to bio (90°)
+          delay(1000);
+          rotateServo.write(recycPos);   // Go to recyclable (180°)
+>>>>>>> Stashed changes
           delay(1000);
           
           // Return both to neutral
