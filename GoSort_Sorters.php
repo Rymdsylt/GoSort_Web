@@ -241,6 +241,7 @@ $currentSortLabel = match($sort) {
             gap: 1rem;
         }
         #deviceWrapper {
+            min-height: 400px;
             max-height: 75vh;   
             overflow-y: auto;   
             overflow-x: hidden; 
@@ -250,6 +251,7 @@ $currentSortLabel = match($sort) {
         #listContainer {
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
             overflow: hidden;
+            min-height: 400px;
         }
 
         #listContainer table {

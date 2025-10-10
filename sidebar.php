@@ -231,7 +231,7 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
     
     <ul class="nav flex-column flex-grow-1">
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_Statistics.php') {echo 'active';} ?>" href="dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+            <a class="nav-link <?php if ($currentPage == 'dashboard.php') {echo 'active';} ?>" href="dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
                 <i class="bi bi-columns-gap"></i> <span>Dashboard</span>
             </a>
         </li>
@@ -241,7 +241,7 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'analytics.php') {echo 'active';} ?>" href="analytics.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Analytics">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_AnalyticsNavpage.php' || $currentPage == 'GoSort_Statistics.php') {echo 'active';} ?>" href="GoSort_AnalyticsNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Analytics">
                 <i class="bi bi-bar-chart"></i> <span>Analytics</span>
             </a>
         </li>
