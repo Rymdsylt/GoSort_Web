@@ -1101,12 +1101,14 @@ $currentSortLabel = match($sort) {
                         if (deviceCard) {
                             const maintenanceBtn = deviceCard.querySelector('.maintenance-btn');
                             const deleteBtn = deviceCard.querySelector('.delete-btn');
-                            if (device.status === 'online') {
-                                maintenanceBtn.style.display = '';
-                                deleteBtn.style.display = 'none';
-                            } else {
-                                maintenanceBtn.style.display = 'none';
-                                deleteBtn.style.display = '';
+                            if (maintenanceBtn && deleteBtn) {
+                                if (device.status === 'online') {
+                                    maintenanceBtn.style.display = '';
+                                    deleteBtn.style.display = 'none';
+                                } else {
+                                    maintenanceBtn.style.display = 'none';
+                                    deleteBtn.style.display = '';
+                                }
                             }
                         }
                     });

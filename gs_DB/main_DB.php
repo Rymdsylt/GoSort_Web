@@ -114,6 +114,21 @@ try {
         )
     ");
 
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS bin_notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            message TEXT NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            device_id VARCHAR(100),
+            priority VARCHAR(20) DEFAULT 'normal',
+            bin_name VARCHAR(20),
+            fullness_level INT,
+            FOREIGN KEY (device_id) REFERENCES sorters(device_identity) ON DELETE CASCADE
+        )
+    ");
+
     // Enable event scheduler
     $conn->query("SET GLOBAL event_scheduler = ON");
 

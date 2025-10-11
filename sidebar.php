@@ -256,6 +256,11 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
             </a>
         </li>
         <li class="nav-item">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_Notifications.php') {echo 'active';} ?>" href="GoSort_Notifications.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Notifications">
+                <i class="bi bi-bell"></i> <span>Notifications</span>
+            </a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link <?php if ($currentPage == 'settings.php') {echo 'active';} ?>" href="settings.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Settings">
                 <i class="bi bi-gear"></i> <span>Settings</span>
             </a>
