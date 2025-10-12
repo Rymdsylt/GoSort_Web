@@ -246,7 +246,7 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_Maintenance.php') {echo 'active';} ?>" href="maintenance.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Maintenance">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_MaintenanceNavpage.php' || $currentPage == 'GoSort_Maintenance.php') {echo 'active';} ?>" href="GoSort_MaintenanceNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Maintenance">
                 <i class="bi bi-clock-history"></i> <span>Maintenance</span>
             </a>
         </li>
