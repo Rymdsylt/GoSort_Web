@@ -35,7 +35,10 @@ if (empty($notifications)) {
                             $binInfo . $fullnessInfo . '
                         </small>
                     </div>
-                    <div>' . $priorityBadge . '</div>
+                    <div class="d-flex align-items-start gap-2">
+                        ' . $priorityBadge . '
+                        <i class="bi bi-trash delete-btn" title="Delete notification"></i>
+                    </div>
                 </div>
               </div>';
     }

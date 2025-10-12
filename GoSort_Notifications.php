@@ -58,6 +58,16 @@ if (!$user) {
             color: #6c757d;
             font-size: 0.875rem;
         }
+        .delete-btn {
+            float: right;
+            color: #dc3545;
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+        .delete-btn:hover {
+            color: #bd2130;
+        }
     </style>
 </head>
 <body>
@@ -69,6 +79,25 @@ if (!$user) {
             
             <div class="notification-container">
                 <!-- Notifications will be loaded here dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteConfirmModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure this is resolved?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+                </div>
             </div>
         </div>
     </div>
@@ -105,7 +134,10 @@ if (!$user) {
         }
 
         // Handle marking notifications as read
-        $(document).on('click', '.notification-item.unread', function() {
+        $(document).on('click', '.notification-item.unread', function(e) {
+            if ($(e.target).hasClass('delete-btn') || $(e.target).closest('.delete-btn').length) {
+                return; // Don't mark as read if clicking delete button
+            }
             const notificationId = $(this).data('id');
             $.ajax({
                 url: 'gs_DB/mark_bin_notification_read.php',
@@ -120,6 +152,44 @@ if (!$user) {
                     } catch (e) {
                         console.error('Error parsing response:', e);
                     }
+                }
+            });
+        });
+
+        let currentNotificationId = null;
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+
+        // Handle deleting notifications
+        $(document).on('click', '.delete-btn', function(e) {
+            e.stopPropagation(); // Prevent triggering the mark as read event
+            currentNotificationId = $(this).closest('.notification-item').data('id');
+            deleteModal.show();
+        });
+
+        // Handle delete confirmation
+        $('#confirmDeleteBtn').on('click', function() {
+            if (!currentNotificationId) return;
+            
+            $.ajax({
+                url: 'gs_DB/delete_bin_notification.php',
+                method: 'POST',
+                data: { notification_id: currentNotificationId },
+                success: function(response) {
+                    try {
+                        const result = JSON.parse(response);
+                        if (result.success) {
+                            deleteModal.hide();
+                            loadNotifications(); // Refresh the notifications
+                        } else {
+                            showError('Failed to delete notification. Please try again.');
+                        }
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                        showError('Error deleting notification. Please try again.');
+                    }
+                },
+                error: function() {
+                    showError('Error deleting notification. Please try again.');
                 }
             });
         });
