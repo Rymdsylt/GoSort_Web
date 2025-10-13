@@ -32,8 +32,9 @@ if (!$user) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: "Inter", sans-serif;
-            background-color: #f0f2f5;
+            font-family: 'Inter', sans-serif !important;
+            background-color: #F3F3EF !important;
+            color: var(--dark-gray);
         }
         #main-content-wrapper {
             margin-left: 260px;
@@ -42,6 +43,26 @@ if (!$user) {
         }
         #main-content-wrapper.collapsed {
             margin-left: 70px;
+        }
+        .page-header {
+            padding: 1rem 0 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+            margin: 0;
+            margin-left: 6px;
         }
         .notification-item {
             border-left: 4px solid #7AF146;
@@ -75,7 +96,14 @@ if (!$user) {
 
     <div id="main-content-wrapper">
         <div class="container-fluid">
-            <h2 class="mb-4">Notifications</h2>
+            <div class="page-header">
+                <div class="header-left">
+                    <h1 class="page-title">Notifications</h1>
+                </div>
+            </div>
+
+            <hr style="height: 1.5px; background-color: #000; opacity: 1; margin-left:6.5px;" class="mb-3">
+
             
             <div class="notification-container">
                 <!-- Notifications will be loaded here dynamically -->
