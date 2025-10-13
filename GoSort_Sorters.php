@@ -644,13 +644,8 @@ $currentSortLabel = match($sort) {
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown" aria-labelledby="dropdownMenu<?php echo $sorter['id']; ?>">
                                             <li>
-                                                <a class="dropdown-item d-flex" href="#" >
-                                                    <i class="bi bi-info-circle me-2"></i> Details
-                                                </a>
-                                            </li>
-                                            <li>
                                                 <a class="dropdown-item d-flex" href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>">
-                                                    <i class="bi bi-bar-chart me-2"></i> Statistics
+                                                    <i class="bi bi-bar-chart me-2"></i> Analytics
                                                 </a>
                                             </li>
                                             <li>
@@ -726,13 +721,8 @@ $currentSortLabel = match($sort) {
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown" aria-labelledby="dropdownMenu<?php echo $sorter['id']; ?>">
                                             <li>
-                                                <a class="dropdown-item d-flex" href="#" >
-                                                    <i class="bi bi-info-circle me-2"></i> Details
-                                                </a>
-                                            </li>
-                                            <li>
                                                 <a class="dropdown-item d-flex" href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>">
-                                                    <i class="bi bi-bar-chart me-2"></i> Statistics
+                                                    <i class="bi bi-bar-chart me-2"></i> Analytics
                                                 </a>
                                             </li>
                                             <li>
