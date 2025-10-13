@@ -212,8 +212,8 @@ if (!$device_id || !$device_identity) {
         }
 
         .connection-status.alert-success {
-            background-color: #F8FFEF;
-            color: var(--light-green);
+            background-color: var(--success-light);
+            color: var(--bio-color);
         }
 
         .connection-status.alert-danger {
@@ -287,39 +287,39 @@ if (!$device_id || !$device_identity) {
         }
 
         .servo-position-left {
-            border-color: #000000;
-            background: rgba(239, 239, 239, 0.05);
+            border-color: var(--bio-color);
+            background: rgba(16, 185, 129, 0.05);
         }
 
         .servo-position-left h6 {
-            color: #000000;
+            color: var(--bio-color);
         }
 
         .servo-position-front {
-            border-color: #000000;
-            background: rgba(239, 239, 239, 0.05);
+            border-color: var(--nbio-color);
+            background: rgba(239, 68, 68, 0.05);
         }
 
         .servo-position-front h6 {
-            color: #000000;
+            color: var(--nbio-color);
         }
 
         .servo-position-right {
-            border-color: #000000;
-            background: rgba(239, 239, 239, 0.05);
+            border-color: var(--hazardous-color);
+            background: rgba(245, 158, 11, 0.05);
         }
 
         .servo-position-right h6 {
-            color: #000000;
-        }   
+            color: var(--hazardous-color);
+        }
 
         .servo-position-back {
-            border-color: #000000;
-            background: rgba(239, 239, 239, 0.05);
+            border-color: var(--mixed-color);
+            background: rgba(107, 114, 128, 0.05);
         }
 
         .servo-position-back h6 {
-            color: #000000;
+            color: var(--mixed-color);
         }
 
         .quadrant-btn {
@@ -598,7 +598,7 @@ if (!$device_id || !$device_identity) {
                     <i class="bi bi-sliders me-2"></i>Device Controls
                 </button>
                 <button class="tab-btn" onclick="switchTab('tests')">
-                    <i class="bi bi-gear-wide-connected me-2"></i>Test Operations
+                    <i class="bi bi-vial me-2"></i>Test Operations
                 </button>
             </div>
 
@@ -663,7 +663,7 @@ if (!$device_id || !$device_identity) {
                     </div>
 
                     <div class="text-center">
-                        <button class="btn btn-primary btn-lg" style="border: 1px #000000; background-color: var(--light-green);" onclick="saveQuadrantMapping()">
+                        <button class="btn btn-primary btn-lg" style="max-width: 400px;" onclick="saveQuadrantMapping()">
                             <i class="bi bi-save me-2"></i>Save Mapping
                         </button>
                     </div>
@@ -797,25 +797,6 @@ if (!$device_id || !$device_identity) {
             </div>
         </div>
     </div>
-
-    <!-- Save Mapping Confirmation Modal -->
-<div class="modal fade" id="saveConfirmModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius: 16px; border: none;">
-            <div class="modal-body p-4">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="bi bi-check-circle-fill" style="color: var(--primary-green); font-size: 1.5rem; margin-right: 1rem;"></i>
-                    <h5 class="modal-title mb-0">Save New Mapping?</h5>
-                </div>
-                <p class="text-muted mb-4">Are you sure you want to save this mapping configuration?</p>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-secondary flex-grow-1" data-bs-dismiss="modal">Discard</button>
-                    <button type="button" class="btn btn-primary flex-grow-1" id="confirmSaveMapBtn" style="border: 1px; background-color: var(--light-green);">Save Mapping</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
     <script src="js/bootstrap.bundle.min.js"></script>
     <script>
@@ -1306,91 +1287,33 @@ window.addEventListener('DOMContentLoaded', function() {
 function showQuadrantSelect(q) {
     const current = quadrantMap[q];
     const options = [
-        {val:'bio', label:'Bio', icon:'leaf', btnClass:'btn-outline-success'},
-        {val:'nbio', label:'Non-Bio', icon:'bag-fill', btnClass:'btn-outline-danger'},
-        {val:'hazardous', label:'Hazardous', icon:'exclamation-circle', btnClass:'btn-outline-warning'},
-        {val:'mixed', label:'Mixed', icon:'layers', btnClass:'btn-outline-secondary'}
+        {val:'bio', label:'Bio'},
+        {val:'nbio', label:'Non-Bio'},
+        {val:'hazardous', label:'Hazardous'},
+        {val:'mixed', label:'Mixed'}
     ];
     
     const positionLabels = {zdeg: 'Left', ndeg: 'Front', odeg: 'Right', tdeg: 'Back'};
-    
-    let html = `
-        <div id="quadrant-select-modal" class="modal fade" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content" style="border-radius: 16px; border: none;">
-                    <div class="modal-body p-4">
-                        <div class="d-flex align-items-center mb-4">
-                            <i class="bi bi-diagram-3" style="color: var(--primary-green); font-size: 1.5rem; margin-right: 1rem;"></i>
-                            <h5 class="modal-title mb-0">Select Trash Type for ${positionLabels[q]}</h5>
-                        </div>
-                        <div class="button-grid">
-    `;
+    let html = '<div id="quadrant-select-modal" class="modal" tabindex="-1" style="display:block;background:rgba(0,0,0,0.3)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-radius: 16px; border: none;"><div class="modal-body p-4"><h5 class="modal-title mb-3">Select Trash Type for ' + positionLabels[q] + '</h5>';
     
     options.forEach(opt => {
         const isActive = current === opt.val;
-        const btnClass = isActive ? opt.btnClass.replace('outline-', '') : opt.btnClass;
-        html += `
-            <button 
-                class="btn ${btnClass} btn-lg" 
-                onclick="setQuadrantType('${q}','${opt.val}'); showSaveConfirmation();"
-                style="text-align: left; display: flex; align-items: center; gap: 0.75rem;">
-                <i class="bi bi-${opt.icon}"></i>
-                ${opt.label}
-            </button>
-        `;
+        html += `<button class="btn btn-lg w-100 my-2 ${isActive ? 'btn-primary' : 'btn-outline-primary'}" onclick="setQuadrantType('${q}','${opt.val}')">${opt.label}</button>`;
     });
     
-    html += `
-                        </div>
-                        <div class="d-flex gap-2 mt-4">
-                            <button type="button" class="btn btn-outline-secondary btn-lg flex-grow-1" onclick="document.getElementById('quadrant-select-modal').remove()">
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
+    html += '<button type="button" class="btn btn-outline-secondary btn-lg w-100 mt-3" onclick="closeQuadrantSelect()">Cancel</button></div></div></div></div>';
     document.body.insertAdjacentHTML('beforeend', html);
-    
-    // Initialize and show the modal using Bootstrap
-    const modalElement = document.getElementById('quadrant-select-modal');
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
-    
-    // Clean up modal when hidden
-    modalElement.addEventListener('hidden.bs.modal', function() {
-        modalElement.remove();
-    });
-}
-
-function showSaveConfirmation() {
-    const quadrantModal = document.getElementById('quadrant-select-modal');
-    if (quadrantModal) {
-        const bsModal = bootstrap.Modal.getInstance(quadrantModal);
-        if (bsModal) bsModal.hide();
-    }
-    
-    setTimeout(() => {
-        const saveConfirmModal = new bootstrap.Modal(document.getElementById('saveConfirmModal'));
-        saveConfirmModal.show();
-    }, 300);
 }
 
 function closeQuadrantSelect() {
     const modal = document.getElementById('quadrant-select-modal');
-    if(modal) {
-        const bsModal = bootstrap.Modal.getInstance(modal);
-        if(bsModal) bsModal.hide();
-        else modal.remove();
-    }
+    if(modal) modal.remove();
 }
 
 function setQuadrantType(q, val) {
     quadrantMap[q] = val;
     updateQuadrantButtons();
+    closeQuadrantSelect();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1425,18 +1348,6 @@ function saveQuadrantMapping() {
         return;
     }
     
-    const saveConfirmModal = new bootstrap.Modal(document.getElementById('saveConfirmModal'));
-    
-    const confirmBtn = document.getElementById('confirmSaveMapBtn');
-    confirmBtn.onclick = function() {
-        saveConfirmModal.hide();
-        performSaveMapping(deviceIdentity);
-    };
-    
-    saveConfirmModal.show();
-}
-
-function performSaveMapping(deviceIdentity) {
     const saveBtn = document.querySelector('button[onclick="saveQuadrantMapping()"]');
     if (saveBtn) {
         saveBtn.disabled = true;
