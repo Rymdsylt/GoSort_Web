@@ -267,7 +267,7 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
         </li>
     </ul>
 
-    <a href="GoSort_Settings.php" class="sidebar-footer" style="text-decoration:none; color:inherit;">
+    <a href="GoSort_Sorters.php?logout=1" class="sidebar-footer" style="text-decoration:none; color:inherit;">
         <img src="<?php echo $accountLogo; ?>" alt="Account Logo" id="footer-logo" data-bs-toggle="tooltip" data-bs-placement="right" title="<?php echo htmlspecialchars($accountName); ?>">
         <div>
             <strong><?php echo $accountName; ?></strong>
