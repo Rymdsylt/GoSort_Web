@@ -813,7 +813,5 @@ if ($sorters_result) {
         URL.revokeObjectURL(url);
     }
     </script>
-
-    <script src="js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

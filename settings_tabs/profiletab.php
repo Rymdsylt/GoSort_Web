@@ -376,7 +376,6 @@ if ($user_id) {
         </div>
     </div>
 
-    <script src="js/bootstrap.bundle.min.js"></script>
     <script>
         const profileConfirmationModal = new bootstrap.Modal(document.getElementById('profileConfirmationModal'));
         const passwordModalInstance = new bootstrap.Modal(document.getElementById('passwordModal'));
