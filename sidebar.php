@@ -251,7 +251,7 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'waste.php') {echo 'active';} ?>" href="waste.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Waste Monitoring">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_WasteMonitoringNavpage.php' || $currentPage == 'GoSort_LiveMonitor.php') {echo 'active';} ?>" href="GoSort_WasteMonitoringNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Waste Monitoring">
                 <i class="bi bi-trash"></i> <span>Waste Monitoring</span>
             </a>
         </li>
