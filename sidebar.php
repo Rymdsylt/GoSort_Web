@@ -231,7 +231,7 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
     
     <ul class="nav flex-column flex-grow-1">
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'dashboard.php') {echo 'active';} ?>" href="dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_Dashboard.php') {echo 'active';} ?>" href="GoSort_Dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
                 <i class="bi bi-columns-gap"></i> <span>Dashboard</span>
             </a>
         </li>

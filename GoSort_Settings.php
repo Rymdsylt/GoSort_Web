@@ -256,7 +256,5 @@ if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
         event.currentTarget.classList.add('active');
     }
     </script>
-
-    <script src="js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
