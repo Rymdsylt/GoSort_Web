@@ -1,5 +1,5 @@
 <?php
-require_once 'connection.php';
+require_once '../gs_DB/connection.php';
 
 // Set headers for API response
 header('Content-Type: application/json');
@@ -56,7 +56,7 @@ $password = $data['password'];
 
 try {
     // Attempt to find user
-    $stmt = $pdo->prepare("SELECT id, username, lastName, isAdmin, password FROM users WHERE username = ?");
+    $stmt = $pdo->prepare("SELECT id, userName as username, lastName, role, password, assigned_floor FROM users WHERE userName = ?");
     $stmt->execute([$username]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -80,7 +80,9 @@ try {
                 'userId' => $user['id'],
                 'username' => $user['username'],
                 'lastName' => $user['lastName'],
-                'isAdmin' => (bool)$user['isAdmin'],
+                'isAdmin' => $user['role'] === 'admin',
+                'role' => $user['role'],
+                'assignedFloor' => $user['assigned_floor'],
                 'token' => $token
             ]
         ]);

@@ -26,24 +26,13 @@ try {
     $conn->query("
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            isAdmin BOOLEAN DEFAULT FALSE,
+            role ENUM('admin', 'utility') NOT NULL,
             userName VARCHAR(50) NOT NULL,
             lastName VARCHAR(50) NOT NULL,
             email VARCHAR(100) UNIQUE,
             password VARCHAR(255),
+            assigned_floor VARCHAR(50),
             registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
-
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS trash_sorted (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            sorted ENUM('biodegradable', 'non-biodegradable', 'hazardous', 'mixed') NOT NULL,
-            confidence FLOAT DEFAULT NULL,
-            bin_location VARCHAR(100) DEFAULT NULL,
-            user_id INT DEFAULT NULL,
-            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         )
     ");
 
@@ -58,6 +47,31 @@ try {
             maintenance_mode TINYINT(1) DEFAULT 0,
             last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS assigned_sorters (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            device_identity VARCHAR(100) NOT NULL,
+            assigned_floor VARCHAR(50),
+            assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE,
+            UNIQUE KEY unique_assignment (user_id, device_identity)
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS trash_sorted (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sorted ENUM('biodegradable', 'non-biodegradable', 'hazardous', 'mixed') NOT NULL,
+            confidence FLOAT DEFAULT NULL,
+            bin_location VARCHAR(100) DEFAULT NULL,
+            user_id INT DEFAULT NULL,
+            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         )
     ");
 
@@ -129,13 +143,10 @@ try {
         )
     ");
 
-    // Enable event scheduler
     $conn->query("SET GLOBAL event_scheduler = ON");
 
-    // Drop existing events if they exist
     $conn->query("DROP EVENT IF EXISTS check_inactive_sorters");
 
-    // Create event to automatically set sorters as offline if inactive (much faster for immediate detection)
     $conn->query("
         CREATE EVENT check_inactive_sorters
         ON SCHEDULE EVERY 5 SECOND
@@ -147,10 +158,8 @@ try {
         AND last_active < NOW() - INTERVAL 10 SECOND
     ");
 
-    // Drop existing event if it exists
     $conn->query("DROP EVENT IF EXISTS end_maintenance_mode_after_1_minute");
 
-    // Create event to automatically end maintenance mode after 1 minute
     $conn->query("
         CREATE EVENT end_maintenance_mode_after_1_minute
         ON SCHEDULE EVERY 1 MINUTE

@@ -77,7 +77,7 @@ try {
             }
             
             if ($all_readings_full) {
-                $message = sprintf("Bin '%s' is probably full. Distance reading has been consistently between 0.1-10cm for the last 5 readings. Please empty when convenient.", 
+                $message = sprintf("Bin '%s' is FULL! Distance reading has been consistently between 0.1-10cm for the last 5 readings. Please empty immediately.", 
                                  $bin_name);
                 $priority = "high";
                 $fullness_level = 100;

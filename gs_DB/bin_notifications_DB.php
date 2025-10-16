@@ -22,20 +22,8 @@ function createBinNotificationsTable() {
     }
 }
 
-function normalizeFullnessMessage($message) {
-    $message = str_replace("100% full", "probably full", $message);
-    $message = str_replace("is FULL!", "is probably full", $message);
-    $message = str_replace("Please empty immediately", "Please empty when convenient", $message);
-    return $message;
-}
-
 function addBinNotification($message, $type, $deviceId = null, $priority = 'normal', $binName = null, $fullnessLevel = null) {
     global $conn;
-    
-    // Normalize fullness messages
-    if ($type === 'bin_fullness') {
-        $message = normalizeFullnessMessage($message);
-    }
     
     $sql = "INSERT INTO bin_notifications (message, type, device_id, priority, bin_name, fullness_level) 
             VALUES (?, ?, ?, ?, ?, ?)";
