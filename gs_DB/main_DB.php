@@ -70,8 +70,10 @@ try {
             confidence FLOAT DEFAULT NULL,
             bin_location VARCHAR(100) DEFAULT NULL,
             user_id INT DEFAULT NULL,
+            sorting_history_id INT,
             time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY (sorting_history_id) REFERENCES sorting_history(id) ON DELETE CASCADE
         )
     ");
 

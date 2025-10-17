@@ -2,34 +2,97 @@
 header('Content-Type: application/json');
 require_once('../gs_DB/connection.php');
 
-// Get data based on requested statistic type
+// Check if connection exists
+if (!isset($conn) || $conn->connect_error) {
+    echo json_encode([
+        'success' => false,
+        'error' => 'Database connection failed'
+    ]);
+    exit;
+}
+
+// Get data based on requested statistic type and device
 $type = isset($_GET['type']) ? $_GET['type'] : '';
+$device_identity = isset($_GET['device_identity']) ? $_GET['device_identity'] : null;
 $response = array();
+
+if (empty($type)) {
+    echo json_encode([
+        'success' => false,
+        'error' => 'Statistics type is required'
+    ]);
+    exit;
+}
 
 try {
     switch($type) {
         case 'trash_types':
             // Get count of different trash types
-            $query = "SELECT sorted, COUNT(*) as count 
-                     FROM trash_sorted 
-                     GROUP BY sorted";
-            $result = $conn->query($query);
+            if ($device_identity) {
+                // First, get counts for each type
+                $query = "WITH counts AS (
+                         SELECT 
+                         CASE 
+                            WHEN sh.trash_type = 'bio' THEN 'biodegradable'
+                            WHEN sh.trash_type = 'nbio' THEN 'non-biodegradable'
+                            WHEN sh.trash_type = 'mixed' THEN 'mixed'
+                            ELSE sh.trash_type
+                         END as sorted,
+                         COUNT(*) as count 
+                         FROM sorting_history sh
+                         WHERE sh.device_identity = ?
+                         GROUP BY sh.trash_type
+                         )
+                         SELECT sorted, count
+                         FROM counts";
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param("s", $device_identity);
+                $stmt->execute();
+                $result = $stmt->get_result();
+            } else {
+                $query = "SELECT sorted, COUNT(*) as count 
+                         FROM trash_sorted 
+                         GROUP BY sorted";
+                $result = $conn->query($query);
+            }
+            if (!$result) {
+                throw new Exception($conn->error);
+            }
             $data = array();
             while($row = $result->fetch_assoc()) {
                 $data[$row['sorted']] = (int)$row['count'];
             }
-            $response['success'] = true;
-            $response['data'] = $data;
+            if (empty($data)) {
+                $response['success'] = true;
+                $response['data'] = $data;
+                $response['message'] = 'No trash sorting data found';
+            } else {
+                $response['success'] = true;
+                $response['data'] = $data;
+            }
             break;
 
         case 'daily_sorting':
             // Get daily sorting counts for the last 7 days
-            $query = "SELECT DATE(time) as date, COUNT(*) as count 
-                     FROM trash_sorted 
-                     WHERE time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-                     GROUP BY DATE(time)
-                     ORDER BY date";
-            $result = $conn->query($query);
+            if ($device_identity) {
+                $query = "SELECT DATE(sh.sorted_at) as date, COUNT(*) as count 
+                         FROM sorting_history sh
+                         WHERE sh.sorted_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                         AND sh.device_identity = ?
+                         GROUP BY DATE(sh.sorted_at)
+                         ORDER BY date";
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param("s", $device_identity);
+                $stmt->execute();
+                $result = $stmt->get_result();
+            } else {
+                $query = "SELECT DATE(time) as date, COUNT(*) as count 
+                         FROM trash_sorted 
+                         WHERE time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                         GROUP BY DATE(time)
+                         ORDER BY date";
+                $result = $conn->query($query);
+            }
             $data = array();
             while($row = $result->fetch_assoc()) {
                 $data[$row['date']] = (int)$row['count'];
