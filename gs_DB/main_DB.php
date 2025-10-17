@@ -63,19 +63,7 @@ try {
         )
     ");
 
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS trash_sorted (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            sorted ENUM('biodegradable', 'non-biodegradable', 'hazardous', 'mixed') NOT NULL,
-            confidence FLOAT DEFAULT NULL,
-            bin_location VARCHAR(100) DEFAULT NULL,
-            user_id INT DEFAULT NULL,
-            sorting_history_id INT,
-            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-            FOREIGN KEY (sorting_history_id) REFERENCES sorting_history(id) ON DELETE CASCADE
-        )
-    ");
+ 
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS maintenance_commands (
@@ -171,6 +159,19 @@ try {
         WHERE active = TRUE AND start_time < NOW() - INTERVAL 1 MINUTE
     ");
 
+   $conn->query("
+        CREATE TABLE IF NOT EXISTS trash_sorted (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sorted ENUM('biodegradable', 'non-biodegradable', 'hazardous', 'mixed') NOT NULL,
+            confidence FLOAT DEFAULT NULL,
+            bin_location VARCHAR(100) DEFAULT NULL,
+            user_id INT DEFAULT NULL,
+            sorting_history_id INT,
+            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY (sorting_history_id) REFERENCES sorting_history(id) ON DELETE CASCADE
+        )
+    ");
 
     $conn->close();
 } catch (Exception $e) {
