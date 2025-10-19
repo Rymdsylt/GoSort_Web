@@ -12,6 +12,20 @@ try {
     $conn->query("CREATE DATABASE IF NOT EXISTS gosort_db");
     $conn->select_db("gosort_db");
 
+<<<<<<< Updated upstream
+=======
+    // Create bin_fullness table
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS bin_fullness (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            device_identity VARCHAR(50) NOT NULL,
+            bin_name VARCHAR(20) NOT NULL,
+            distance DECIMAL(10,2) NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+>>>>>>> Stashed changes
     $conn->query("
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
