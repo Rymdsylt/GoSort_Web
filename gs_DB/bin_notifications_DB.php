@@ -10,11 +10,11 @@ function createBinNotificationsTable() {
         type VARCHAR(50) NOT NULL,
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        device_id VARCHAR(100),
+        device_identity VARCHAR(100),
         priority VARCHAR(20) DEFAULT 'normal',
         bin_name VARCHAR(20),
         fullness_level INT,
-        FOREIGN KEY (device_id) REFERENCES sorters(device_identity) ON DELETE CASCADE
+        FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
     )";
 
     if ($conn->query($sql) !== TRUE) {
@@ -25,7 +25,7 @@ function createBinNotificationsTable() {
 function addBinNotification($message, $type, $deviceId = null, $priority = 'normal', $binName = null, $fullnessLevel = null) {
     global $conn;
     
-    $sql = "INSERT INTO bin_notifications (message, type, device_id, priority, bin_name, fullness_level) 
+    $sql = "INSERT INTO bin_notifications (message, type, device_identity, priority, bin_name, fullness_level) 
             VALUES (?, ?, ?, ?, ?, ?)";
     
     $stmt = $conn->prepare($sql);

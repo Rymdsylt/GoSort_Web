@@ -31,7 +31,7 @@ if (empty($notifications)) {
                         <p class="mb-1">' . htmlspecialchars($notification['message']) . '</p>
                         <small class="notification-time">
                             <i class="bi bi-clock"></i> ' . $timeAgo . 
-                            ($notification['device_id'] ? ' | Device: ' . htmlspecialchars($notification['device_id']) : '') .
+                            ($notification['device_identity'] ? ' | Device: ' . htmlspecialchars($notification['device_identity']) : '') .
                             $binInfo . $fullnessInfo . '
                         </small>
                     </div>
