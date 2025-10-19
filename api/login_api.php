@@ -72,7 +72,24 @@ try {
         // Set cookie for web client
         setcookie('user_logged_in', 'true', time() + (86400 * 30), "/", "", true, true);
 
-        // Return success with user data and token
+        // Get assigned sorter
+        $stmt = $pdo->prepare("
+            SELECT 
+                s.device_name,
+                s.device_identity,
+                s.location,
+                s.status,
+                s.maintenance_mode,
+                a.assigned_floor
+            FROM assigned_sorters a
+            JOIN sorters s ON s.device_identity = a.device_identity
+            WHERE a.user_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$user['id']]);
+        $sorter = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Return success with user data, token and sorter
         echo json_encode([
             'success' => true,
             'message' => 'Login successful',
@@ -83,7 +100,15 @@ try {
                 'isAdmin' => $user['role'] === 'admin',
                 'role' => $user['role'],
                 'assignedFloor' => $user['assigned_floor'],
-                'token' => $token
+                'token' => $token,
+                'sorter' => $sorter ? [
+                    'device_name' => $sorter['device_name'],
+                    'device_identity' => $sorter['device_identity'],
+                    'location' => $sorter['location'],
+                    'status' => $sorter['status'],
+                    'maintenance_mode' => (bool)$sorter['maintenance_mode'],
+                    'assigned_floor' => $sorter['assigned_floor']
+                ] : null
             ]
         ]);
     } else {
