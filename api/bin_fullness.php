@@ -21,26 +21,18 @@ if (!$device_identity) {
 }
 
 try {
-    // Query to get the latest record for each bin_name for the given device
+    // Query to get the last 20 entries for the given device
     $query = "
         SELECT bf.*,
                CASE 
                    WHEN distance < 0.5 THEN -1 -- Sensor failure indicator
-                   WHEN distance <= 10 THEN 100 -- Full bin (capped at 100%)
                    WHEN distance >= 60.96 THEN 0 -- Empty (2 feet or more)
-                   ELSE ROUND(((60.96 - distance) / 50.96) * 100) -- Formula: (60.96 - D_measured) / 50.96 × 100
+                   ELSE ROUND(100 - ((distance - 0.5) / (60.96 - 0.5) * 100)) -- New calculation matching update_bin_fullness
                END as fullness_percentage
         FROM bin_fullness bf
-        INNER JOIN (
-            SELECT device_identity, bin_name, MAX(timestamp) as max_timestamp
-            FROM bin_fullness
-            WHERE device_identity = ?
-            GROUP BY device_identity, bin_name
-        ) latest 
-        ON bf.device_identity = latest.device_identity 
-        AND bf.bin_name = latest.bin_name 
-        AND bf.timestamp = latest.max_timestamp
-        ORDER BY bf.bin_name";
+        WHERE device_identity = ?
+        ORDER BY timestamp DESC
+        LIMIT 20";
 
     $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $device_identity);

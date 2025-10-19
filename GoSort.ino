@@ -11,16 +11,19 @@ const int TRIG_PIN_1 = 2;  // Non-biodegradable bin sensor
 const int ECHO_PIN_1 = 3;
 const int TRIG_PIN_2 = 4;  // Biodegradable bin sensor
 const int ECHO_PIN_2 = 5;
-const int TRIG_PIN_3 = 6;  // Recyclable bin sensor
+const int TRIG_PIN_3 = 6;  // Hazardous bin sensor
 const int ECHO_PIN_3 = 7;
-const int TRIG_PIN_4 = 10; // Extra bin sensor
+const int TRIG_PIN_4 = 10; // Mixed bin sensor
 const int ECHO_PIN_4 = 11;
 
 // Variables for sensor timing
-const unsigned long SENSOR_INTERVAL = 0.7; // 0.7 seconds in milliseconds
-unsigned long lastSensorReadTime;  // Will be initialized after booting
-int currentSensor;                // Will be initialized after booting
-bool sensorsActive = false;       // Flag to control sensor activation
+const unsigned long SENSOR_BURST_INTERVAL = 5000;  // Check sensors every 5 seconds
+const unsigned long SENSOR_READ_DELAY = 300;       // 0.3 seconds between readings in burst
+unsigned long lastSensorBurstTime;   // Time of last sensor burst
+unsigned long lastSensorReadTime;    // Time of last individual sensor read
+int currentSensor;                   // Current sensor being read in burst
+bool sensorsActive = false;          // Flag to control sensor activation
+bool burstInProgress = false;        // Flag to track if we're in the middle of a burst
 
 String inputString = "";
 bool isSorting = false;
@@ -35,7 +38,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 const char* jokes[] = {
   "Sorting trash? Its   a waste of time!",
   "Why did the can    join recycling?   ",
-  "To make new      friends!           ",
+  "To make new      friends!           1",
   "Im not trashy,    Im recyclable!    ",
   "Refuse to waste!                    ",
   "Keep calm and     sort on!          ",
@@ -46,11 +49,16 @@ const char* jokes[] = {
 const int NUM_JOKES = 8;
 
 // Servo positions (must be between 0 and 180)
-const int neutralPos = 90;    // D8 neutral position
-const int nbioPos = 0;
-const int bioPos = 90;
-const int recycPos = 180;     // was 270 – corrected to valid servo range
-const int tiltNeutralPos = 97;  // D9 neutral position
+const int neutralPos = 45;    // D8 neutral position (pan)
+const int nbioPos = 22;      // Non-bio position (pan)
+const int bioPos = 22;       // Bio position (pan)
+const int hazardPos = 67;    // Hazardous position (pan)
+const int mixedPos = 67;     // Mixed position (pan)
+
+// Tilt positions
+const int tiltNeutralPos = 90;   // D9 neutral position
+const int tiltHighPos = 150;     // High tilt position
+const int tiltLowPos = 30;       // Low tilt position
 
 void setup() {
   // Initialize servos
@@ -67,7 +75,7 @@ void setup() {
   pinMode(TRIG_PIN_4, OUTPUT);
   pinMode(ECHO_PIN_4, INPUT);
   
-  Serial.begin(19200);
+  Serial.begin(115200);
   lcd.begin(16, 2);  
   lcd.backlight();
 
@@ -169,9 +177,9 @@ void setup() {
   lcd.print("Biodegradable     ");
   delay(1000);
 
-  rotateServo.write(recycPos);
+  rotateServo.write(hazardPos);
   lcd.setCursor(0, 1);
-  lcd.print("Recyclable        ");
+  lcd.print("Hazardous        ");
   delay(1000);
 
   rotateServo.write(neutralPos);
@@ -194,9 +202,11 @@ void setup() {
   Serial.println("Initialization complete - Ready for sorting!");
   
   // Initialize sensor variables after booting
+  lastSensorBurstTime = millis();
   lastSensorReadTime = millis();
   currentSensor = 1;
   sensorsActive = true;  // Activate sensors
+  burstInProgress = false;
 }
 
 
@@ -223,8 +233,16 @@ long measureDistance(int trigPin, int echoPin) {
 void loop() {
   unsigned long currentTime = millis();
   
-  // Check bin fullness every SENSOR_INTERVAL (0.7 seconds) only if sensors are active
-  if (sensorsActive && currentTime - lastSensorReadTime >= SENSOR_INTERVAL) {
+  // Check if it's time to start a new burst of sensor readings
+  if (sensorsActive && !burstInProgress && currentTime - lastSensorBurstTime >= SENSOR_BURST_INTERVAL) {
+    burstInProgress = true;
+    currentSensor = 1;
+    lastSensorReadTime = currentTime;
+    lastSensorBurstTime = currentTime;
+  }
+  
+  // If we're in a burst and it's time for the next sensor reading
+  if (sensorsActive && burstInProgress && currentTime - lastSensorReadTime >= SENSOR_READ_DELAY) {
     int distance = 0;
     String binName = "";
     
@@ -240,11 +258,11 @@ void loop() {
         break;
       case 3:
         distance = measureDistance(TRIG_PIN_3, ECHO_PIN_3);
-        binName = "Recyclable";
+        binName = "Hazardous";
         break;
       case 4:
         distance = measureDistance(TRIG_PIN_4, ECHO_PIN_4);
-        binName = "Extra";
+        binName = "Hazardous";
         break;
     }
     
@@ -256,7 +274,13 @@ void loop() {
     
     // Update timing and move to next sensor
     lastSensorReadTime = currentTime;
-    currentSensor = (currentSensor % 4) + 1;
+    currentSensor++;
+    
+    // If we've read all sensors, end the burst
+    if (currentSensor > 4) {
+      burstInProgress = false;
+      currentSensor = 1;
+    }
   }
 
   // Handle maintenance mode scrolling text
@@ -270,66 +294,84 @@ void loop() {
     }
   }
 
-  while (Serial.available() && (!isSorting || maintenanceMode)) {
+  if (Serial.available()) {
     char inChar = (char)Serial.read();
     inputString += inChar;
 
     if (inChar == '\n' || inChar == '\r') {
       inputString.trim();
-      isSorting = !maintenanceMode; // Only set sorting flag if not in maintenance mode
+      if (!isSorting || maintenanceMode) {  // Process command if not sorting or in maintenance mode
 
-      if (inputString == "nbio") {
+      if (inputString == "ndeg") {
         lcd.setCursor(0, 0);
         lcd.print("Sorting:          ");
         lcd.setCursor(0, 1);
         lcd.print("Non-Biodegradable");
 
-        rotateServo.write(nbioPos);  // D8 rotate
+        rotateServo.write(nbioPos);    // Pan to non-bio position (22)
         delay(500);
-        tiltServo.write(150);    // D9 tilt
+        tiltServo.write(tiltHighPos);  // Tilt up (150)
         delay(500);
-        tiltServo.write(tiltNeutralPos);     // D9 back to neutral (85 yung sweet spot, tsaka na pag nalangisan na yung tilter, stalling kasi baka masunog)
+        tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
-        rotateServo.write(neutralPos);  // D8 back to neutral
+        rotateServo.write(neutralPos);  // Pan back to neutral (45)
         delay(500);
 
         Serial.println("Moved to non-biodegradable position");
         Serial.println("ready");
       } 
-      else if (inputString == "bio") {
+      else if (inputString == "zdeg") {
         lcd.setCursor(0, 0);
         lcd.print("Sorting:          ");
         lcd.setCursor(0, 1);
         lcd.print("Biodegradable     ");
 
-        rotateServo.write(bioPos);   // D8 rotate
+        rotateServo.write(bioPos);     // Pan to bio position (22)
         delay(500);
-        tiltServo.write(150);    // D9 tilt
+        tiltServo.write(tiltLowPos);   // Tilt down (30)
         delay(500);
-        tiltServo.write(tiltNeutralPos);     // D9 back to neutral (85 yung sweet spot, tsaka na pag nalangisan na yung tilter, stalling kasi baka masunog)
+        tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
-        rotateServo.write(neutralPos);  // D8 back to neutral
+        rotateServo.write(neutralPos);  // Pan back to neutral (45)
         delay(500);
 
         Serial.println("Moved to biodegradable position");
         Serial.println("ready");
       } 
-      else if (inputString == "recyc") {
+      else if (inputString == "odeg") {
         lcd.setCursor(0, 0);
         lcd.print("Sorting:          ");
         lcd.setCursor(0, 1);
-        lcd.print("Recyclable        ");
+        lcd.print("Hazardous         ");
 
-        rotateServo.write(recycPos); // D8 rotate
+        rotateServo.write(hazardPos);   // Pan to hazardous position (67)
         delay(500);
-        tiltServo.write(150);    // D9 tilt
+        tiltServo.write(tiltHighPos);   // Tilt up (150)
         delay(500);
-        tiltServo.write(tiltNeutralPos);     // D9 back to neutral (85 yung sweet spot, tsaka na pag nalangisan na yung tilter, stalling kasi baka masunog)
+        tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
-        rotateServo.write(neutralPos);  // D8 back to neutral
+        rotateServo.write(neutralPos);   // Pan back to neutral (45)
         delay(500);
 
         Serial.println("Moved to recyclable position");
+        Serial.println("ready");
+      }
+      else if (inputString == "mdeg") {
+        lcd.setCursor(0, 0);
+        lcd.print("Sorting:          ");
+        lcd.setCursor(0, 1);
+        lcd.print("Mixed Waste       ");
+
+        rotateServo.write(mixedPos);    // Pan to mixed position (67)
+        delay(500);
+        tiltServo.write(tiltLowPos);    // Tilt down (30)
+        delay(500);
+        tiltServo.write(tiltNeutralPos); // Return tilt to neutral
+        delay(500);
+        rotateServo.write(neutralPos);   // Pan back to neutral (45)
+        delay(500);
+
+        Serial.println("Moved to mixed waste position");
         Serial.println("ready");
       }
       // Maintenance mode commands
@@ -380,14 +422,24 @@ void loop() {
           lcd.setCursor(0, 1);
           lcd.print("Testing...       ");
 
-          // Sweep D8 through all positions
-          rotateServo.write(nbioPos);    // Go to non-bio (0°)
+          // Start from neutral position
+          rotateServo.write(neutralPos); // Start at neutral (45°)
           delay(1000);
-          rotateServo.write(bioPos);     // Go to bio (90°)
+          
+          // Test left side positions
+          rotateServo.write(nbioPos);    // Go to non-bio/bio (22°)
           delay(1000);
-          rotateServo.write(recycPos);   // Go to recyclable (180°)
+          
+          // Return to neutral
+          rotateServo.write(neutralPos); // Back to neutral (45°)
           delay(1000);
-          rotateServo.write(neutralPos); // Return to neutral (90°)
+          
+          // Test right side positions
+          rotateServo.write(hazardPos);  // Go to hazardous/mixed (67°)
+          delay(1000);
+          
+          // End at neutral
+          rotateServo.write(neutralPos); // Return to neutral (45°)
           
           Serial.println("D8 sweep test complete");
           Serial.println("ready");
@@ -399,33 +451,50 @@ void loop() {
           lcd.setCursor(0, 1);
           lcd.print("Testing...       ");
 
-          // Set D9 to maintenance position
-          tiltServo.write(150);
-          delay(1000);
-
-          // Sweep D8 through all positions
-          rotateServo.write(nbioPos);    // Go to non-bio (0°)
-          delay(1000);
-          rotateServo.write(bioPos);     // Go to bio (90°)
-          delay(1000);
-          rotateServo.write(recycPos);   // Go to recyclable (180°)
+          // Start both servos at neutral
+          rotateServo.write(neutralPos);    // Pan to neutral (45°)
+          tiltServo.write(tiltNeutralPos);  // Tilt to neutral
           delay(1000);
           
-          // Return both to neutral
-          rotateServo.write(neutralPos); // D8 to neutral (90°)
-          tiltServo.write(tiltNeutralPos);  // D9 to neutral (85°)
+          // Test left side with both tilt positions
+          rotateServo.write(nbioPos);       // Pan to left (22°)
+          delay(1000);
+          tiltServo.write(tiltHighPos);     // High tilt for non-bio (150°)
+          delay(1000);
+          tiltServo.write(tiltLowPos);      // Low tilt for bio (30°)
+          delay(1000);
+          
+          // Return to neutral
+          rotateServo.write(neutralPos);    // Pan to neutral (45°)
+          tiltServo.write(tiltNeutralPos);  // Tilt to neutral
+          delay(1000);
+          
+          // Test right side with both tilt positions
+          rotateServo.write(hazardPos);     // Pan to right (67°)
+          delay(1000);
+          tiltServo.write(tiltHighPos);     // High tilt for hazardous (150°)
+          delay(1000);
+          tiltServo.write(tiltLowPos);      // Low tilt for mixed (30°)
+          delay(1000);
+          
+          // Return to neutral
+          rotateServo.write(neutralPos);    // Pan to neutral (45°)
+          tiltServo.write(tiltNeutralPos);  // Tilt to neutral
           
           Serial.println("Full sweep test complete");
           Serial.println("ready");
       }
 
-      // Reset to "Ready"
-      lcd.setCursor(0, 0);
-      lcd.print("Ready             ");
-      lcd.setCursor(0, 1);
-      lcd.print("Awaiting command  ");
-      inputString = "";
-      isSorting = false;
+        // Only reset if the command is complete
+        if (!maintenanceMode) {
+          lcd.setCursor(0, 0);
+          lcd.print("Ready             ");
+          lcd.setCursor(0, 1);
+          lcd.print("Awaiting command  ");
+        }
+        inputString = "";
+        isSorting = false;
+      }  // Close the if(!isSorting || maintenanceMode) block
     }
   }
 }

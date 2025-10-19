@@ -176,7 +176,7 @@ def connect_to_arduino(port):
 
         ser = serial.Serial(
             port=port,
-            baudrate=19200,
+            baudrate=115200,
             timeout=1,
             write_timeout=1,
             exclusive=True
@@ -307,17 +307,43 @@ def main():
         config['sorter_id'] = sorter_id
         save_config(config)
     
+    # Define default mapping
+    default_mapping = {
+        'zdeg': 'bio',
+        'ndeg': 'nbio',
+        'odeg': 'recyc',
+        'mdeg': 'mixed'
+    }
+    
     # Fetch mapping from backend
     mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
     try:
         resp = requests.get(mapping_url)
-        mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc', 'mdeg': 'mixed'})
+        server_mapping = resp.json().get('mapping', {})
+        # Update default mapping with server values, keeping defaults for missing keys
+        mapping = default_mapping.copy()
+        mapping.update(server_mapping)
     except Exception as e:
         print(f"Warning: Could not fetch mapping, using default. {e}")
-        mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc', 'mdeg': 'mixed'}
+        mapping = default_mapping
     # For menu display: get the order and labels
-    menu_order = [('zdeg', mapping['zdeg']), ('ndeg', mapping['ndeg']), ('odeg', mapping['odeg'])]
-    trash_labels = {'bio': 'Biodegradable', 'nbio': 'Non-Biodegradable', 'recyc': 'Recyclable', 'mixed': 'Mixed Waste'}
+    # Create menu order - only include items that exist in mapping
+    menu_order = []
+    if 'zdeg' in mapping:
+        menu_order.append(('zdeg', mapping['zdeg']))
+    if 'ndeg' in mapping:
+        menu_order.append(('ndeg', mapping['ndeg']))
+    if 'odeg' in mapping:
+        menu_order.append(('odeg', mapping['odeg']))
+    if 'mdeg' in mapping:
+        menu_order.append(('mdeg', mapping['mdeg']))
+        
+    trash_labels = {
+        'bio': 'Biodegradable',
+        'nbio': 'Non-Biodegradable',
+        'recyc': 'Hazardous',
+        'mixed': 'Mixed Waste'
+    }
 
     print("\nRequesting device registration with the server...")
     dots_thread = None

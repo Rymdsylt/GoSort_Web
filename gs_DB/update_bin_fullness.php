@@ -170,16 +170,18 @@ try {
     else if ($distance >= 0.5 && $distance <= 400.0) {
         $fullness = calculateFullness($distance);
         
-        // Check if we have at least 5 readings and they indicate high fullness (consistently between 0.5-10cm)
-        if (count($readings) >= 5) {
-            $all_readings_critical = true;
-            $readings_in_range = array_filter($readings, function($reading) {
-                return $reading >= 0.5 && $reading <= 10.0;
-            });
+        // Check if we have at least 2 readings and compare last two readings
+        if (count($readings) >= 2) {
+            $latest_reading = $readings[0];  // Most recent reading
+            $previous_reading = $readings[1]; // Previous reading
             
-            // Only notify if last 5 consecutive readings are in the full range
-            if (count($readings_in_range) >= 5) {
-                error_log("Bin fullness check - Last 5 readings: " . implode(", ", array_slice($readings, 0, 5)));
+            // Check if both readings are in the full range (5-10cm)
+            $is_full = ($latest_reading >= 5 && $latest_reading <= 10 && 
+                       $previous_reading >= 5 && $previous_reading <= 10);
+            
+            // Only notify if both readings indicate fullness
+            if ($is_full) {
+                error_log("Bin fullness check - Latest: {$latest_reading}cm, Previous: {$previous_reading}cm");
                 
                 // Check if there's already a fullness notification for this bin
                 $check_existing_sql = "SELECT id FROM bin_notifications 
@@ -191,8 +193,8 @@ try {
                 $check_stmt->execute();
                 $result = $check_stmt->get_result();
                 
-                $message = sprintf("Bin '%s' is FULL! Distance readings have been consistently between 0.5-10cm for the last 5 readings. Trash height: %0.1fcm. Please empty immediately.", 
-                                 $bin_name, $distance);
+                $message = sprintf("Bin '%s' is FULL! Current distance: %0.1fcm, Previous: %0.1fcm. Please empty immediately.", 
+                                 $bin_name, $latest_reading, $previous_reading);
                 $priority = "high";
                 $fullness_level = $fullness;
 
