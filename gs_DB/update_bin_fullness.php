@@ -7,46 +7,39 @@ require_once 'connection.php';
 $json = file_get_contents('php://input');
 $data = json_decode($json, true);
 
-if (!isset($data['device_identity']) || !isset($data['bin_name']) || !isset($data['distance'])) {
+// Check both JSON and POST data
+if (isset($data['device_identity']) && isset($data['bin_name']) && isset($data['distance'])) {
+    $device_identity = $data['device_identity'];
+    $bin_name = $data['bin_name'];
+    $distance = floatval($data['distance']);
+} else if (isset($_POST['device_identity']) && isset($_POST['bin_name']) && isset($_POST['distance'])) {
+    $device_identity = $_POST['device_identity'];
+    $bin_name = $_POST['bin_name'];
+    $distance = floatval($_POST['distance']);
+} else {
     echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
     exit;
 }
 
-<<<<<<< Updated upstream
-$device_identity = $data['device_identity'];
-$bin_name = $data['bin_name'];
-$distance = $data['distance'];
-=======
-$device_identity = $_POST['device_identity'];
-$bin_name = $_POST['bin_name'];
-$distance = floatval($_POST['distance']);
-
 error_log("Processing bin fullness - Device: $device_identity, Bin: $bin_name, Distance: $distance");
->>>>>>> Stashed changes
+
 
 try {
     // First check if the device exists and is registered
-    $stmt = $conn->prepare("SELECT id FROM sorters WHERE identity = ?");
-    $stmt->bind_param("s", $device_identity);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-<<<<<<< Updated upstream
-    if ($result->num_rows === 0) {
-        echo json_encode(['success' => false, 'message' => 'Device not registered']);
-        exit;
-=======
+    $stmt = $conn->prepare("SELECT id FROM sorters WHERE device_identity = ?");
     if (!$stmt) {
         throw new Exception("Prepare failed: " . $conn->error);
     }
-
-    error_log("Executing query with params: $device_identity, $bin_name, $distance");
     
-    $stmt->bind_param("ssd", $device_identity, $bin_name, $distance);
-    
+    $stmt->bind_param("s", $device_identity);
     if (!$stmt->execute()) {
         throw new Exception("Execute failed: " . $stmt->error);
->>>>>>> Stashed changes
+    }
+    
+    $result = $stmt->get_result();
+    if ($result->num_rows === 0) {
+        echo json_encode(['success' => false, 'message' => 'Device not registered']);
+        exit;
     }
     
     $device_row = $result->fetch_assoc();
@@ -62,11 +55,20 @@ try {
     $stmt->bind_param("isi", $device_id, $bin_name, $distance);
     $stmt->execute();
     
-<<<<<<< Updated upstream
-    echo json_encode(['success' => true]);
-=======
+
+    // Prepare notification statement
+    $notification_sql = "INSERT INTO bin_notifications (message, type, device_id, priority, bin_name, fullness_level) 
+                        VALUES (?, ?, ?, ?, ?, ?)";
+    $notification_stmt = $conn->prepare($notification_sql);
+    if (!$notification_stmt) {
+        throw new Exception("Failed to prepare notification statement: " . $conn->error);
+    }
+
     $type = "bin_fullness";
     $params = "sssssi"; // Parameter types for bind_param
+    
+    // Initialize readings array to track the last 5 readings
+    $readings = [$distance];
 
     // First check for sensor failure (distance less than 0.5cm)
     if ($distance < 0.5) {
@@ -143,32 +145,41 @@ try {
         }
     }
     
-    $notification_stmt->close();
-    echo "OK - Record inserted";
+    if (isset($notification_stmt)) {
+        $notification_stmt->close();
+    }
 
     // Keep only the 10 most recent entries for each device and bin combination
     $cleanup_sql = "DELETE bf1 FROM bin_fullness bf1
                    LEFT JOIN (
                        SELECT id 
                        FROM bin_fullness 
-                       WHERE device_identity = ? AND bin_name = ?
+                       WHERE device_id = ? AND bin_name = ?
                        ORDER BY timestamp DESC 
                        LIMIT 10
                    ) bf2 ON bf1.id = bf2.id
-                   WHERE bf1.device_identity = ? AND bf1.bin_name = ?
+                   WHERE bf1.device_id = ? AND bf1.bin_name = ?
                    AND bf2.id IS NULL";
                    
     $cleanup_stmt = $conn->prepare($cleanup_sql);
-    $cleanup_stmt->bind_param("ssss", $device_identity, $bin_name, $device_identity, $bin_name);
-    $cleanup_stmt->execute();
-    $cleanup_stmt->close();
+    if ($cleanup_stmt) {
+        $cleanup_stmt->bind_param("iiii", $device_id, $bin_name, $device_id, $bin_name);
+        $cleanup_stmt->execute();
+        $cleanup_stmt->close();
+    }
 
-    $stmt->close();
->>>>>>> Stashed changes
+    if (isset($stmt)) {
+        $stmt->close();
+    }
+
+    echo json_encode(['success' => true, 'message' => 'Record updated successfully']);
 
 } catch (Exception $e) {
+    error_log("Error in update_bin_fullness.php: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+} finally {
+    if (isset($conn)) {
+        $conn->close();
+    }
 }
-
-$conn->close();
 ?>

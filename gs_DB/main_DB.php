@@ -12,8 +12,6 @@ try {
     $conn->query("CREATE DATABASE IF NOT EXISTS gosort_db");
     $conn->select_db("gosort_db");
 
-<<<<<<< Updated upstream
-=======
     // Create bin_fullness table
     $conn->query("
         CREATE TABLE IF NOT EXISTS bin_fullness (
@@ -24,8 +22,6 @@ try {
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ");
-
->>>>>>> Stashed changes
     $conn->query("
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -96,8 +92,6 @@ try {
         )
     ");
 
-<<<<<<< Updated upstream
-=======
     $conn->query("
         CREATE TABLE IF NOT EXISTS maintenance_mode (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -131,8 +125,6 @@ try {
             FOREIGN KEY (device_id) REFERENCES sorters(id) ON DELETE CASCADE
         )
     ");
-
->>>>>>> Stashed changes
     // Enable event scheduler
     $conn->query("SET GLOBAL event_scheduler = ON");
 
