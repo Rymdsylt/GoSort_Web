@@ -4,6 +4,24 @@ require_once 'gs_DB/main_DB.php';
 require_once 'gs_DB/connection.php';
 require_once 'gs_DB/bin_notifications_DB.php';
 
+// Handle AJAX requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    
+    if ($_POST['action'] === 'delete' && isset($_POST['notification_id'])) {
+        try {
+            $notification_id = intval($_POST['notification_id']);
+            $stmt = $pdo->prepare("DELETE FROM bin_notifications WHERE id = ?");
+            $success = $stmt->execute([$notification_id]);
+            echo json_encode(['success' => $success]);
+        } catch (PDOException $e) {
+            error_log("Error deleting notification: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Database error occurred']);
+        }
+        exit;
+    }
+}
+
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header("Location: GoSort_Login.php");
@@ -199,21 +217,18 @@ if (!$user) {
             if (!currentNotificationId) return;
             
             $.ajax({
-                url: 'gs_DB/delete_bin_notification.php',
+                url: window.location.href,
                 method: 'POST',
-                data: { notification_id: currentNotificationId },
+                data: { 
+                    action: 'delete',
+                    notification_id: currentNotificationId 
+                },
                 success: function(response) {
-                    try {
-                        const result = JSON.parse(response);
-                        if (result.success) {
-                            deleteModal.hide();
-                            loadNotifications(); // Refresh the notifications
-                        } else {
-                            showError('Failed to delete notification. Please try again.');
-                        }
-                    } catch (e) {
-                        console.error('Error parsing response:', e);
-                        showError('Error deleting notification. Please try again.');
+                    if (response.success) {
+                        deleteModal.hide();
+                        loadNotifications(); // Refresh the notifications
+                    } else {
+                        showError(response.message || 'Failed to delete notification. Please try again.');
                     }
                 },
                 error: function() {
