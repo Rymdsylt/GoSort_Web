@@ -8,19 +8,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode(['success' => false, 'message' => 'Missing device_identity']);
         exit;
     }
-    $stmt = $pdo->prepare("SELECT zdeg, ndeg, odeg, tdeg FROM sorter_mapping WHERE device_identity = ?");
-    $stmt->execute([$device_identity]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($row) {
-        echo json_encode(['success' => true, 'mapping' => $row]);
-    } else {
-        echo json_encode(['success' => true, 'mapping' => [
-            'zdeg' => 'bio',
-            'ndeg' => 'nbio',
-            'odeg' => 'hazardous',
-            'tdeg' => 'mixed'
-        ]]);
+    // Read mapping using the canonical 'mdeg' column. If not present, return defaults.
+    $stmt = $pdo->prepare("SELECT zdeg, ndeg, odeg, mdeg FROM sorter_mapping WHERE device_identity = ?");
+    try {
+        $stmt->execute([$device_identity]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            echo json_encode(['success' => true, 'mapping' => $row]);
+            exit;
+        }
+    } catch (PDOException $e) {
+        // Table or column may not exist yet; fall through to defaults
     }
+
+    // If nothing found or table/column doesn't exist, return defaults
+    echo json_encode(['success' => true, 'mapping' => [
+        'zdeg' => 'bio',
+        'ndeg' => 'nbio',
+        'odeg' => 'hazardous',
+        'mdeg' => 'mixed'
+    ]]);
     exit;
 }
 
@@ -29,28 +36,28 @@ $device_identity = $data['device_identity'] ?? null;
 $zdeg = $data['zdeg'] ?? null;
 $ndeg = $data['ndeg'] ?? null;
 $odeg = $data['odeg'] ?? null;
-$tdeg = $data['tdeg'] ?? null;
+$mdeg = $data['mdeg'] ?? null;
 
-if (!$device_identity || !$zdeg || !$ndeg || !$odeg || !$tdeg) {
+if (!$device_identity || !$zdeg || !$ndeg || !$odeg || !$mdeg) {
     echo json_encode(['success' => false, 'message' => 'Missing parameters']);
     exit;
 }
 
 try {
-    // Create table if not exists
+    // Ensure table exists with 'mdeg' column
     $pdo->exec("CREATE TABLE IF NOT EXISTS sorter_mapping (
-        device_identity VARCHAR(100) PRIMARY KEY,
-        zdeg VARCHAR(10) NOT NULL,
-        ndeg VARCHAR(10) NOT NULL,
-        odeg VARCHAR(10) NOT NULL,
-        tdeg VARCHAR(10) NOT NULL,
-        FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
-    )");
+            device_identity VARCHAR(100) PRIMARY KEY,
+            zdeg VARCHAR(10) NOT NULL,
+            ndeg VARCHAR(10) NOT NULL,
+            odeg VARCHAR(10) NOT NULL,
+            mdeg VARCHAR(10) NOT NULL,
+            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
+        )");
 
-    // Upsert mapping
-    $stmt = $pdo->prepare("INSERT INTO sorter_mapping (device_identity, zdeg, ndeg, odeg, tdeg) VALUES (?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE zdeg=VALUES(zdeg), ndeg=VALUES(ndeg), odeg=VALUES(odeg), tdeg=VALUES(tdeg)");
-    $stmt->execute([$device_identity, $zdeg, $ndeg, $odeg, $tdeg]);
+    // Upsert mapping using mdeg column
+    $stmt = $pdo->prepare("INSERT INTO sorter_mapping (device_identity, zdeg, ndeg, odeg, mdeg) VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE zdeg=VALUES(zdeg), ndeg=VALUES(ndeg), odeg=VALUES(odeg), mdeg=VALUES(mdeg)");
+    $stmt->execute([$device_identity, $zdeg, $ndeg, $odeg, $mdeg]);
     echo json_encode(['success' => true]);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

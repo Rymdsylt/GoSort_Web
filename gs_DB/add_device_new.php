@@ -61,7 +61,7 @@ try {
         
         // Set default mapping for the new device
         $stmt = $pdo->prepare("
-            INSERT INTO sorter_mapping (device_identity, zdeg, ndeg, odeg, tdeg) 
+            INSERT INTO sorter_mapping (device_identity, zdeg, ndeg, odeg, mdeg) 
             VALUES (?, 'bio', 'nbio', 'hazardous', 'mixed')
         ");
         $stmt->execute([$data['deviceIdentity']]);

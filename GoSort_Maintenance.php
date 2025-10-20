@@ -612,54 +612,51 @@ if (!$device_id || !$device_identity) {
 
                     <p class="text-muted">Assign each position (Left, Front, Right, Back) to a trash type. Each position must have a unique type.</p>
 
-                    <!-- Servo Mapping Grid -->
-                    <div class="servo-mapping-container">
-                        <div></div>
-                        <div class="servo-position servo-position-front">
-                            <h6>Front</h6>
-                            <button id="btn-ndeg" class="btn btn-outline-danger quadrant-btn">Non-Bio</button>
-                        </div>
-                        <div></div>
-
-                        <div class="servo-position servo-position-left">
-                            <h6>Left</h6>
+                    <!-- Servo Mapping Grid (2x2) -->
+                    <div class="servo-mapping-container" style="grid-template-columns: repeat(2, 1fr); max-width: 640px;">
+                        <div class="servo-position servo-position-front servo-position-left">
+                            <h6>Front - Left</h6>
                             <button id="btn-zdeg" class="btn btn-outline-success quadrant-btn">Bio</button>
                         </div>
-                        <div></div>
-                        <div class="servo-position servo-position-right">
-                            <h6>Right</h6>
+
+                        <div class="servo-position servo-position-front servo-position-right">
+                            <h6>Front - Right</h6>
+                            <button id="btn-ndeg" class="btn btn-outline-danger quadrant-btn">Non-Bio</button>
+                        </div>
+
+                        <div class="servo-position servo-position-back servo-position-left">
+                            <h6>Back - Left</h6>
                             <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Hazardous</button>
                         </div>
 
-                        <div></div>
-                        <div class="servo-position servo-position-back">
-                            <h6>Back</h6>
-                            <button id="btn-tdeg" class="btn btn-outline-secondary quadrant-btn">Mixed</button>
+                        <div class="servo-position servo-position-back servo-position-right">
+                            <h6>Back - Right</h6>
+                            <button id="btn-mdeg" class="btn btn-outline-secondary quadrant-btn">Mixed</button>
                         </div>
-                        <div></div>
+
                     </div>
 
                     <!-- Mapping Preview -->
                     <div class="mapping-preview">
                         <h6>Current Mapping</h6>
-                        <div id="mapping-preview-content">
-                            <div class="mapping-preview-item">
-                                <span class="mapping-preview-position">Left:</span>
-                                <span id="preview-left">Bio</span>
+                            <div id="mapping-preview-content">
+                                <div class="mapping-preview-item">
+                                    <span class="mapping-preview-position">Front - Left:</span>
+                                    <span id="preview-front-left">Bio</span>
+                                </div>
+                                <div class="mapping-preview-item">
+                                    <span class="mapping-preview-position">Front - Right:</span>
+                                    <span id="preview-front-right">Non-Bio</span>
+                                </div>
+                                <div class="mapping-preview-item">
+                                    <span class="mapping-preview-position">Back - Left:</span>
+                                    <span id="preview-back-left">Hazardous</span>
+                                </div>
+                                <div class="mapping-preview-item">
+                                    <span class="mapping-preview-position">Back - Right:</span>
+                                    <span id="preview-back-right">Mixed</span>
+                                </div>
                             </div>
-                            <div class="mapping-preview-item">
-                                <span class="mapping-preview-position">Front:</span>
-                                <span id="preview-front">Non-Bio</span>
-                            </div>
-                            <div class="mapping-preview-item">
-                                <span class="mapping-preview-position">Right:</span>
-                                <span id="preview-right">Hazardous</span>
-                            </div>
-                            <div class="mapping-preview-item">
-                                <span class="mapping-preview-position">Back:</span>
-                                <span id="preview-back">Mixed</span>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="text-center">
@@ -967,17 +964,18 @@ updateConnectionStatus();
 
 let currentServoOperation = null;
 
-const OPERATION_TIMINGS = {
+    const OPERATION_TIMINGS = {
     'zdeg': 2000,
     'ndeg': 2000,
     'odeg': 2000,
-    'tdeg': 2000,
+    'mdeg': 2000,
     'unclog': 3500,
     'sweep1': 4000,
     'sweep2': 5000
 };
 
 function moveServo(position) {
+    console.debug('moveServo requested', {position, quadrantMap});
     if (currentServoOperation) {
         console.log('Operation already in progress');
         return;
@@ -1001,7 +999,7 @@ function moveServo(position) {
         'zdeg': 'Moving to Bio',
         'ndeg': 'Moving to Non-Bio',
         'odeg': 'Moving to Hazardous',
-        'tdeg': 'Moving to Mixed',
+        'mdeg': 'Moving to Mixed',
         'unclog': 'Unclogging Section',
         'sweep1': 'Testing Pan Sweep',
         'sweep2': 'Testing Full Sweep'
@@ -1120,6 +1118,7 @@ function pollCommandCompletion(deviceIdentity, command, statusDiv, controlButton
 }
 
 function confirmOperation(command, operationName) {
+    console.debug('confirmOperation invoked', {command, operationName, quadrantMap});
     const operationModal = new bootstrap.Modal(document.getElementById('operationModal'));
     document.getElementById('operationName').textContent = operationName;
     
@@ -1205,13 +1204,13 @@ document.getElementById('confirmShutdownBtn').addEventListener('click', function
 });
 
 // Quadrant Mapping
-let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'hazardous', tdeg: 'mixed'};
+let quadrantMap = {zdeg: 'bio', ndeg: 'nbio', odeg: 'hazardous', mdeg: 'mixed'};
 
 function updateQuadrantButtons() {
     const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', hazardous: 'Hazardous', mixed: 'Mixed'};
     const mapToClass = {bio: 'btn-outline-success', nbio: 'btn-outline-danger', hazardous: 'btn-outline-warning', mixed: 'btn-outline-secondary'};
     
-    ['zdeg','ndeg','odeg','tdeg'].forEach(q => {
+    ['zdeg','ndeg','odeg','mdeg'].forEach(q => {
         const btn = document.getElementById('btn-' + q);
         if (btn) {
             const label = mapToLabel[quadrantMap[q]];
@@ -1226,12 +1225,21 @@ function updateQuadrantButtons() {
 
 function updateMappingPreview() {
     const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', hazardous: 'Hazardous', mixed: 'Mixed'};
-    const servoLabels = {zdeg: 'Left', ndeg: 'Front', odeg: 'Right', tdeg: 'Back'};
-    const servoOrder = ['zdeg', 'ndeg', 'odeg', 'tdeg'];
-    
-    servoOrder.forEach(servoKey => {
+    // Map internal quadrant keys to UI positions according to GoSort.py default_mapping
+    // Front - Left  -> zdeg
+    // Front - Right -> ndeg
+    // Back - Left   -> odeg
+    // Back - Right  -> mdeg
+    const previewMap = {
+        zdeg: 'preview-front-left',   // Front - Left (Bio)
+        ndeg: 'preview-front-right',  // Front - Right (Non-Bio)
+        odeg: 'preview-back-left',    // Back - Left (Hazardous)
+        mdeg: 'preview-back-right'    // Back - Right (Mixed)
+    };
+
+    Object.keys(previewMap).forEach(servoKey => {
         const trashType = quadrantMap[servoKey] || 'Not Set';
-        const previewEl = document.getElementById(`preview-${servoLabels[servoKey].toLowerCase()}`);
+        const previewEl = document.getElementById(previewMap[servoKey]);
         if (previewEl) {
             previewEl.textContent = mapToLabel[trashType] || trashType;
         }
@@ -1253,7 +1261,8 @@ function renderServoControls() {
             }
         }
         if (mappedServo) {
-            html += `<button class="btn ${mapToClass[trashType]} btn-lg" onclick="confirmOperation('${mappedServo}', '${mapToLabel[trashType]}')">${mapToLabel[trashType]}</button>`;
+            // Include servo key in the label for clarity and debugging
+            html += `<button class="btn ${mapToClass[trashType]} btn-lg" data-servo="${mappedServo}" onclick="confirmOperation('${mappedServo}', '${mapToLabel[trashType]}')">${mapToLabel[trashType]} <small style=\"opacity:0.8;margin-left:.5rem\">(${mappedServo})</small></button>`;
         }
     }
     
@@ -1293,7 +1302,12 @@ function showQuadrantSelect(q) {
         {val:'mixed', label:'Mixed'}
     ];
     
-    const positionLabels = {zdeg: 'Left', ndeg: 'Front', odeg: 'Right', tdeg: 'Back'};
+    const positionLabels = {
+        zdeg: 'Front - Left',
+        ndeg: 'Front - Right',
+        odeg: 'Back - Left',
+        mdeg: 'Back - Right'
+    };
     let html = '<div id="quadrant-select-modal" class="modal" tabindex="-1" style="display:block;background:rgba(0,0,0,0.3)"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-radius: 16px; border: none;"><div class="modal-body p-4"><h5 class="modal-title mb-3">Select Trash Type for ' + positionLabels[q] + '</h5>';
     
     options.forEach(opt => {
@@ -1316,11 +1330,10 @@ function setQuadrantType(q, val) {
     closeQuadrantSelect();
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('btn-zdeg')?.addEventListener('click', () => showQuadrantSelect('zdeg'));
-    document.getElementById('btn-ndeg')?.addEventListener('click', () => showQuadrantSelect('ndeg'));
-    document.getElementById('btn-odeg')?.addEventListener('click', () => showQuadrantSelect('odeg'));
-    document.getElementById('btn-tdeg')?.addEventListener('click', () => showQuadrantSelect('tdeg'));
+// Bind quadrant select buttons (safe if elements not present)
+['zdeg','ndeg','odeg','mdeg'].forEach(key => {
+    const btn = document.getElementById('btn-' + key);
+    if (btn) btn.addEventListener('click', () => showQuadrantSelect(key));
 });
 
 function saveQuadrantMapping() {
@@ -1332,7 +1345,7 @@ function saveQuadrantMapping() {
     const urlParams = new URLSearchParams(window.location.search);
     const deviceIdentity = urlParams.get('identity');
     
-    const values = [quadrantMap.zdeg, quadrantMap.ndeg, quadrantMap.odeg, quadrantMap.tdeg];
+    const values = [quadrantMap.zdeg, quadrantMap.ndeg, quadrantMap.odeg, quadrantMap.mdeg];
     const unique = new Set(values);
     
     if (unique.size < values.length) {
@@ -1362,7 +1375,7 @@ function saveQuadrantMapping() {
             zdeg: quadrantMap.zdeg,
             ndeg: quadrantMap.ndeg,
             odeg: quadrantMap.odeg,
-            tdeg: quadrantMap.tdeg || 'mixed'
+            mdeg: quadrantMap.mdeg || 'mixed'
         })
     })
     .then(res => res.json())

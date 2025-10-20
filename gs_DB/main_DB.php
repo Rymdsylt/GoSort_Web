@@ -36,31 +36,7 @@ try {
         )
     ");
 
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS trash_sorted (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            sorted ENUM('biodegradable', 'non-biodegradable', 'hazardous', 'mixed') NOT NULL,
-            confidence FLOAT DEFAULT NULL,
-            bin_location VARCHAR(100) DEFAULT NULL,
-            user_id INT DEFAULT NULL,
-            sorting_history_id INT DEFAULT NULL,
-            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-            FOREIGN KEY (sorting_history_id) REFERENCES sorting_history(id) ON DELETE CASCADE
-        )
-    ");
 
-    $conn->query("
-        CREATE TABLE IF NOT EXISTS maintenance_commands (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            device_identity VARCHAR(100) NOT NULL,
-            command VARCHAR(50) NOT NULL,
-            executed TINYINT(1) DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            executed_at TIMESTAMP NULL,
-            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
-        )
-    ");
 
    $conn->query("
     CREATE TABLE IF NOT EXISTS sorters (
@@ -113,7 +89,7 @@ try {
             zdeg VARCHAR(10) NOT NULL,
             ndeg VARCHAR(10) NOT NULL,
             odeg VARCHAR(10) NOT NULL,
-            tdeg VARCHAR(10) NOT NULL,
+            mdeg VARCHAR(10) NOT NULL,
             FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
         )
     ");
@@ -172,6 +148,33 @@ try {
         UPDATE maintenance_mode
         SET active = FALSE, end_time = NOW()
         WHERE active = TRUE AND start_time < NOW() - INTERVAL 1 MINUTE
+    ");
+
+      $conn->query("
+        CREATE TABLE IF NOT EXISTS trash_sorted (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sorted ENUM('biodegradable', 'non-biodegradable', 'hazardous', 'mixed') NOT NULL,
+            confidence FLOAT DEFAULT NULL,
+            bin_location VARCHAR(100) DEFAULT NULL,
+            user_id INT DEFAULT NULL,
+            sorting_history_id INT DEFAULT NULL,
+            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY (sorting_history_id) REFERENCES sorting_history(id) ON DELETE CASCADE
+        )
+    ");
+
+    
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS maintenance_commands (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            device_identity VARCHAR(100) NOT NULL,
+            command VARCHAR(50) NOT NULL,
+            executed TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            executed_at TIMESTAMP NULL,
+            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
+        )
     ");
 
     $conn->close();
