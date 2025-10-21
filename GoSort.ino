@@ -49,11 +49,11 @@ const char* jokes[] = {
 const int NUM_JOKES = 8;
 
 // Servo positions (must be between 0 and 180)
-const int neutralPos = 45;    // D8 neutral position (pan)
-const int nbioPos = 22;      // Non-bio position (pan)
-const int bioPos = 22;       // Bio position (pan)
-const int hazardPos = 67;    // Hazardous position (pan)
-const int mixedPos = 67;     // Mixed position (pan)
+const int neutralPos = 90;    // D8 neutral position (pan)
+const int nbioPos = 45;      // Non-bio position (pan)
+const int bioPos = 135;      // Bio position (pan)
+const int hazardPos = 45;    // Hazardous position (pan)
+const int mixedPos = 135;    // Mixed position (pan)
 
 // Tilt positions
 const int tiltNeutralPos = 90;   // D9 neutral position
@@ -262,7 +262,7 @@ void loop() {
         break;
       case 4:
         distance = measureDistance(TRIG_PIN_4, ECHO_PIN_4);
-        binName = "Hazardous";
+        binName = "Mixed";
         break;
     }
     
@@ -308,13 +308,13 @@ void loop() {
         lcd.setCursor(0, 1);
         lcd.print("Non-Biodegradable");
 
-        rotateServo.write(nbioPos);    // Pan to non-bio position (22)
+        rotateServo.write(nbioPos);    // Pan to non-bio position (45)
         delay(500);
-        tiltServo.write(tiltHighPos);  // Tilt up (150)
+        tiltServo.write(tiltLowPos);   // Tilt down (30)
         delay(500);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
-        rotateServo.write(neutralPos);  // Pan back to neutral (45)
+        rotateServo.write(neutralPos);  // Pan back to neutral (90)
         delay(500);
 
         Serial.println("Moved to non-biodegradable position");
@@ -326,13 +326,13 @@ void loop() {
         lcd.setCursor(0, 1);
         lcd.print("Biodegradable     ");
 
-        rotateServo.write(bioPos);     // Pan to bio position (22)
+        rotateServo.write(bioPos);     // Pan to bio position (135)
         delay(500);
-        tiltServo.write(tiltLowPos);   // Tilt down (30)
+        tiltServo.write(tiltHighPos);  // Tilt up (150)
         delay(500);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
-        rotateServo.write(neutralPos);  // Pan back to neutral (45)
+        rotateServo.write(neutralPos);  // Pan back to neutral (90)
         delay(500);
 
         Serial.println("Moved to biodegradable position");
@@ -344,16 +344,16 @@ void loop() {
         lcd.setCursor(0, 1);
         lcd.print("Hazardous         ");
 
-        rotateServo.write(hazardPos);   // Pan to hazardous position (67)
+        rotateServo.write(hazardPos);   // Pan to hazardous position (45)
         delay(500);
         tiltServo.write(tiltHighPos);   // Tilt up (150)
         delay(500);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
-        rotateServo.write(neutralPos);   // Pan back to neutral (45)
+        rotateServo.write(neutralPos);   // Pan back to neutral (90)
         delay(500);
 
-        Serial.println("Moved to recyclable position");
+        Serial.println("Moved to hazardous position");
         Serial.println("ready");
       }
       else if (inputString == "mdeg") {
@@ -362,13 +362,13 @@ void loop() {
         lcd.setCursor(0, 1);
         lcd.print("Mixed Waste       ");
 
-        rotateServo.write(mixedPos);    // Pan to mixed position (67)
+        rotateServo.write(mixedPos);    // Pan to mixed position (135)
         delay(500);
         tiltServo.write(tiltLowPos);    // Tilt down (30)
         delay(500);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
-        rotateServo.write(neutralPos);   // Pan back to neutral (45)
+        rotateServo.write(neutralPos);   // Pan back to neutral (90)
         delay(500);
 
         Serial.println("Moved to mixed waste position");
