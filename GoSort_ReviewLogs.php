@@ -1,3 +1,47 @@
+<?php
+session_start();
+date_default_timezone_set('Asia/Manila');
+require_once 'gs_DB/main_DB.php';
+require_once 'gs_DB/connection.php';
+
+if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
+    header("Location: GoSort_Login.php");
+    exit();
+}
+
+// Get device ID and other parameters from URL
+$deviceId = $_GET['device'] ?? null;
+$deviceName = $_GET['name'] ?? 'Unknown Device';
+$deviceIdentity = $_GET['identity'] ?? '';
+
+if (!$deviceId || !$deviceIdentity) {
+    header("Location: GoSort_WasteMonitoringNavpage.php");
+    exit();
+}
+
+// Get today's date in YYYY-MM-DD format
+$today = date('Y-m-d');
+
+// Fetch today's sorting history for this device
+$query = "
+    SELECT 
+        id,
+        trash_type,
+        trash_class,
+        confidence,
+        image_data,
+        sorted_at
+    FROM sorting_history 
+    WHERE 
+        device_identity = ? 
+        AND DATE(sorted_at) = ?
+        AND is_maintenance = 0
+    ORDER BY sorted_at DESC";
+
+$stmt = $pdo->prepare($query);
+$stmt->execute([$deviceIdentity, $today]);
+$sortingHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -395,34 +439,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Sample detection data (replace with actual data from your backend)
-        const detections = [
-            {
-                category: 'Biodegradable',
-                item: 'Fruit Peel',
-                image: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=500&h=500&fit=crop'
-            },
-            {
-                category: 'Non-Biodegradable',
-                item: 'Plastic Bottle',
-                image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=500&h=500&fit=crop'
-            },
-            {
-                category: 'Biodegradable',
-                item: 'Paper',
-                image: 'https://images.unsplash.com/photo-1594843310722-12e197c55fc5?w=500&h=500&fit=crop'
-            },
-            {
-                category: 'Non-Biodegradable',
-                item: 'Aluminum Can',
-                image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&h=500&fit=crop'
-            },
-            {
-                category: 'Biodegradable',
-                item: 'Food Waste',
-                image: 'https://images.unsplash.com/photo-1628102491629-778571d893a3?w=500&h=500&fit=crop'
-            }
-        ];
+        // Get sorting history data from PHP
+        const detections = <?php echo json_encode($sortingHistory); ?> || [];
 
         let currentIndex = 0;
 
@@ -448,6 +466,10 @@
             if (detections.length === 0) {
                 document.getElementById('placeholderImage').style.display = 'block';
                 document.getElementById('detectionImage').style.display = 'none';
+                document.getElementById('wasteCategory').textContent = 'No Detections';
+                document.getElementById('detectedItem').textContent = 'N/A';
+                document.getElementById('currentCount').textContent = '0';
+                document.getElementById('totalCount').textContent = '0';
                 return;
             }
 
@@ -458,12 +480,14 @@
             document.getElementById('totalCount').textContent = detections.length;
             
             // Update category and item
-            document.getElementById('wasteCategory').textContent = detection.category;
-            document.getElementById('detectedItem').textContent = detection.item;
+            document.getElementById('wasteCategory').textContent = detection.trash_type.toUpperCase();
+            // Split trash_class by comma and take first item if multiple items
+            const detectedItems = detection.trash_class.split(',').map(item => item.trim());
+            document.getElementById('detectedItem').textContent = detectedItems.join(', ');
             
             // Update image
             const img = document.getElementById('detectionImage');
-            img.src = detection.image;
+            img.src = `data:image/jpeg;base64,${detection.image_data}`;
             img.style.display = 'block';
             document.getElementById('placeholderImage').style.display = 'none';
             
@@ -505,16 +529,74 @@
         }
 
         // Action handlers
-        function markWrong() {
-            console.log('Marked as wrong:', detections[currentIndex]);
-            // Add your logic here (e.g., API call to update database)
-            alert('Marked as Wrong');
+        async function markWrong() {
+            const detection = detections[currentIndex];
+            try {
+                const response = await fetch('api/mark_sorting_wrong.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sorting_id: detection.id,
+                        device_identity: '<?php echo $deviceIdentity; ?>'
+                    })
+                });
+                
+                if (response.ok) {
+                    const btn = document.getElementById('wrongBtn');
+                    const icon = btn.querySelector('.btn-icon');
+                    icon.style.background = '#dc2626';
+                    icon.style.color = 'white';
+                    setTimeout(() => {
+                        icon.style.background = '';
+                        icon.style.color = '';
+                        if (currentIndex < detections.length - 1) {
+                            navigateNext();
+                        }
+                    }, 500);
+                } else {
+                    throw new Error('Failed to mark as wrong');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to mark detection as wrong');
+            }
         }
 
-        function markCorrect() {
-            console.log('Marked as correct:', detections[currentIndex]);
-            // Add your logic here (e.g., API call to update database)
-            alert('Marked as Correct');
+        async function markCorrect() {
+            const detection = detections[currentIndex];
+            try {
+                const response = await fetch('api/mark_sorting_correct.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sorting_id: detection.id,
+                        device_identity: '<?php echo $deviceIdentity; ?>'
+                    })
+                });
+                
+                if (response.ok) {
+                    const btn = document.getElementById('correctBtn');
+                    const icon = btn.querySelector('.btn-icon');
+                    icon.style.background = '#16a34a';
+                    icon.style.color = 'white';
+                    setTimeout(() => {
+                        icon.style.background = '';
+                        icon.style.color = '';
+                        if (currentIndex < detections.length - 1) {
+                            navigateNext();
+                        }
+                    }, 500);
+                } else {
+                    throw new Error('Failed to mark as correct');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to mark detection as correct');
+            }
         }
 
         // Event listeners
