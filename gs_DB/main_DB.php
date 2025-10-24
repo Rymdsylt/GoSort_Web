@@ -66,6 +66,9 @@ try {
             id INT AUTO_INCREMENT PRIMARY KEY,
             device_identity VARCHAR(100) NOT NULL,
             trash_type ENUM('bio', 'nbio', 'hazardous', 'mixed') NOT NULL,
+            trash_class VARCHAR(255) DEFAULT NULL,
+            confidence FLOAT DEFAULT NULL,
+            image_data MEDIUMBLOB DEFAULT NULL,
             is_maintenance TINYINT(1) DEFAULT 0,
             sorted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE

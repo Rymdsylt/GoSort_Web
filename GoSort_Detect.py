@@ -8,6 +8,7 @@ import torch
 import requests
 import json
 import os
+import base64
 import socket
 import concurrent.futures
 import threading
@@ -298,16 +299,24 @@ def check_server_connection(ip_address):
         return False
 
 def map_category_to_command(category, mapping):
-    # Map categories to the standard waste types used in the mapping
-    category_to_type = {
-        'bio': 'bio',
-        'hazardous': 'nbio',  # Hazardous waste goes to non-bio bin
-        'recyclable': 'recyc',
-        'non_bio': 'nbio',
-        'mixed': 'mixed'
-    }
+    # Define hazardous items
+    hazardous_items = {'light bulb', 'glass', 'face mask'}
+    # Define biodegradable items
+    bio_items = {'banana peel', 'food'}
+    # Everything else is non-bio by default
     
-    waste_type = category_to_type.get(category, 'nbio')  # Default to non-bio if category not found
+    # Convert category to lowercase for comparison
+    category = category.lower()
+    
+    # Check if the item is in hazardous list
+    if category in {item.lower() for item in hazardous_items}:
+        waste_type = 'hazardous'
+    # Check if the item is in biodegradable list
+    elif category in {item.lower() for item in bio_items}:
+        waste_type = 'bio'
+    # All other items are non-biodegradable
+    else:
+        waste_type = 'nbio'
     
     # Find the servo command for this waste type
     for cmd, typ in mapping.items():
@@ -940,13 +949,13 @@ def main():
                     if class_name is None:
                         class_name = "non_bio"  # Default category if not found
 
-                    # Draw bounding box and label with 75% opacity
-                    overlay = frame.copy()
-                    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(overlay, f"{detected_item} {conf:.2f}", (x1, y1 - 10),
+                    # Store original frame for database
+                    clean_frame = frame.copy()
+
+                    # Draw bounding box and label with 75% opacity (only for display)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(frame, f"{detected_item} {conf:.2f}", (x1, y1 - 10),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                    # Apply the overlay with 75% opacity
-                    cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
 
                     # Process detections with high confidence
                     if conf > 0.50:  # 50% confidence threshold
@@ -958,11 +967,34 @@ def main():
                         try:
                             print(f"✅ Detection: {detected_item} ({conf:.2f}) - Category: {class_name}")
                             
+                            # Convert clean frame to base64 for sending
+                            _, buffer = cv2.imencode('.jpg', clean_frame)
+                            image_base64 = base64.b64encode(buffer).decode('utf-8')
+                            
+                            # For mixed waste, we'll collect all detected items
+                            detected_classes = []
+                            if trash_type == 'mixed':
+                                # Look for other detections in this frame
+                                for other_box in boxes:
+                                    other_conf = other_box.conf[0]
+                                    if other_conf > 0.50:  # Use same confidence threshold
+                                        other_class_id = int(other_box.cls[0])
+                                        other_item = model.names[other_class_id]
+                                        detected_classes.append(other_item)
+                            else:
+                                detected_classes = [detected_item]
+                            
+                            # Join the detected classes with commas
+                            trash_class_str = ', '.join(detected_classes)
+                            
                             # Record sorting operation
                             url = f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php"
                             response = requests.post(url, json={
                                 'device_identity': sorter_id,
                                 'trash_type': trash_type,
+                                'trash_class': trash_class_str,
+                                'confidence': float(conf),
+                                'image_data': image_base64,
                                 'is_maintenance': False
                             })
                             if response.status_code == 200:
@@ -1012,7 +1044,7 @@ def main():
         combined_frame = np.vstack((frame, ui_panel))
 
         # Show the result
-        cv2.imshow("YOLOv8 Detection", combined_frame)
+        cv2.imshow("YOLOv11 Detection", combined_frame)
         
         # Handle mouse events
         def mouse_callback(event, x, y, flags, param):
@@ -1058,7 +1090,7 @@ def main():
                             command_handler.stop()
                         exit()
 
-        cv2.setMouseCallback("YOLOv8 Detection", mouse_callback)
+        cv2.setMouseCallback("YOLOv11 Detection", mouse_callback)
         
         # Wait for key press (reduced wait time for smoother UI)
         if cv2.waitKey(1) & 0xFF == ord('q'):

@@ -395,6 +395,55 @@ $offlineDevices = array_values($offlineDevices);
             margin-bottom: 0;
         }
 
+        /* Sorting Statistics Styles */
+        .stats-card {
+            border: 2px solid var(--border-color);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-count {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-green);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--medium-gray);
+        }
+
+        .confidence-badge {
+            background: var(--light-green);
+            color: var(--primary-green);
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .latest-sort-preview {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .latest-sort-preview img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
         @media (max-width: 768px) {
             .action-buttons {
                 flex-direction: column;
@@ -426,6 +475,39 @@ $offlineDevices = array_values($offlineDevices);
             </div>
 
             <hr style="height: 1.5px; background-color: #000; opacity: 1; margin-left:6.5px;" class="mb-4">
+
+            <!-- Today's Sorting Statistics -->
+            <div class="stats-card mb-4">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center p-3">
+                    <h5 class="mb-0">Today's Sorting Statistics</h5>
+                    <div class="d-flex align-items-center">
+                        <small class="me-2">Auto-updates every 2 seconds</small>
+                        <div class="spinner-border spinner-border-sm text-light" role="status" id="updateSpinner" style="display: none;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="row" id="sortingStats">
+                                <!-- Stats will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="latest-sort-preview">
+                                <h6 class="text-center mb-3">Latest Sorted Item</h6>
+                                <div id="latestImageContainer" class="text-center">
+                                    <!-- Latest image will be displayed here -->
+                                </div>
+                                <div id="latestSortInfo" class="text-center mt-2">
+                                    <!-- Latest sort info will be displayed here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Info Banner -->
             <div class="info-banner">
@@ -685,6 +767,96 @@ $offlineDevices = array_values($offlineDevices);
     <script src="js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Function to update sorting statistics
+            function updateSortingStats() {
+                const spinner = document.getElementById('updateSpinner');
+                spinner.style.display = 'inline-block';
+
+                fetch('api/get_daily_sorting.php')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const statsContainer = document.getElementById('sortingStats');
+                            const imageContainer = document.getElementById('latestImageContainer');
+                            const sortInfoContainer = document.getElementById('latestSortInfo');
+                            
+                            // Clear existing stats
+                            statsContainer.innerHTML = '';
+                            
+                            // Group data by trash type
+                            const statsByType = {};
+                            let latestImage = null;
+                            let latestInfo = null;
+                            let latestTimestamp = 0;
+                            
+                            data.data.forEach(item => {
+                                if (!statsByType[item.trash_type]) {
+                                    statsByType[item.trash_type] = {
+                                        count: 0,
+                                        confidence: []
+                                    };
+                                }
+                                statsByType[item.trash_type].count += parseInt(item.count);
+                                statsByType[item.trash_type].confidence.push(parseFloat(item.avg_confidence));
+                                
+                                // Check if this is the latest image by comparing timestamps
+                                if (item.latest_image && item.timestamp) {
+                                    const itemTimestamp = new Date(item.timestamp).getTime();
+                                    if (itemTimestamp > latestTimestamp) {
+                                        latestTimestamp = itemTimestamp;
+                                        latestImage = item.latest_image;
+                                        latestInfo = {
+                                            type: item.trash_type,
+                                            confidence: item.avg_confidence,
+                                            timestamp: item.timestamp
+                                        };
+                                    }
+                                }
+                            });
+                            
+                            // Create stat cards for each type
+                            Object.entries(statsByType).forEach(([type, stats]) => {
+                                const avgConfidence = stats.confidence.reduce((a, b) => a + b, 0) / stats.confidence.length;
+                                const html = `
+                                    <div class="col-md-6 col-lg-4 mb-3">
+                                        <div class="stat-item">
+                                            <div class="stat-count">${stats.count}</div>
+                                            <div class="stat-label">${type.toUpperCase()} Items</div>
+                                            <div class="confidence-badge mt-2">
+                                                Avg. Confidence: ${avgConfidence.toFixed(2)}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                                statsContainer.innerHTML += html;
+                            });
+                            
+                            // Update latest image if available
+                            if (latestImage && latestInfo) {
+                                imageContainer.innerHTML = `<img src="data:image/jpeg;base64,${latestImage}" class="img-fluid rounded" alt="Latest sorted item">`;
+                                sortInfoContainer.innerHTML = `
+                                    <div class="mt-2">
+                                        <strong>Type:</strong> ${latestInfo.type.toUpperCase()}<br>
+                                        <strong>Confidence:</strong> ${parseFloat(latestInfo.confidence).toFixed(2)}%<br>
+                                        <small class="text-muted">Time: ${new Date(latestInfo.timestamp).toLocaleTimeString()}</small>
+                                    </div>
+                                `;
+                            }
+                        }
+                        spinner.style.display = 'none';
+                    })
+                    .catch(error => {
+                        console.error('Error fetching sorting data:', error);
+                        spinner.style.display = 'none';
+                    });
+            }
+
+            // Initial update
+            updateSortingStats();
+
+            // Update every 2 seconds
+            setInterval(updateSortingStats, 2000);
+
             // Search functionality
             document.getElementById('searchDevice').addEventListener('keyup', function() {
                 const searchValue = this.value.toLowerCase().trim();
