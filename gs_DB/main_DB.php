@@ -95,6 +95,22 @@ try {
     ");
 
     $conn->query("
+        CREATE TABLE IF NOT EXISTS corrected_waste (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            device_identity VARCHAR(100) NOT NULL,
+            was_class VARCHAR(50) NOT NULL,
+            now_class VARCHAR(50) NOT NULL,
+            waste_category ENUM('bio', 'nbio', 'hazardous', 'mixed') NOT NULL,
+            corrected_category ENUM('bio', 'nbio', 'hazardous', 'mixed') NOT NULL,
+            image_path VARCHAR(255),
+            correction_notes TEXT,
+            confidence_score DECIMAL(5,2),
+            corrected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
+        )
+    ");
+
+    $conn->query("
         CREATE TABLE IF NOT EXISTS assigned_sorters (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,

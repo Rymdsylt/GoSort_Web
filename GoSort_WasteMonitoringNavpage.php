@@ -316,6 +316,25 @@ $offlineDevices = array_values($offlineDevices);
             margin-left: 0.5rem;
         }
 
+        .device-card.archive {
+            border-color: #0d6efd;
+        }
+
+        .device-card.archive::before {
+            background: linear-gradient(to bottom, #0d6efd, #084298);
+        }
+
+        .device-card.archive .action-btn {
+            border-color: #0d6efd;
+            color: #0d6efd;
+        }
+
+        .device-card.archive .action-btn:hover {
+            background: #f0f6ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
+        }
+
         .info-banner {
             background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
             border: 2px solid #0ea5e9;
@@ -577,6 +596,89 @@ $offlineDevices = array_values($offlineDevices);
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
+        </div>
+
+        <!-- Archive Section -->
+        <div class="section-title mt-5">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-archive-fill text-primary me-2" style="font-size: 0.75rem;"></i>
+                <h3 class="mb-0" style="font-size: 1.25rem;">Archive</h3>
+            </div>
+        </div>
+        <div class="row">
+            <?php
+            // Get archived sorting data grouped by device and date
+            $archiveQuery = "
+                SELECT 
+                    s.device_identity,
+                    s.device_name,
+                    DATE(sh.sorted_at) as sort_date,
+                    COUNT(*) as total_sorted
+                FROM sorting_history sh
+                JOIN sorters s ON s.device_identity = sh.device_identity
+                GROUP BY s.device_identity, DATE(sh.sorted_at)
+                ORDER BY sort_date DESC
+                LIMIT 6";
+            
+            $archiveStmt = $pdo->query($archiveQuery);
+            $archiveData = $archiveStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($archiveData)): ?>
+                <div class="col-12">
+                    <div class="no-devices-message">
+                        <i class="bi bi-archive-fill d-block"></i>
+                        <p>No sorting history available.</p>
+                    </div>
+                </div>
+            <?php else: 
+                foreach ($archiveData as $archive): ?>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="device-card archive">
+                            <div class="device-header">
+                                <h3 class="device-name">
+                                    <?php echo htmlspecialchars($archive['device_name']); ?>
+                                </h3>
+                                <div class="badge bg-primary">
+                                    <?php echo date('M j, Y', strtotime($archive['sort_date'])); ?>
+                                </div>
+                            </div>
+                            <div class="device-info">
+                                <div class="info-item">
+                                    <i class="bi bi-fingerprint"></i>
+                                    ID: <?php echo htmlspecialchars($archive['device_identity']); ?>
+                                </div>
+                                <div class="info-item">
+                                    <i class="bi bi-trash"></i>
+                                    Total Sorted: <?php echo number_format($archive['total_sorted']); ?> items
+                                </div>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <a href="GoSort_ReviewLogs.php?device=<?php echo urlencode($archive['device_identity']); ?>&date=<?php echo urlencode($archive['sort_date']); ?>" 
+                                   class="action-btn review-logs w-100">
+                                    <i class="bi bi-clock-history"></i>
+                                    View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach;
+            endif; ?>
+        </div>
+
+        <!-- Corrected Waste Section -->
+        <div class="section-title mt-5">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <i class="bi bi-image text-warning me-2" style="font-size: 0.75rem;"></i>
+                    <h3 class="d-inline" style="font-size: 1.25rem;">Corrected Waste Images</h3>
+                </div>
+                <a href="GoSort_CorrectedWaste.php" class="btn btn-warning">
+                    <i class="bi bi-table me-2"></i>
+                    View Corrections Table
+                </a>
+            </div>
+
         </div>
     </div>
 
