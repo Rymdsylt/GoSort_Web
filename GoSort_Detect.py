@@ -298,36 +298,21 @@ def check_server_connection(ip_address):
     except:
         return False
 
-def map_category_to_command(category, mapping):
-    # Define hazardous items
-    hazardous_items = {'light bulb', 'glass', 'face mask'}
-    # Define biodegradable items
-    bio_items = {'banana peel', 'food'}
-    # Everything else is non-bio by default
+def map_category_to_command(waste_type, mapping):
+    # waste_type is already a category like 'bio', 'nbio', 'hazardous', 'mixed'
+    # Convert to lowercase for comparison
+    waste_type = waste_type.lower()
     
-    # Convert category to lowercase for comparison
-    category = category.lower()
-    
-    # Check if the item is in hazardous list
-    if category in {item.lower() for item in hazardous_items}:
-        waste_type = 'hazardous'
-    # Check if the item is in biodegradable list
-    elif category in {item.lower() for item in bio_items}:
-        waste_type = 'bio'
-    # All other items are non-biodegradable
-    else:
-        waste_type = 'nbio'
-    
-    # Find the servo command for this waste type
+    # Find the servo command for this waste type from the mapping
     for cmd, typ in mapping.items():
-        if typ == waste_type:
+        if typ.lower() == waste_type:
             return cmd
     
     # Default commands if not found in mapping
     default_commands = {
         'bio': 'zdeg',
         'nbio': 'ndeg',
-        'recyc': 'odeg',
+        'hazardous': 'odeg',
         'mixed': 'mdeg'
     }
     return default_commands.get(waste_type, 'ndeg')  # Default to ndeg if no mapping found
@@ -743,10 +728,10 @@ def main():
     mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
     try:
         resp = requests.get(mapping_url)
-        mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'})
+        mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
     except Exception as e:
         print(f"Warning: Could not fetch mapping, using default. {e}")
-        mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'}
+        mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'}
 
     trash_to_cmd = {v: k for k, v in mapping.items()}
 
@@ -802,10 +787,10 @@ def main():
 
                 try:
                     resp = requests.get(mapping_url)
-                    mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'})
+                    mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
                 except Exception as e:
                     print(f"Warning: Could not fetch mapping, using default. {e}")
-                    mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'recyc'}
+                    mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'}
 
                 trash_to_cmd = {v: k for k, v in mapping.items()}
             last_maintenance_status = current_maintenance
@@ -947,7 +932,7 @@ def main():
                             break
                     
                     if class_name is None:
-                        class_name = "non_bio"  # Default category if not found
+                        class_name = "nbio"  # Default category if not found
 
                     # Store original frame for database
                     clean_frame = frame.copy()

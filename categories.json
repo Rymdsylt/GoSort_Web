@@ -1,0 +1,26 @@
+{
+  "bio": [
+    "banana peel",
+    "food",
+    "food container",
+    "paper",
+    "paper cup",
+    "paper plate"
+  ],
+  "nbio": [
+    "can",
+    "pen",
+    "pet bottle",
+    "plastic bag",
+    "plastic cup",
+    "plastic straw",
+    "plastic utensil",
+    "wrappers"
+  ],
+  "hazardous": [
+    "light bulb",
+    "glass",
+    "face mask"
+  ],
+  "mixed": []
+}
