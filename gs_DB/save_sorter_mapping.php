@@ -1,5 +1,7 @@
 <?php
+session_start();
 require_once 'connection.php';
+require_once 'activity_logs.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -58,6 +60,11 @@ try {
     $stmt = $pdo->prepare("INSERT INTO sorter_mapping (device_identity, zdeg, ndeg, odeg, mdeg) VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE zdeg=VALUES(zdeg), ndeg=VALUES(ndeg), odeg=VALUES(odeg), mdeg=VALUES(mdeg)");
     $stmt->execute([$device_identity, $zdeg, $ndeg, $odeg, $mdeg]);
+    
+    // Log mapping update
+    $user_id = $_SESSION['user_id'] ?? null;
+    log_mapping_updated($user_id, $device_identity);
+    
     echo json_encode(['success' => true]);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

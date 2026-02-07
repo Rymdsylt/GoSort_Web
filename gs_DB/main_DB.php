@@ -196,6 +196,46 @@ try {
         )
     ");
 
+    // Create activity_logs table for tracking all system activities
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category ENUM('devices', 'analytics', 'maintenance', 'general') NOT NULL,
+            action VARCHAR(100) NOT NULL,
+            details TEXT,
+            user_id INT DEFAULT NULL,
+            username VARCHAR(100) DEFAULT NULL,
+            device_identity VARCHAR(100) DEFAULT NULL,
+            device_name VARCHAR(100) DEFAULT NULL,
+            ip_address VARCHAR(45) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_category (category),
+            INDEX idx_action (action),
+            INDEX idx_created_at (created_at),
+            INDEX idx_user_id (user_id)
+        )
+    ");
+
+    // Create sorting_reviews table to track correct/wrong markings
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS sorting_reviews (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sorting_history_id INT NOT NULL,
+            device_identity VARCHAR(100) NOT NULL,
+            is_correct TINYINT(1) NOT NULL COMMENT '1 = correct, 0 = wrong',
+            reviewed_by INT DEFAULT NULL,
+            reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            notes TEXT DEFAULT NULL,
+            UNIQUE KEY unique_review (sorting_history_id),
+            FOREIGN KEY (sorting_history_id) REFERENCES sorting_history(id) ON DELETE CASCADE,
+            FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE,
+            FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+            INDEX idx_device_identity (device_identity),
+            INDEX idx_is_correct (is_correct),
+            INDEX idx_reviewed_at (reviewed_at)
+        )
+    ");
+
     $conn->close();
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());

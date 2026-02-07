@@ -2,8 +2,13 @@
 session_start();
 require_once 'gs_DB/main_DB.php';
 require_once 'gs_DB/connection.php';
+require_once 'gs_DB/activity_logs.php';
 
 if (isset($_GET['logout'])) {
+    // Log logout before destroying session
+    if (isset($_SESSION['user_id'])) {
+        log_logout($_SESSION['user_id']);
+    }
     session_destroy();
     setcookie('user_logged_in', '', time() - 3600, '/');
     header("Location: GoSort_Login.php");
@@ -66,6 +71,10 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 
             // Commit transaction
             $conn->commit();
+            
+            // Log user addition
+            $fullName = $userName . ' ' . $lastName;
+            log_user_added($_SESSION['user_id'], $fullName);
             
             echo json_encode([
                 'success' => true,

@@ -1,5 +1,7 @@
 <?php
+session_start();
 require_once 'connection.php';
+require_once 'activity_logs.php';
 
 header('Content-Type: application/json');
 
@@ -65,6 +67,10 @@ try {
             VALUES (?, 'bio', 'nbio', 'hazardous', 'mixed')
         ");
         $stmt->execute([$data['deviceIdentity']]);
+        
+        // Log device addition
+        $user_id = $_SESSION['user_id'] ?? null;
+        log_device_added($user_id, $data['deviceIdentity'], $data['deviceName']);
         
         echo json_encode([
             'success' => true,

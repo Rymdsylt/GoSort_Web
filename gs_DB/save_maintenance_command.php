@@ -1,5 +1,7 @@
 <?php
+session_start();
 require_once 'connection.php';
+require_once 'activity_logs.php';
 
 // Get the command from POST data
 $data = json_decode(file_get_contents('php://input'), true);
@@ -31,6 +33,12 @@ try {
     ");
     
     if ($stmt->execute([$device_identity, $command])) {
+        // Log bin test command if it's a bin test
+        $user_id = $_SESSION['user_id'] ?? null;
+        if (strpos($command, 'test_') === 0 || strpos($command, 'bin') !== false) {
+            log_bin_test($user_id, $device_identity, $command);
+        }
+        
         echo json_encode(['success' => true]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to save command']);

@@ -1,5 +1,7 @@
 <?php
+session_start();
 require_once 'connection.php';
+require_once 'activity_logs.php';
 
 // Disable error display but enable error logging
 error_reporting(E_ALL);
@@ -41,9 +43,20 @@ try {
         ], 400);
     }
 
+    // Get device info before deletion for logging
+    $stmt = $pdo->prepare("SELECT device_name, device_identity FROM sorters WHERE id = ?");
+    $stmt->execute([$deviceId]);
+    $deviceInfo = $stmt->fetch();
+
     // Delete the device
     $stmt = $pdo->prepare("DELETE FROM sorters WHERE id = ?");
     $stmt->execute([$deviceId]);
+
+    // Log device deletion
+    $user_id = $_SESSION['user_id'] ?? null;
+    if ($deviceInfo) {
+        log_device_deleted($user_id, $deviceInfo['device_identity'], $deviceInfo['device_name']);
+    }
 
     send_json_response([
         'success' => true,

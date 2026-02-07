@@ -3,9 +3,14 @@ session_start();
 require_once 'gs_DB/main_DB.php';
 require_once 'gs_DB/connection.php';
 require_once 'gs_DB/sorters_DB.php';
+require_once 'gs_DB/activity_logs.php';
 
 // Handle logout
 if (isset($_GET['logout'])) {
+    // Log logout before destroying session
+    if (isset($_SESSION['user_id'])) {
+        log_logout($_SESSION['user_id']);
+    }
     // Clean up maintenance mode if active
     require_once 'gs_DB/maintenance_tracking.php';
     if (isset($_SESSION['user_id'])) {

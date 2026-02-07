@@ -3,8 +3,13 @@ session_start();
 date_default_timezone_set('Asia/Manila');
 require_once 'gs_DB/main_DB.php';
 require_once 'gs_DB/connection.php';
+require_once 'gs_DB/activity_logs.php';
 
 if (isset($_GET['logout'])) {
+    // Log logout before destroying session
+    if (isset($_SESSION['user_id'])) {
+        log_logout($_SESSION['user_id']);
+    }
     session_destroy();
     setcookie('user_logged_in', '', time() - 3600, '/');
     header("Location: GoSort_Login.php");
@@ -595,18 +600,11 @@ $offlineDevices = array_values($offlineDevices);
                                         Monitor Live
                                     </a>
                                     
-                                    <?php if ($isOperatingHours): ?>
-                                        <div class="action-btn review-logs disabled">
-                                            <i class="bi bi-clock-history"></i>
-                                            Review Logs
-                                        </div>
-                                    <?php else: ?>
-                                        <a href="GoSort_ReviewLogs.php?device=<?php echo $device['id']; ?>&name=<?php echo urlencode($device['device_name']); ?>&identity=<?php echo urlencode($device['device_identity']); ?>" 
-                                           class="action-btn review-logs">
-                                            <i class="bi bi-clock-history"></i>
-                                            Review Logs
-                                        </a>
-                                    <?php endif; ?>
+                                    <a href="GoSort_ReviewLogs.php?device=<?php echo $device['id']; ?>&name=<?php echo urlencode($device['device_name']); ?>&identity=<?php echo urlencode($device['device_identity']); ?>" 
+                                       class="action-btn review-logs">
+                                        <i class="bi bi-clock-history"></i>
+                                        Review Logs
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -660,18 +658,11 @@ $offlineDevices = array_values($offlineDevices);
                                         Monitor Live
                                     </div>
                                     
-                                    <?php if ($isOperatingHours): ?>
-                                        <div class="action-btn review-logs disabled">
-                                            <i class="bi bi-clock-history"></i>
-                                            Review Logs
-                                        </div>
-                                    <?php else: ?>
-                                        <a href="GoSort_ReviewLogs.php?device=<?php echo $device['id']; ?>&name=<?php echo urlencode($device['device_name']); ?>&identity=<?php echo urlencode($device['device_identity']); ?>" 
-                                           class="action-btn review-logs">
-                                            <i class="bi bi-clock-history"></i>
-                                            Review Logs
-                                        </a>
-                                    <?php endif; ?>
+                                    <a href="GoSort_ReviewLogs.php?device=<?php echo $device['id']; ?>&name=<?php echo urlencode($device['device_name']); ?>&identity=<?php echo urlencode($device['device_identity']); ?>" 
+                                       class="action-btn review-logs">
+                                        <i class="bi bi-clock-history"></i>
+                                        Review Logs
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -689,15 +680,21 @@ $offlineDevices = array_values($offlineDevices);
         </div>
         <div class="row">
             <?php
-            // Get archived sorting data grouped by device and date
+            // Get archived sorting data grouped by device and date, with review counts
             $archiveQuery = "
                 SELECT 
+                    s.id as device_id,
                     s.device_identity,
                     s.device_name,
                     DATE(sh.sorted_at) as sort_date,
-                    COUNT(*) as total_sorted
+                    COUNT(*) as total_sorted,
+                    SUM(CASE WHEN sr.id IS NOT NULL THEN 1 ELSE 0 END) as reviewed_count,
+                    SUM(CASE WHEN sr.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+                    SUM(CASE WHEN sr.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count
                 FROM sorting_history sh
                 JOIN sorters s ON s.device_identity = sh.device_identity
+                LEFT JOIN sorting_reviews sr ON sh.id = sr.sorting_history_id
+                WHERE sh.is_maintenance = 0
                 GROUP BY s.device_identity, DATE(sh.sorted_at)
                 ORDER BY sort_date DESC
                 LIMIT 6";
@@ -713,7 +710,9 @@ $offlineDevices = array_values($offlineDevices);
                     </div>
                 </div>
             <?php else: 
-                foreach ($archiveData as $archive): ?>
+                foreach ($archiveData as $archive): 
+                    $pendingCount = $archive['total_sorted'] - $archive['reviewed_count'];
+                    ?>
                     <div class="col-lg-4 col-md-6">
                         <div class="device-card archive">
                             <div class="device-header">
@@ -733,13 +732,21 @@ $offlineDevices = array_values($offlineDevices);
                                     <i class="bi bi-trash"></i>
                                     Total Sorted: <?php echo number_format($archive['total_sorted']); ?> items
                                 </div>
+                                <div class="info-item">
+                                    <i class="bi bi-check-circle text-success"></i>
+                                    <span class="text-success"><?php echo $archive['correct_count']; ?></span> |
+                                    <i class="bi bi-x-circle text-danger"></i>
+                                    <span class="text-danger"><?php echo $archive['wrong_count']; ?></span> |
+                                    <i class="bi bi-clock text-warning"></i>
+                                    <span class="text-warning"><?php echo $pendingCount; ?> pending</span>
+                                </div>
                             </div>
                             
                             <div class="action-buttons">
-                                <a href="GoSort_ReviewLogs.php?device=<?php echo urlencode($archive['device_identity']); ?>&date=<?php echo urlencode($archive['sort_date']); ?>" 
+                                <a href="GoSort_ReviewLogs.php?device=<?php echo $archive['device_id']; ?>&name=<?php echo urlencode($archive['device_name']); ?>&identity=<?php echo urlencode($archive['device_identity']); ?>&date=<?php echo urlencode($archive['sort_date']); ?>" 
                                    class="action-btn review-logs w-100">
-                                    <i class="bi bi-clock-history"></i>
-                                    View Details
+                                    <i class="bi bi-clipboard-check"></i>
+                                    Review Detections
                                 </a>
                             </div>
                         </div>
