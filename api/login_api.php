@@ -41,23 +41,23 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 // Validate required fields
-if (empty($data['username']) || empty($data['password'])) {
+if (empty($data['email']) || empty($data['password'])) {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'message' => 'Username and password are required',
+        'message' => 'Email and password are required',
         'debug' => ['received_data' => $data]
     ]);
     exit();
 }
 
-$username = trim($data['username']);
+$email = trim($data['email']);
 $password = $data['password'];
 
 try {
-    // Attempt to find user
-    $stmt = $pdo->prepare("SELECT id, userName as username, lastName, role, password, assigned_floor FROM users WHERE userName = ?");
-    $stmt->execute([$username]);
+    // Attempt to find user by email
+    $stmt = $pdo->prepare("SELECT id, userName as username, lastName, role, password, assigned_floor, email FROM users WHERE email = ?");
+    $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($user && password_verify($password, $user['password'])) {
@@ -96,6 +96,7 @@ try {
             'data' => [
                 'userId' => $user['id'],
                 'username' => $user['username'],
+                'email' => $user['email'],
                 'lastName' => $user['lastName'],
                 'isAdmin' => $user['role'] === 'admin',
                 'role' => $user['role'],
