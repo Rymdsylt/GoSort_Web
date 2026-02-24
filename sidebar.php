@@ -27,7 +27,9 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="css/dark-mode-global.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/theme-manager.js"></script>
     <style>
         body {
             font-family: "Inter", sans-serif;
@@ -214,6 +216,52 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
         .sidebar.collapsed .sidebar-footer div {
             display: none;
             opacity: 0;
+        }
+
+        /* Dark Mode Styles for Sidebar */
+        body.dark-mode {
+            background-color: #1a1a1a;
+        }
+
+        body.dark-mode .sidebar {
+            background-color: #2d2d2d;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        body.dark-mode .sidebar-footer {
+            border-top-color: #444;
+        }
+
+        body.dark-mode .nav-link {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .nav-link:hover {
+            background-color: rgba(102, 187, 106, 0.15);
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .nav-link.active {
+            background-color: #2e7d32;
+            color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        body.dark-mode .nav-link.active i {
+            color: #fff !important;
+        }
+
+        body.dark-mode .collapse-btn i {
+            color: #888;
+        }
+
+        body.dark-mode .collapse-btn i:hover {
+            background-color: rgba(102, 187, 106, 0.2);
+            color: #66bb6a;
+        }
+
+        body.dark-mode .logo-section {
+            border-bottom-color: #444;
         }
     </style>
 </head>

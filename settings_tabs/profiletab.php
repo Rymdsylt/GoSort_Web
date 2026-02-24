@@ -17,6 +17,18 @@ if ($user_id) {
 <html lang="en">
 <head>
     <style>
+        :root {
+            --primary-green: #2e7d32;
+            --light-green: #66bb6a;
+            --dark-gray: #333;
+            --medium-gray: #6b7280;
+            --light-gray: #f9fafb;
+        }
+
+        body {
+            background-color: var(--light-gray);
+        }
+
         .section-header {
             font-size: 1.1rem;
             font-weight: 700;
@@ -25,6 +37,113 @@ if ($user_id) {
             margin-bottom: 0.5rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid #0a0a0aff;
+        }
+
+        /* Global Dark Mode Styles - imported from global CSS */
+        /* Dark Mode Styles */
+        body.dark-mode {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .section-header {
+            color: #e0e0e0;
+            border-bottom-color: #444;
+        }
+
+        body.dark-mode .profile-card {
+            background-color: #2d2d2d;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        body.dark-mode .profile-header {
+            border-bottom-color: #444;
+        }
+
+        body.dark-mode .profile-info label {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .profile-info .info-row span {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .profile-info .info-row {
+            border-bottom-color: #444;
+        }
+
+        body.dark-mode .form-control {
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        body.dark-mode .form-control:focus {
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            border-color: #66bb6a;
+            box-shadow: 0 0 0 0.2rem rgba(102, 187, 106, 0.25);
+        }
+
+        body.dark-mode .modal-content {
+            background-color: #2d2d2d;
+            border-color: #444;
+        }
+
+        body.dark-mode .modal-header {
+            border-bottom-color: #444;
+        }
+
+        body.dark-mode .modal-footer {
+            border-top-color: #444;
+        }
+
+        body.dark-mode .modal-title {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .modal-body {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .btn-light {
+            background-color: #444;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .btn-light:hover {
+            background-color: #555;
+            border-color: #666;
+            color: #fff;
+        }
+
+        body.dark-mode .btn-close {
+            filter: invert(1);
+        }
+
+        body.dark-mode h4 {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode p {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .text-muted {
+            color: #999 !important;
+        }
+
+        body.dark-mode .text-danger {
+            color: #ff6b6b !important;
+        }
+
+        body.dark-mode .slider {
+            background-color: #555;
+        }
+
+        body.dark-mode .slider:before {
+            background-color: #e0e0e0;
         }
 
         .theme-switch-wrapper {
@@ -429,21 +548,35 @@ if ($user_id) {
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('theme') ||
-                              (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            if (savedTheme === 'dark') {
-                document.body.classList.add('dark-mode');
-                document.getElementById('theme-toggle').checked = true;
+            // If global theme manager exists, use it; otherwise use local storage
+            if (window.themeManager) {
+                const currentTheme = window.themeManager.getCurrentTheme();
+                document.getElementById('theme-toggle').checked = currentTheme === 'dark';
+            } else {
+                const savedTheme = localStorage.getItem('gosort-theme') || localStorage.getItem('theme') ||
+                                  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                if (savedTheme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                    document.getElementById('theme-toggle').checked = true;
+                }
             }
         });
 
         function toggleTheme() {
-            if (document.getElementById('theme-toggle').checked) {
-                document.body.classList.add('dark-mode');
-                localStorage.setItem('theme', 'dark');
+            // Use global theme manager if available
+            if (window.themeManager) {
+                window.themeManager.toggleTheme();
             } else {
-                document.body.classList.remove('dark-mode');
-                localStorage.setItem('theme', 'light');
+                // Fallback to local storage
+                if (document.getElementById('theme-toggle').checked) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('gosort-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('gosort-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
             }
             console.log("Theme toggled.");
         }

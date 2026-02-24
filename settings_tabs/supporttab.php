@@ -101,6 +101,119 @@
             background-color: #1f3a13;
         }
 
+        /* Dark Mode Styles */
+        body.dark-mode {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .content-area {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .support-card {
+            background-color: #2d2d2d;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        body.dark-mode .section-header {
+            color: #e0e0e0;
+            border-bottom-color: #66bb6a;
+        }
+
+        body.dark-mode p {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .text-secondary {
+            color: #b0b0b0 !important;
+        }
+
+        body.dark-mode .faq-item {
+            background-color: #3a3a3a;
+            border-color: #444;
+        }
+
+        body.dark-mode .faq-item button {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .faq-item button:hover {
+            color: #66bb6a;
+        }
+
+        body.dark-mode .faq-body {
+            color: #b0b0b0;
+            background-color: #353535;
+        }
+
+        body.dark-mode .faq-item.active .faq-body {
+            background-color: #383838;
+        }
+
+        body.dark-mode .list-group-item {
+            background-color: #3a3a3a;
+            border-color: #444;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .list-group-item strong {
+            color: #fff;
+        }
+
+        body.dark-mode .contact-info {
+            color: #b0b0b0;
+        }
+
+        body.dark-mode .contact-info i {
+            color: #66bb6a;
+        }
+
+        body.dark-mode .feedback-box {
+            background-color: #3a3a3a;
+            border-color: #555;
+        }
+
+        body.dark-mode .btn-custom {
+            background-color: #2e7d32;
+        }
+
+        body.dark-mode .btn-custom:hover {
+            background-color: #1f5a1f;
+        }
+
+        body.dark-mode .form-control,
+        body.dark-mode textarea {
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        body.dark-mode .form-control:focus,
+        body.dark-mode textarea:focus {
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            border-color: #66bb6a;
+            box-shadow: 0 0 0 0.2rem rgba(102, 187, 106, 0.25);
+        }
+
+        body.dark-mode .modal-content {
+            background-color: #2d2d2d;
+            border-color: #444;
+        }
+
+        body.dark-mode .modal-header {
+            border-bottom-color: #444;
+        }
+
+        body.dark-mode .modal-body {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .modal-title {
+            color: #e0e0e0;
+        }
+
     </style>
 </head>
 <body>
