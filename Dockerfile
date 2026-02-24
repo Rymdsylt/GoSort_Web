@@ -16,9 +16,9 @@ RUN a2dismod mpm_event mpm_worker mpm_async 2>/dev/null || true && \
     a2enmod mpm_prefork && \
     a2enmod php8.1
 
-# Set ServerName to suppress Apache warning
-RUN echo 'ServerName localhost' | tee /etc/apache2/conf-available/servername.conf && \
-    a2enconf servername
+# Set ServerName and enable rewrite module
+RUN echo 'ServerName localhost' >> /etc/apache2/apache2.conf && \
+    a2enmod rewrite
 
 # Copy project files
 COPY . /var/www/html/
