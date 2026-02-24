@@ -8,11 +8,10 @@ RUN apt-get update && apt-get install -y \
     php-mysqli \
     && rm -rf /var/lib/apt/lists/*
 
-# Disable mpm_event and enable mpm_prefork to avoid MPM conflict
-RUN a2dismod mpm_event && a2enmod mpm_prefork
-
-# Enable mod_php
-RUN a2enmod php8.1
+# Disable all MPMs and enable only mpm_prefork (required for mod_php)
+RUN a2dismod mpm_event mpm_worker mpm_async 2>/dev/null || true && \
+    a2enmod mpm_prefork && \
+    a2enmod php8.1
 
 # Copy project files
 COPY . /var/www/html/
