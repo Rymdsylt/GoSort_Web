@@ -13,5 +13,5 @@ WORKDIR /var/www/html
 # Expose port (Railway sets PORT env var)
 EXPOSE 8080
 
-# Start PHP built-in server
-CMD ["php", "-S", "0.0.0.0:${PORT:-8080}", "-t", "."]
+# Start PHP built-in server (shell form to expand PORT env var)
+CMD php -S 0.0.0.0:${PORT:-8080} -t .
