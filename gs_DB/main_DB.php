@@ -2,13 +2,20 @@
 require_once __DIR__ . '/mariadb_credentials.php';
 
 try {
-    $conn = new mysqli($db_host, $db_user, $db_pass, '', $db_port);
+    $conn = new mysqli("p:$db_host", $db_user, $db_pass, '', $db_port);
     if ($conn->connect_error) {
         throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
     $conn->query("CREATE DATABASE IF NOT EXISTS `$db_name`");
     $conn->select_db($db_name);
+
+    // Migration guard: skip schema creation if already initialized
+    $check = $conn->query("SHOW TABLES LIKE 'schema_initialized'");
+    if ($check && $check->num_rows > 0) {
+        // Schema already exists — no need to run CREATE TABLE statements
+        return;
+    }
 
     // Create bin_fullness table
     $conn->query("
@@ -232,8 +239,12 @@ try {
         )
     ");
 
-    $conn->close();
+    // Mark schema as initialized so we skip all CREATE TABLE statements next time
+    $conn->query("CREATE TABLE IF NOT EXISTS schema_initialized (id INT PRIMARY KEY DEFAULT 1)");
+    $conn->query("INSERT IGNORE INTO schema_initialized VALUES (1)");
+
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
 }
 ?>
+

@@ -1,1 +1,1 @@
-web: php -S 0.0.0.0:${PORT} -t . router.php
+web: php -c /tmp/php-optimize.ini -S 0.0.0.0:${PORT:-8080} -t . router.php
