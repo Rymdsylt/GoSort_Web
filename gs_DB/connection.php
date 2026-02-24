@@ -15,13 +15,13 @@ try {
     }
 
     // Check if root user exists
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE userName = ?");
     $stmt->execute(['root']);
     if (!$stmt->fetch()) {
         $hashedPassword = password_hash('pcsadmin', PASSWORD_DEFAULT);
-        $sql = "INSERT INTO users (username, password) VALUES (?, ?)";
+        $sql = "INSERT INTO users (role, userName, lastName, password) VALUES (?, ?, ?, ?)";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute(['root', $hashedPassword]);
+        $stmt->execute(['admin', 'root', 'Admin', $hashedPassword]);
     }
     
 } catch(PDOException $e) {
