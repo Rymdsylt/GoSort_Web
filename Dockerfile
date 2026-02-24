@@ -1,17 +1,17 @@
-# Use the official PHP image
-FROM php:8.2-cli
+# Use the official PHP Apache image
+FROM php:8.2-apache
 
 # Install mysqli extension
 RUN docker-php-ext-install mysqli
 
 # Copy all project files to the container
-COPY . /app/
+COPY . /var/www/html/
 
 # Set working directory
-WORKDIR /app
+WORKDIR /var/www/html
 
-# Expose the port that Railway assigns via $PORT
-EXPOSE 8080
+# Expose the port
+EXPOSE 80
 
-# Start PHP built-in server with router
-CMD php -S 0.0.0.0:${PORT:-8080} router.php
+# Start Apache
+CMD ["apache2-foreground"]
