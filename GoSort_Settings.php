@@ -26,6 +26,34 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
     ob_clean();
     header('Content-Type: application/json');
 
+    // Handle GET request to fetch users
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        try {
+            if (!isset($_SESSION['user_id'])) {
+                throw new Exception('Not authorized');
+            }
+
+            $users_query = "SELECT id, userName, lastName, role, assigned_floor FROM users";
+            $result = $conn->query($users_query);
+            $users = [];
+            while ($row = $result->fetch_assoc()) {
+                $users[] = $row;
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'users' => $users
+            ]);
+            exit();
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+            exit();
+        }
+    }
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             // Check if user is logged in and is admin
@@ -637,6 +665,57 @@ if ($sorters_result) {
     const deleteUserModal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
     const addUserModal = new bootstrap.Modal(document.getElementById('addUserModal'));
 
+    // Function to load users from database
+    function loadUsers() {
+        fetch(window.location.pathname, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && Array.isArray(data.users)) {
+                const tableBody = document.getElementById('userTableBody');
+                tableBody.innerHTML = ''; // Clear existing rows
+                
+                data.users.forEach(user => {
+                    const fullName = `${user.userName} ${user.lastName}`;
+                    const role = user.role === 'admin' ? 'Administrator' : 'Utility Member';
+                    const floor = user.assigned_floor || 'Not Assigned';
+                    
+                    const row = `
+                        <tr>
+                            <td>${fullName}</td>
+                            <td>${role}</td>
+                            <td>${floor}</td>
+                            <td>
+                                <button class="action-btn edit" onclick="openEditModal('${fullName.replace(/'/g, "\\'")}', '${role}', '${floor.replace(/'/g, "\\'")}')">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <button class="action-btn delete" onclick="openDeleteModal('${fullName.replace(/'/g, "\\'")}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading users:', error));
+    }
+
+    // Load users when accounts tab is clicked or page loads
+    document.addEventListener('DOMContentLoaded', loadUsers);
+    
+    // Reload users when switching to accounts tab
+    const accountsButton = document.querySelector('button[onclick="switchTab(\'accounts\')"]');
+    if (accountsButton) {
+        accountsButton.addEventListener('click', loadUsers);
+    }
+
     function openEditModal(name, role, bin) {
         document.getElementById('editName').value = name;
         document.getElementById('editRole').value = role;
@@ -690,30 +769,7 @@ if ($sorters_result) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Add new row to table
-                const table = document.getElementById('userTableBody');
-                const fullName = `${formData.get('userName')} ${formData.get('lastName')}`;
-                const role = formData.get('role') === 'admin' ? 'Administrator' : 'Utility Member';
-                const floor = formData.get('assigned_floor');
-                
-                const newRow = `
-                    <tr>
-                        <td>${fullName}</td>
-                        <td>${role}</td>
-                        <td>${floor}</td>
-                        <td>
-                            <button class="action-btn edit" onclick="openEditModal('${fullName}', '${role}', '${floor}')">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                            <button class="action-btn delete" onclick="openDeleteModal('${fullName}')">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                table.insertAdjacentHTML('beforeend', newRow);
-                
-                // Reset form and close modal properly
+                // Reset form and close modal
                 form.reset();
                 modal.hide();
                 setTimeout(() => {
@@ -722,6 +778,8 @@ if ($sorters_result) {
                     document.body.classList.remove('modal-open');
                     document.body.style.overflow = '';
                     document.body.style.paddingRight = '';
+                    // Reload users from database
+                    loadUsers();
                 }, 200);
                 
                 // Show success message with Bootstrap Toast
