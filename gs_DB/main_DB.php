@@ -1,19 +1,14 @@
 <?php
-// Support both local XAMPP and Railway deployment
-$host = getenv('DB_HOST') ?: '127.0.0.1';
-$user = getenv('DB_USER') ?: 'root';
-$pass = getenv('DB_PASSWORD') ?: '';
-$port = getenv('DB_PORT') ?: 3306;
+require_once __DIR__ . '/mariadb_credentials.php';
 
 try {
-    $conn = new mysqli($host, $user, $pass, '', (int)$port);
+    $conn = new mysqli($db_host, $db_user, $db_pass, '', $db_port);
     if ($conn->connect_error) {
         throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
-    $dbname = getenv('DB_NAME') ?: 'gosort_db';
-    $conn->query("CREATE DATABASE IF NOT EXISTS `$dbname`");
-    $conn->select_db($dbname);
+    $conn->query("CREATE DATABASE IF NOT EXISTS `$db_name`");
+    $conn->select_db($db_name);
 
     // Create bin_fullness table
     $conn->query("
