@@ -1,6 +1,9 @@
 # Use Ubuntu with Apache and PHP
 FROM ubuntu:22.04
 
+# Set non-interactive mode to prevent prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install Apache, PHP, and required extensions
 RUN apt-get update && apt-get install -y \
     apache2 \
