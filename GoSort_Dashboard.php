@@ -66,8 +66,10 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GoSort - Dashboard</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/dark-mode-global.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="js/theme-manager.js"></script>
     <style>
         :root {
             --primary-green: #274a17ff;
@@ -577,7 +579,7 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
                             <i class="bi bi-hdd-rack"></i>
                         </div>
                         <div class="welcome-stat-info">
-                            <h3><?php echo $system_stats['online_devices']; ?>/<?php echo $system_stats['total_devices']; ?></h3>
+                            <h3><?php echo $system_stats['online_devices'] ?? 0; ?></h3>
                             <p>Devices Online</p>
                         </div>
                     </div>
@@ -682,6 +684,7 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
             <div class="row g-4">
                 <!-- Left Column: About GoSort + Additional Cards -->
                 <div class="col-lg-8">
+                    <?php if(false): ?>
                     <!-- About GoSort -->
                     <div class="about-card mb-4">
                         <div class="about-header">
@@ -838,10 +841,11 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
                             <li>Carbon footprint reduced by <b>8%</b> 🌏</li>
                         </ul>
                     </div>
+                    <?php endif; ?>
                 </div>
 
-                <!-- Right Column: System Alerts & Recent Activity -->
-                <div class="col-lg-4">
+                <!-- System Alerts & Recent Activity -->
+                <div class="col-lg-12">
                     <!-- System Alerts -->
                     <div class="alert-card mb-4">
                         <div class="stat-card-header mb-3">
