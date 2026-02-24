@@ -2,7 +2,10 @@
 FROM php:8.1-apache
 
 # Install required PHP extensions
-RUN docker-php-ext-install mysqli
+RUN docker-php-ext-install mysqli && \
+    # Ensure only mpm_prefork is enabled, disable all others
+    a2dismod mpm_event mpm_worker mpm_async 2>/dev/null || true && \
+    a2enmod mpm_prefork
 
 # Copy project files
 COPY . /var/www/html/
