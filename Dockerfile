@@ -2,12 +2,13 @@
 FROM ubuntu:22.04
 
 # Set timezone non-interactively to prevent hanging during build
-ENV DEBIAN_FRONTEND=noninteractive \
-    TZ=Asia/Manila
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Apache, PHP, and required extensions
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
-    apt-get update && apt-get install -y \
+RUN apt-get update && \
+    apt-get install -y -qq --no-install-recommends tzdata && \
+    echo "Asia/Manila" > /etc/timezone && \
+    ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime && \
+    apt-get install -y \
     apache2 \
     php \
     php-mysqli \
