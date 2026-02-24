@@ -1,18 +1,8 @@
-# Use Ubuntu with Apache and PHP
-FROM ubuntu:22.04
+# Use official PHP with Apache (pre-configured)
+FROM php:8.1-apache
 
-# Install Apache, PHP, and required extensions
-RUN apt-get update && apt-get install -y \
-    apache2 \
-    php \
-    php-mysqli \
-    libapache2-mod-php \
-    && rm -rf /var/lib/apt/lists/*
-
-# Disable all MPMs and conflicting modules to avoid multiple MPM error
-RUN a2dismod mpm_event mpm_worker 2>/dev/null || true && \
-    a2enmod mpm_prefork && \
-    a2enmod php8.1
+# Install required PHP extensions
+RUN docker-php-ext-install mysqli
 
 # Copy project files
 COPY . /var/www/html/
