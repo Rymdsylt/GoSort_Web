@@ -208,6 +208,10 @@ function log_user_added($admin_user_id, $new_username) {
     return log_activity('general', 'User Added', "Added new user: $new_username", $admin_user_id);
 }
 
+function log_user_deleted($admin_user_id, $deleted_username) {
+    return log_activity('general', 'User Deleted', "Deleted user: $deleted_username", $admin_user_id);
+}
+
 function log_mapping_updated($user_id, $device_identity) {
     return log_activity('maintenance', 'Mapping Updated', "Updated sorter mapping", $user_id, $device_identity);
 }

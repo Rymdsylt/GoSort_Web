@@ -121,6 +121,76 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             exit();
         }
     }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        try {
+            // Check if user is logged in and is admin
+            if (!isset($_SESSION['user_id'])) {
+                throw new Exception('Not authorized');
+            }
+
+            // Get DELETE data
+            parse_str(file_get_contents("php://input"), $_DELETE);
+            $user_id_to_delete = $_DELETE['user_id'] ?? null;
+
+            // Validate user_id
+            if (!$user_id_to_delete) {
+                throw new Exception('User ID is required');
+            }
+
+            // Prevent admin from deleting themselves
+            if ($user_id_to_delete == $_SESSION['user_id']) {
+                throw new Exception('You cannot delete your own account');
+            }
+
+            // Start transaction
+            $conn->begin_transaction();
+
+            // Get user info before deletion for logging
+            $stmt = $conn->prepare("SELECT userName, lastName FROM users WHERE id = ?");
+            $stmt->bind_param("i", $user_id_to_delete);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $user = $result->fetch_assoc();
+
+            if (!$user) {
+                throw new Exception('User not found');
+            }
+
+            $fullName = $user['userName'] . ' ' . $user['lastName'];
+
+            // Delete assigned sorters
+            $stmt = $conn->prepare("DELETE FROM assigned_sorters WHERE user_id = ?");
+            $stmt->bind_param("i", $user_id_to_delete);
+            $stmt->execute();
+
+            // Delete user
+            $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->bind_param("i", $user_id_to_delete);
+            $stmt->execute();
+
+            // Commit transaction
+            $conn->commit();
+
+            // Log user deletion
+            log_user_deleted($_SESSION['user_id'], $fullName);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'User deleted successfully'
+            ]);
+            exit();
+        } catch (Exception $e) {
+            if ($conn->connect_errno) {
+                $conn->rollback();
+            }
+            echo json_encode([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+            exit();
+        }
+    }
 }
 
 // Get list of available sorters for the form
@@ -694,7 +764,7 @@ if ($sorters_result) {
                                 <button class="action-btn edit" onclick="openEditModal('${fullName.replace(/'/g, "\\'")}', '${role}', '${floor.replace(/'/g, "\\'")}')">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
-                                <button class="action-btn delete" onclick="openDeleteModal('${fullName.replace(/'/g, "\\'")}')">
+                                <button class="action-btn delete" onclick="openDeleteModal('${fullName.replace(/'/g, "\\'")}', ${user.id})">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </td>
@@ -733,15 +803,103 @@ if ($sorters_result) {
         editUserModal.hide();
     }
 
-    function openDeleteModal(name) {
+    function openDeleteModal(name, userId) {
         document.getElementById('deleteUserName').textContent = name;
-        currentUser = { name };
+        currentUser = { name, userId };
         deleteUserModal.show();
     }
 
     function confirmDelete() {
-        console.log("Deleted user:", currentUser.name);
-        deleteUserModal.hide();
+        if (!currentUser.userId) {
+            console.error('User ID is missing');
+            return;
+        }
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteUserModal'));
+
+        // Send DELETE request
+        fetch(window.location.pathname, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `user_id=${currentUser.userId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                modal.hide();
+                setTimeout(() => {
+                    // Remove all modal backdrops
+                    document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                    // Reload users from database
+                    loadUsers();
+                }, 200);
+                
+                // Show success message
+                const toastContainer = document.createElement('div');
+                toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+                toastContainer.style.zIndex = '1070';
+                toastContainer.innerHTML = `
+                    <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                User deleted successfully!
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toastContainer);
+                const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+                toast.show();
+                setTimeout(() => toastContainer.remove(), 5000);
+            } else {
+                const errorMessage = data.message || 'Error deleting user. Please try again.';
+                const errorToast = document.createElement('div');
+                errorToast.className = 'position-fixed bottom-0 end-0 p-3';
+                errorToast.style.zIndex = '1070';
+                errorToast.innerHTML = `
+                    <div class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                ${errorMessage}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(errorToast);
+                const toast = new bootstrap.Toast(errorToast.querySelector('.toast'));
+                toast.show();
+                setTimeout(() => errorToast.remove(), 5000);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const errorToast = document.createElement('div');
+            errorToast.className = 'position-fixed bottom-0 end-0 p-3';
+            errorToast.style.zIndex = '1070';
+            errorToast.innerHTML = `
+                <div class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            An error occurred. Please try again.
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(errorToast);
+            const toast = new bootstrap.Toast(errorToast.querySelector('.toast'));
+            toast.show();
+            setTimeout(() => errorToast.remove(), 5000);
+        });
     }
 
     function addUser() {
