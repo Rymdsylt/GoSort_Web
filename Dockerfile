@@ -1,15 +1,13 @@
 # Use Ubuntu with Apache and PHP
 FROM ubuntu:22.04
 
-# Set timezone to Philippines (Asia/Manila) and make apt non-interactive
+# Set timezone non-interactively to prevent hanging during build
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Manila
 
-# Set timezone info
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
 # Install Apache, PHP, and required extensions
-RUN apt-get update && apt-get install -y \
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
+    apt-get update && apt-get install -y \
     apache2 \
     php \
     php-mysqli \
@@ -19,9 +17,6 @@ RUN apt-get update && apt-get install -y \
 RUN a2dismod mpm_event mpm_worker mpm_async 2>/dev/null || true && \
     a2enmod mpm_prefork && \
     a2enmod php8.1
-
-# Set ServerName to suppress Apache warning
-RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Copy project files
 COPY . /var/www/html/
