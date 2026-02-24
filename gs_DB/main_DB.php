@@ -138,13 +138,11 @@ try {
             FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
         )
     ");
-    // Enable event scheduler
+    // Enable event scheduler (requires SUPER privilege, skip on Railway)
+    // Temporarily disable mysqli exceptions for these privileged queries
+    mysqli_report(MYSQLI_REPORT_OFF);
     $conn->query("SET GLOBAL event_scheduler = ON");
-
-    // Drop existing events if they exist
     $conn->query("DROP EVENT IF EXISTS check_inactive_sorters");
-
-    // Create event to automatically set sorters as offline if inactive
     $conn->query("
         CREATE EVENT check_inactive_sorters
         ON SCHEDULE EVERY 30 SECOND
@@ -155,8 +153,6 @@ try {
         AND maintenance_mode = 0
         AND last_active < NOW() - INTERVAL 60 SECOND
     ");
-
-    // Create event to automatically end maintenance mode after 1 minute
     $conn->query("DROP EVENT IF EXISTS end_maintenance_mode_after_1_minute");
     $conn->query("
         CREATE EVENT end_maintenance_mode_after_1_minute
@@ -166,6 +162,8 @@ try {
         SET active = FALSE, end_time = NOW()
         WHERE active = TRUE AND start_time < NOW() - INTERVAL 1 MINUTE
     ");
+    // Restore strict exception reporting
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
       $conn->query("
         CREATE TABLE IF NOT EXISTS trash_sorted (
