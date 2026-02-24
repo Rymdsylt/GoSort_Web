@@ -1,8 +1,9 @@
 <?php
-$host = 'localhost';
-$dbname = 'gosort_db';
-$username = 'root';
-$password = '';
+// Support both local development and Railway deployment
+$host = getenv('DB_HOST') ?: 'localhost';
+$dbname = getenv('DB_NAME') ?: 'gosort_db';
+$username = getenv('DB_USER') ?: 'root';
+$password = getenv('DB_PASSWORD') ?: '';
 
 try {
     // Create PDO connection
