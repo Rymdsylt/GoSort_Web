@@ -12,6 +12,5 @@ installer.bat
 maintenance_command.txt
 python_maintenance_mode.txt
 run_dev.bat
-settings_tabs/historytab.php
 test_mapping.py
 run.bat
