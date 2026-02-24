@@ -25,13 +25,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Get raw input and log it for debugging
 $raw_input = file_get_contents('php://input');
-error_log("Raw input received: " . $raw_input);
 
 // Try to decode JSON
 $data = json_decode($raw_input, true);
 
-// Log the parsed data
-error_log("Parsed data: " . print_r($data, true));
+
 
 // Check if JSON parsing failed
 if (json_last_error() !== JSON_ERROR_NONE) {

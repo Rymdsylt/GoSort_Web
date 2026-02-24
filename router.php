@@ -1,5 +1,6 @@
 <?php
 // Simple router for PHP built-in server
+ob_start();
 $request_uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $requested_file = __DIR__ . $request_uri;
 
