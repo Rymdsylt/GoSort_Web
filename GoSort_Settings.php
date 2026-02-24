@@ -519,7 +519,14 @@ if ($sorters_result) {
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label fw-semibold">Assigned Floor</label>
-                                                <input type="text" class="form-control" name="assigned_floor" id="addFloor" placeholder="e.g., Floor 1, Floor 2">
+                                                <select class="form-select" name="assigned_floor" id="addFloor" required>
+                                                    <option value="">Select Floor</option>
+                                                    <option value="Floor 1">Floor 1</option>
+                                                    <option value="Floor 2">Floor 2</option>
+                                                    <option value="Floor 3">Floor 3</option>
+                                                    <option value="Floor 4">Floor 4</option>
+                                                    <option value="Floor 5">Floor 5</option>
+                                                </select>
                                             </div>
                                         </div>
 
