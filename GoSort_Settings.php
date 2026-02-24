@@ -191,6 +191,67 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             exit();
         }
     }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
+        try {
+            // Check if user is logged in and is admin
+            if (!isset($_SESSION['user_id'])) {
+                throw new Exception('Not authorized');
+            }
+
+            // Get PUT data
+            parse_str(file_get_contents("php://input"), $_PUT);
+            $user_id_to_update = $_PUT['user_id'] ?? null;
+            $userName = $_PUT['userName'] ?? '';
+            $lastName = $_PUT['lastName'] ?? '';
+            $role = $_PUT['role'] ?? '';
+            $assigned_floor = $_PUT['assigned_floor'] ?? '';
+
+            // Validate user_id
+            if (!$user_id_to_update) {
+                throw new Exception('User ID is required');
+            }
+
+            // Prevent admin from changing their own role
+            if ($user_id_to_update == $_SESSION['user_id']) {
+                throw new Exception('You cannot change your own role');
+            }
+
+            // Validate role
+            if (!in_array($role, ['admin', 'utility'])) {
+                throw new Exception('Invalid role');
+            }
+
+            // Validate required fields
+            if (!$userName || !$lastName) {
+                throw new Exception('Full name is required');
+            }
+
+            // Update user
+            $stmt = $conn->prepare("UPDATE users SET userName = ?, lastName = ?, role = ?, assigned_floor = ? WHERE id = ?");
+            $stmt->bind_param("ssssi", $userName, $lastName, $role, $assigned_floor, $user_id_to_update);
+            $stmt->execute();
+
+            if ($stmt->affected_rows === 0) {
+                throw new Exception('User not found or no changes made');
+            }
+
+            // Log user update
+            log_activity('general', 'User Updated', "Updated user: $userName $lastName, role to $role and floor to $assigned_floor", $_SESSION['user_id']);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'User updated successfully'
+            ]);
+            exit();
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+            exit();
+        }
+    }
 }
 
 // Get list of available sorters for the form
@@ -671,8 +732,15 @@ if ($sorters_result) {
                                             </select>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label fw-semibold">Bin Assignment</label>
-                                            <input type="text" class="form-control" id="editBin">
+                                            <label class="form-label fw-semibold">Assigned Floor</label>
+                                            <select class="form-select" id="editFloor" required>
+                                                <option value="">Select Floor</option>
+                                                <option value="Floor 1">Floor 1</option>
+                                                <option value="Floor 2">Floor 2</option>
+                                                <option value="Floor 3">Floor 3</option>
+                                                <option value="Floor 4">Floor 4</option>
+                                                <option value="Floor 5">Floor 5</option>
+                                            </select>
                                         </div>
                                     </form>
                                 </div>
@@ -761,7 +829,7 @@ if ($sorters_result) {
                             <td>${role}</td>
                             <td>${floor}</td>
                             <td>
-                                <button class="action-btn edit" onclick="openEditModal('${fullName.replace(/'/g, "\\'")}', '${role}', '${floor.replace(/'/g, "\\'")}')">
+                                <button class="action-btn edit" onclick="openEditModal('${fullName.replace(/'/g, "\\'")}', '${user.role}', '${floor.replace(/'/g, "\\'")}', ${user.id})">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
                                 <button class="action-btn delete" onclick="openDeleteModal('${fullName.replace(/'/g, "\\'")}', ${user.id})">
@@ -786,21 +854,130 @@ if ($sorters_result) {
         accountsButton.addEventListener('click', loadUsers);
     }
 
-    function openEditModal(name, role, bin) {
+    function openEditModal(name, role, floor, userId) {
         document.getElementById('editName').value = name;
-        document.getElementById('editRole').value = role;
-        document.getElementById('editBin').value = bin;
-        currentUser = { name, role, bin };
+        document.getElementById('editRole').value = role === 'admin' ? 'Administrator' : 'Utility Member';
+        document.getElementById('editFloor').value = floor;
+        currentUser = { name, role, floor, userId };
         editUserModal.show();
     }
 
     function saveUserChanges() {
-        console.log("Saved changes for:", {
-            name: document.getElementById('editName').value,
-            role: document.getElementById('editRole').value,
-            bin: document.getElementById('editBin').value
+        if (!currentUser.userId) {
+            console.error('User ID is missing');
+            return;
+        }
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
+        const fullName = document.getElementById('editName').value.trim();
+        const editedRole = document.getElementById('editRole').value === 'Administrator' ? 'admin' : 'utility';
+        const editedFloor = document.getElementById('editFloor').value;
+
+        // Validate full name
+        if (!fullName) {
+            alert('Please enter a full name');
+            return;
+        }
+
+        // Validate floor selection
+        if (!editedFloor) {
+            alert('Please select an assigned floor');
+            return;
+        }
+
+        // Split full name into firstName and lastName
+        const nameParts = fullName.split(' ');
+        const userName = nameParts[0];
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+        if (!lastName) {
+            alert('Please enter both first and last name (e.g., "John Doe")');
+            return;
+        }
+
+        // Send PUT request
+        fetch(window.location.pathname, {
+            method: 'PUT',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `user_id=${currentUser.userId}&userName=${encodeURIComponent(userName)}&lastName=${encodeURIComponent(lastName)}&role=${editedRole}&assigned_floor=${encodeURIComponent(editedFloor)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                modal.hide();
+                setTimeout(() => {
+                    // Remove all modal backdrops
+                    document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                    // Reload users from database
+                    loadUsers();
+                }, 200);
+                
+                // Show success message
+                const toastContainer = document.createElement('div');
+                toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+                toastContainer.style.zIndex = '1070';
+                toastContainer.innerHTML = `
+                    <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                User updated successfully!
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toastContainer);
+                const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+                toast.show();
+                setTimeout(() => toastContainer.remove(), 5000);
+            } else {
+                const errorMessage = data.message || 'Error updating user. Please try again.';
+                const errorToast = document.createElement('div');
+                errorToast.className = 'position-fixed bottom-0 end-0 p-3';
+                errorToast.style.zIndex = '1070';
+                errorToast.innerHTML = `
+                    <div class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                ${errorMessage}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(errorToast);
+                const toast = new bootstrap.Toast(errorToast.querySelector('.toast'));
+                toast.show();
+                setTimeout(() => errorToast.remove(), 5000);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const errorToast = document.createElement('div');
+            errorToast.className = 'position-fixed bottom-0 end-0 p-3';
+            errorToast.style.zIndex = '1070';
+            errorToast.innerHTML = `
+                <div class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            An error occurred. Please try again.
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(errorToast);
+            const toast = new bootstrap.Toast(errorToast.querySelector('.toast'));
+            toast.show();
+            setTimeout(() => errorToast.remove(), 5000);
         });
-        editUserModal.hide();
     }
 
     function openDeleteModal(name, userId) {
