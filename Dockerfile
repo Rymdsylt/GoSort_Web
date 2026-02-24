@@ -1,23 +1,16 @@
 # Use Ubuntu with Apache and PHP
 FROM ubuntu:22.04
 
-# Allow timezone to be passed as build argument
-ARG TIMEZONE=Asia/Manila
-
-# Set timezone non-interactively
-ENV DEBIAN_FRONTEND=noninteractive \
-    TZ=${TIMEZONE}
-
-RUN echo ${TIMEZONE} > /etc/timezone && \
-    ln -snf /usr/share/zoneinfo/${TIMEZONE} /etc/localtime && \
-    apt-get update && apt-get install -y \
+# Install Apache, PHP, and required extensions
+RUN apt-get update && apt-get install -y \
     apache2 \
     php \
     php-mysqli \
+    libapache2-mod-php \
     && rm -rf /var/lib/apt/lists/*
 
-# Disable all MPMs and enable only mpm_prefork (required for mod_php)
-RUN a2dismod mpm_event mpm_worker mpm_async 2>/dev/null || true && \
+# Disable all MPMs and conflicting modules to avoid multiple MPM error
+RUN a2dismod mpm_event mpm_worker 2>/dev/null || true && \
     a2enmod mpm_prefork && \
     a2enmod php8.1
 
