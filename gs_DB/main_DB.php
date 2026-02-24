@@ -1,16 +1,19 @@
 <?php
-$host = "localhost";
-$user = "root";
-$pass = "";
+// Support both local XAMPP and Railway deployment
+$host = getenv('DB_HOST') ?: '127.0.0.1';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASSWORD') ?: '';
+$port = getenv('DB_PORT') ?: 3306;
 
 try {
-    $conn = new mysqli($host, $user, $pass);
+    $conn = new mysqli($host, $user, $pass, '', (int)$port);
     if ($conn->connect_error) {
         throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
-    $conn->query("CREATE DATABASE IF NOT EXISTS gosort_db");
-    $conn->select_db("gosort_db");
+    $dbname = getenv('DB_NAME') ?: 'gosort_db';
+    $conn->query("CREATE DATABASE IF NOT EXISTS `$dbname`");
+    $conn->select_db($dbname);
 
     // Create bin_fullness table
     $conn->query("
