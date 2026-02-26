@@ -123,6 +123,8 @@
             align-items: center;
             gap: 10px;
         }
+
+        /* Dark mode styles are handled by css/dark-mode-global.css */
     </style>
 </head>
 <body>
