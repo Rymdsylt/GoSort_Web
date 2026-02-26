@@ -357,6 +357,29 @@ $currentSortLabel = match($sort) {
             box-shadow: 0 0 0 0.2rem rgba(54, 129, 55, 0.15);
         }
 
+        #addDeviceModal .form-control.is-invalid {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15);
+        }
+
+        #addDeviceModal .form-control.is-valid {
+            border-color: #368137;
+        }
+
+        #addDeviceModal .invalid-feedback {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+            color: #dc3545;
+            margin-top: 0.35rem;
+        }
+
+        #addDeviceModal .form-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.78rem;
+            color: #6c757d;
+            margin-top: 0.3rem;
+        }
+
         #addDeviceModal .modal-footer {
             background: #f8f9fa;
             border-top: 1px solid #e0e0e0;
@@ -576,12 +599,19 @@ $currentSortLabel = match($sort) {
             box-shadow: 0 6px 12px rgba(220, 53, 69, 0.4);
         }
 
+        @media (max-width: 992px) {
+            #main-content-wrapper {
+                margin-left: 0;
+                padding: 12px;
+            }
+        }
+
 </style>
 <body>
     <?php include 'sidebar.php'; ?>
 
    <div id="main-content-wrapper">
-  <div class="container">
+  <div class="container-fluid">
 
             <div class="d-flex justify-content-between align-items-center mb-2">
             <h2 class="fw-bold mb-0 mt-3">Devices</h2>
@@ -778,18 +808,21 @@ $currentSortLabel = match($sort) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="addDeviceForm">
+                <form id="addDeviceForm" novalidate>
                     <div class="mb-3">
                         <label for="deviceName" class="form-label">Device Name</label>
-                        <input type="text" class="form-control" id="deviceName" name="deviceName" required>
+                        <input type="text" class="form-control" id="deviceName" name="deviceName">
+                        <div class="invalid-feedback">Please enter a device name.</div>
                     </div>
                     <div class="mb-3">
                         <label for="location" class="form-label">Location</label>
-                        <input type="text" class="form-control" id="location" name="location" required>
+                        <input type="text" class="form-control" id="location" name="location">
+                        <div class="invalid-feedback">Please enter the device location.</div>
                     </div>
                     <div class="mb-3">
                         <label for="deviceIdentity" class="form-label">Device Identity</label>
-                        <input type="text" class="form-control" id="deviceIdentity" name="deviceIdentity" required>
+                        <input type="text" class="form-control" id="deviceIdentity" name="deviceIdentity">
+                        <div class="invalid-feedback">Please enter the device identity.</div>
                     </div>
                 </form>
             </div>
@@ -926,9 +959,37 @@ $currentSortLabel = match($sort) {
         }
     }
 
+    // Inline validation: clear error state on input
+    document.querySelectorAll('#addDeviceForm .form-control').forEach(function(input) {
+        input.addEventListener('input', function() {
+            if (this.value.trim() !== '') {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.remove('is-valid');
+            }
+        });
+    });
+
     document.getElementById('addDeviceForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const form = this;
+
+        // Client-side validation
+        let isValid = true;
+        form.querySelectorAll('.form-control').forEach(function(input) {
+            if (input.value.trim() === '') {
+                input.classList.add('is-invalid');
+                input.classList.remove('is-valid');
+                isValid = false;
+            } else {
+                input.classList.remove('is-invalid');
+                input.classList.add('is-valid');
+            }
+        });
+
+        if (!isValid) return;
+
         const formData = new FormData(form);
         const deviceIdentity = formData.get('deviceIdentity');
         

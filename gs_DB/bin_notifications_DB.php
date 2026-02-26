@@ -38,19 +38,52 @@ function addBinNotification($message, $type, $deviceId = null, $priority = 'norm
     return true;
 }
 
-function getBinNotifications($limit = 50) {
+function getBinNotifications($limit = 10, $page = 1, $readFilter = null) {
     global $conn;
     
-    $sql = "SELECT * FROM bin_notifications 
-            ORDER BY created_at DESC 
-            LIMIT ?";
+    $offset = ($page - 1) * $limit;
+    
+    $sql = "SELECT bn.*, s.device_name, s.location 
+            FROM bin_notifications bn
+            LEFT JOIN sorters s ON bn.device_identity = s.device_identity";
+    
+    if ($readFilter === 0) {
+        $sql .= " WHERE bn.is_read = 0";
+    } elseif ($readFilter === 1) {
+        $sql .= " WHERE bn.is_read = 1";
+    }
+    
+    $sql .= " ORDER BY bn.created_at DESC LIMIT ? OFFSET ?";
     
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $limit);
+    $stmt->bind_param("ii", $limit, $offset);
     $stmt->execute();
     
     $result = $stmt->get_result();
     return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+function countBinNotifications($readFilter = null) {
+    global $conn;
+    
+    $sql = "SELECT COUNT(*) as total FROM bin_notifications";
+    if ($readFilter === 0) {
+        $sql .= " WHERE is_read = 0";
+    } elseif ($readFilter === 1) {
+        $sql .= " WHERE is_read = 1";
+    }
+    $result = $conn->query($sql);
+    $row = $result->fetch_assoc();
+    return intval($row['total']);
+}
+
+function countUnreadBinNotifications() {
+    global $conn;
+    
+    $sql = "SELECT COUNT(*) as total FROM bin_notifications WHERE is_read = 0";
+    $result = $conn->query($sql);
+    $row = $result->fetch_assoc();
+    return intval($row['total']);
 }
 
 function markBinNotificationAsRead($id) {
@@ -64,6 +97,13 @@ function markBinNotificationAsRead($id) {
     $stmt->bind_param("i", $id);
     
     return $stmt->execute();
+}
+
+function markAllBinNotificationsAsRead() {
+    global $conn;
+    
+    $sql = "UPDATE bin_notifications SET is_read = TRUE WHERE is_read = FALSE";
+    return $conn->query($sql);
 }
 
 // Initialize the bin_notifications table
