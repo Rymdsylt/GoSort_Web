@@ -33,8 +33,8 @@ def get_base_path(ip_address):
     if ip_address.replace('.', '').isdigit() or ip_address.startswith(('192.', '10.', '172.')):
         return f"http://{ip_address}/GoSort_Web"
     else:
-        # It's a domain name
-        return f"http://{ip_address}"
+        # It's a domain name - use HTTPS
+        return f"https://{ip_address}"
 
 def load_config():
     config_file = 'gosort_config.json'
@@ -47,7 +47,7 @@ def save_config(config):
     with open('gosort_config.json', 'w') as f:
         json.dump(config, f)
 
-def scan_network():
+def scan_network():     
     print("\nScanning network for available devices...")
     available_ips = []
     gosort_ips = []
