@@ -3,12 +3,24 @@ require_once 'connection.php';
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+// Accept both GET and POST requests
+$input = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Try to get JSON data first
+    $json_input = json_decode(file_get_contents('php://input'), true);
+    if (is_array($json_input)) {
+        $input = $json_input;
+    } else {
+        // Fallback to POST data
+        $input = $_POST;
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $input = $_GET;
+} else {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit;
 }
-
-$input = json_decode(file_get_contents('php://input'), true);
 
 if (!isset($input['identity'])) {
     echo json_encode(['success' => false, 'message' => 'Missing sorter identity']);

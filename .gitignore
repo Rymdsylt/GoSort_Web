@@ -1,5 +1,15 @@
-GoSort.ino
-GoSort.py
-gosort_config.json
-*.json
-gosort_config.json
+
+
+# Ignore config and secrets (uncomment if you use Railway ENV vars)
+# gosort_config.json
+# *.json
+
+# Ignore OS/editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+node_modules/
+__pycache__/
+
+test_results.txt

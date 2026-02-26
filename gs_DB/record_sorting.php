@@ -16,7 +16,7 @@ $trash_type = $data['trash_type'];
 $trash_class = isset($data['trash_class']) ? $data['trash_class'] : null;
 $confidence = isset($data['confidence']) ? (float)$data['confidence'] : null;
 $image_data = isset($data['image_data']) ? $data['image_data'] : null;
-$is_maintenance = isset($data['is_maintenance']) ? (bool)$data['is_maintenance'] : false;
+$is_maintenance = isset($data['is_maintenance']) ? (int)(bool)$data['is_maintenance'] : 0;
 
 try {
     // First verify the device exists

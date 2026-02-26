@@ -11,20 +11,36 @@ import sys
 
 def check_maintenance_mode(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance.php"
+        base_path = get_base_path(ip_address)
+        url = f"{base_path}/gs_DB/check_maintenance.php"
         response = requests.post(
             url,
             json={'identity': device_identity},
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            timeout=5
         )
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
                 return data.get('maintenance_mode') == 1
         return False
-    except Exception as e:
-        print(f"\n❌ Error checking maintenance mode: {e}")
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        # Silently fail on timeouts - maintenance mode remains unchanged
         return False
+    except Exception as e:
+        # Only print unexpected errors, not timeout/connection errors
+        if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+            print(f"\n⚠️ Maintenance mode check failed: {type(e).__name__}")
+        return False
+
+def get_base_path(ip_address):
+    """Determine the correct base path based on whether it's a local IP or domain"""
+    # If it's a local IP (contains dots and no dots at end, or starts with 192., 10., etc.)
+    if ip_address.replace('.', '').isdigit() or ip_address.startswith(('192.', '10.', '172.')):
+        return f"http://{ip_address}/GoSort_Web"
+    else:
+        # It's a domain name - use HTTPS
+        return f"https://{ip_address}"
 
 def load_config():
     config_file = 'gosort_config.json'
@@ -37,7 +53,7 @@ def save_config(config):
     with open('gosort_config.json', 'w') as f:
         json.dump(config, f)
 
-def scan_network():
+def scan_network():     
     print("\nScanning network for available devices...")
     available_ips = []
     gosort_ips = []
@@ -67,7 +83,8 @@ def scan_network():
 
     def check_ip(ip):
         try:
-            response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", 
+            base_path = get_base_path(ip)
+            response = requests.get(f"{base_path}/gs_DB/trash_detected.php", 
                                  timeout=0.5)
             if response.status_code == 200 or (
                 response.status_code == 400 and 
@@ -92,7 +109,8 @@ def scan_network():
 def check_server(ip):
     print("\rChecking server...", end="", flush=True)
     try:
-        response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", timeout=5)
+        base_path = get_base_path(ip)
+        response = requests.get(f"{base_path}/gs_DB/trash_detected.php", timeout=5)
         if response.status_code == 200 or (response.status_code == 400 and "No trash type provided" in response.text):
             print("\r✅ Server connection successful!")
             return True
@@ -155,10 +173,11 @@ def get_ip_address():
 
 def add_to_waiting_devices(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/add_waiting_device.php"
+        base_path = get_base_path(ip_address)
+        url = f"{base_path}/gs_DB/add_waiting_device.php"
         response = requests.post(url, json={
             'identity': device_identity
-        })
+        }, timeout=5)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
@@ -172,12 +191,24 @@ def add_to_waiting_devices(ip_address, device_identity):
 def request_registration(ip_address, identity):
     try:
         # First check if device is in sorters table
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php"
-        response = requests.post(
-            url,
-            json={'identity': identity},
-            headers={'Content-Type': 'application/json'}
-        )
+        base_path = get_base_path(ip_address)
+        url = f"{base_path}/gs_DB/verify_sorter.php"
+        try:
+            response = requests.post(
+                url,
+                json={'identity': identity},
+                timeout=5
+            )
+        except Exception as e:
+            print(f"\n⚠️ POST request failed: {e}. Retrying...")
+            # Fallback: try with data parameter instead of json
+            response = requests.post(
+                url,
+                data=json.dumps({'identity': identity}),
+                headers={'Content-Type': 'application/json'},
+                timeout=5
+            )
+        
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
@@ -186,8 +217,9 @@ def request_registration(ip_address, identity):
                 else:
                     # Try to add to waiting devices
                     response = requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/add_waiting_device.php",
-                        json={'identity': identity}
+                        f"{base_path}/gs_DB/add_waiting_device.php",
+                        json={'identity': identity},
+                        timeout=5
                     )
                     if response.status_code == 200:
                         data = response.json()
@@ -196,6 +228,8 @@ def request_registration(ip_address, identity):
                             return False, None
                     return False, None
             print(f"\n❌ Server error: {data.get('message', 'Unknown error')}")
+        else:
+            print(f"\n❌ Server error: HTTP {response.status_code}")
         return False, None
     except Exception as e:
         print(f"\n❌ Error requesting registration: {e}")
@@ -208,8 +242,9 @@ def restart_program():
 
 def remove_from_waiting_devices(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/remove_waiting_device.php"
-        response = requests.post(url, json={'identity': device_identity}, headers={'Content-Type': 'application/json'})
+        base_path = get_base_path(ip_address)
+        url = f"{base_path}/gs_DB/remove_waiting_device.php"
+        response = requests.post(url, json={'identity': device_identity}, headers={'Content-Type': 'application/json'}, timeout=5)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
@@ -230,33 +265,23 @@ def process_bin_fullness(data, ip_address, device_identity):
             
             # Send data to database using form data
             try:
+                base_path = get_base_path(ip_address)
                 response = requests.post(
-                    f"http://{ip_address}/GoSort_Web/gs_DB/update_bin_fullness.php",
+                    f"{base_path}/gs_DB/update_bin_fullness.php",
                     data={
                         'device_identity': device_identity,
                         'bin_name': bin_name,
                         'distance': distance
-                    }
+                    },
+                    timeout=5
                 )
                 
-                if response.status_code == 200:
-                    try:
-                        data_response = response.json()
-                        if data_response.get('success'):
-                            # Success - show bin fullness and database status
-                            print(f"\r✅ Bin Fullness - {bin_name}: {distance}cm (Saved to DB)\n", end="", flush=True)
-                        else:
-                            # Error - show what went wrong
-                            print(f"\r❌ Bin Fullness - {bin_name}: {distance}cm (DB Error: {data_response.get('message', 'Unknown error')})\n", end="", flush=True)
-                    except:
-                        # If not JSON, check for text indicators
-                        if "Record inserted" in response.text or "updated" in response.text.lower():
-                            print(f"\r✅ Bin Fullness - {bin_name}: {distance}cm (Saved to DB)\n", end="", flush=True)
-                        else:
-                            print(f"\r❌ Bin Fullness - {bin_name}: {distance}cm (DB Error: {response.text})\n", end="", flush=True)
+                if response.status_code == 200 and "Record inserted" in response.text:
+                    # Success - show bin fullness and database status
+                    print(f"\r✅ Bin Fullness - {bin_name}: {distance}cm (Saved to DB)\n", end="", flush=True)
                 else:
                     # Error - show what went wrong
-                    print(f"\r❌ Bin Fullness - {bin_name}: {distance}cm (HTTP {response.status_code}: {response.text})\n", end="", flush=True)
+                    print(f"\r❌ Bin Fullness - {bin_name}: {distance}cm (DB Error: {response.text})\n", end="", flush=True)
             except Exception as e:
                 print(f"\r❌ Bin Fullness - {bin_name}: {distance}cm (Error: {e})\n", end="", flush=True)
                 
@@ -268,6 +293,9 @@ def main():
     # First get IP address
     ip_address = get_ip_address()
     print(f"\nUsing GoSort server at: {ip_address}")
+    
+    # Get base path for this server
+    base_path = get_base_path(ip_address)
 
     # Then get or set identity
     config = load_config()
@@ -286,7 +314,7 @@ def main():
     }
     
     # Fetch mapping from backend
-    mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
+    mapping_url = f"{base_path}/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
     try:
         resp = requests.get(mapping_url, timeout=5)
         server_mapping = resp.json().get('mapping', {})
@@ -425,15 +453,19 @@ def main():
                     
                     # Send heartbeat to update last_active
                     requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php",
+                        f"{base_path}/gs_DB/verify_sorter.php",
                         json={'identity': config['sorter_id']},
-                        headers={'Content-Type': 'application/json'}
+                        headers={'Content-Type': 'application/json'},
+                        timeout=5
                     )
                     last_heartbeat = current_time
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                    # Silently fail on timeouts/connection errors for heartbeat
+                    last_heartbeat = current_time
                 except Exception as e:
-                    print(f"\n⚠️ Heartbeat error: {e}")
-                    # Remove from waiting devices if heartbeat fails
-                    remove_from_waiting_devices(ip_address, config['sorter_id'])
+                    # Only print unexpected errors
+                    if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+                        print(f"\n⚠️ Heartbeat error: {type(e).__name__}")
             else:
                 # Arduino disconnected, stop sending heartbeats
                 print("\n⚠️ Arduino (Simulated) disconnected - stopping heartbeats")
@@ -479,9 +511,10 @@ def main():
                 
             try:
                 response = requests.post(
-                    f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance_commands.php",
+                    f"{base_path}/gs_DB/check_maintenance_commands.php",
                     json={'device_identity': config['sorter_id']},
-                    headers={'Content-Type': 'application/json'}
+                    headers={'Content-Type': 'application/json'},
+                    timeout=5
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -520,28 +553,31 @@ def main():
                             if trash_type:
                                 try:
                                     requests.post(
-                                        f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
+                                        f"{base_path}/gs_DB/record_sorting.php",
                                         json={
                                             'device_identity': config['sorter_id'],
                                             'trash_type': trash_type,
                                             'is_maintenance': True
-                                        }
+                                        },
+                                        timeout=5
                                     )
                                 except Exception as e:
                                     print(f"\n⚠️ Error recording sorting: {e}")
                         
                         # Mark command as executed
                         requests.post(
-                            f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
-                            json={'device_identity': config['sorter_id'], 'command': command}
+                            f"{base_path}/gs_DB/mark_command_executed.php",
+                            json={'device_identity': config['sorter_id'], 'command': command},
+                            timeout=5
                         )
                         if command == 'shutdown':
                             print("\n⚠️ Shutdown command received. Shutting down computer...")
                             # Mark command as executed before shutdown
                             try:
                                 requests.post(
-                                    f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
-                                    json={'device_identity': config['sorter_id'], 'command': command}
+                                    f"{base_path}/gs_DB/mark_command_executed.php",
+                                    json={'device_identity': config['sorter_id'], 'command': command},
+                                    timeout=5
                                 )
                             except Exception as e:
                                 print(f"\n⚠️ Error marking shutdown command as executed: {e}")
@@ -590,7 +626,7 @@ def main():
                             
                             # Record the sorting action
                             try:
-                                sorting_url = f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php"
+                                sorting_url = f"{base_path}/gs_DB/record_sorting.php"
                                 response = requests.post(
                                     sorting_url,
                                     json={
@@ -635,25 +671,6 @@ def main():
                 simulated_responses.append(f"bin_fullness:{bin_type}:10")
                 print(f"\n📡 Sensor Triggered: Simulating '{bin_type}' bin full at 9cm and 10cm")
                 
-                # Also trigger a notification
-                try:
-                    bin_label = trash_labels.get(bin_type, bin_type).title()
-                    notification_message = f"{bin_label} bin is full"
-                    requests.post(
-                        f"http://{ip_address}/GoSort_Web/api/add_bin_notification.php",
-                        json={
-                            'message': notification_message,
-                            'type': 'bin_full',
-                            'device_identity': config['sorter_id'],
-                            'priority': 'high',
-                            'bin_name': bin_type,
-                            'fullness_level': 100
-                        },
-                        headers={'Content-Type': 'application/json'}
-                    )
-                except Exception as e:
-                    print(f"⚠️ Error sending notification: {e}")
-                
             elif choice not in ['\r', '\n']:  # Ignore enter key presses
                 print("\nInvalid choice. Please choose from the menu options.")
         
@@ -664,3 +681,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

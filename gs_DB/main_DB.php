@@ -1,16 +1,21 @@
 <?php
-$host = "localhost";
-$user = "root";
-$pass = "";
+require_once __DIR__ . '/mariadb_credentials.php';
 
 try {
-    $conn = new mysqli($host, $user, $pass);
+    $conn = new mysqli("p:$db_host", $db_user, $db_pass, '', $db_port);
     if ($conn->connect_error) {
         throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
-    $conn->query("CREATE DATABASE IF NOT EXISTS gosort_db");
-    $conn->select_db("gosort_db");
+    $conn->query("CREATE DATABASE IF NOT EXISTS `$db_name`");
+    $conn->select_db($db_name);
+
+    // Migration guard: skip schema creation if already initialized
+    $check = $conn->query("SHOW TABLES LIKE 'schema_initialized'");
+    if ($check && $check->num_rows > 0) {
+        // Schema already exists — no need to run CREATE TABLE statements
+        return;
+    }
 
     // Create bin_fullness table
     $conn->query("
@@ -140,13 +145,11 @@ try {
             FOREIGN KEY (device_identity) REFERENCES sorters(device_identity) ON DELETE CASCADE
         )
     ");
-    // Enable event scheduler
+    // Enable event scheduler (requires SUPER privilege, skip on Railway)
+    // Temporarily disable mysqli exceptions for these privileged queries
+    mysqli_report(MYSQLI_REPORT_OFF);
     $conn->query("SET GLOBAL event_scheduler = ON");
-
-    // Drop existing events if they exist
     $conn->query("DROP EVENT IF EXISTS check_inactive_sorters");
-
-    // Create event to automatically set sorters as offline if inactive
     $conn->query("
         CREATE EVENT check_inactive_sorters
         ON SCHEDULE EVERY 30 SECOND
@@ -157,8 +160,6 @@ try {
         AND maintenance_mode = 0
         AND last_active < NOW() - INTERVAL 60 SECOND
     ");
-
-    // Create event to automatically end maintenance mode after 1 minute
     $conn->query("DROP EVENT IF EXISTS end_maintenance_mode_after_1_minute");
     $conn->query("
         CREATE EVENT end_maintenance_mode_after_1_minute
@@ -168,6 +169,8 @@ try {
         SET active = FALSE, end_time = NOW()
         WHERE active = TRUE AND start_time < NOW() - INTERVAL 1 MINUTE
     ");
+    // Restore strict exception reporting
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
       $conn->query("
         CREATE TABLE IF NOT EXISTS trash_sorted (
@@ -236,8 +239,12 @@ try {
         )
     ");
 
-    $conn->close();
+    // Mark schema as initialized so we skip all CREATE TABLE statements next time
+    $conn->query("CREATE TABLE IF NOT EXISTS schema_initialized (id INT PRIMARY KEY DEFAULT 1)");
+    $conn->query("INSERT IGNORE INTO schema_initialized VALUES (1)");
+
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
 }
 ?>
+

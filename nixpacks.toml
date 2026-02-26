@@ -1,0 +1,30 @@
+[phases.setup]
+nixPkgs = ["php81Extensions.mysqli", "php81Extensions.pdo_mysql", "php81Extensions.opcache", "php81Extensions.zlib"]
+
+[phases.install]
+cmds = [
+    "mkdir -p /tmp",
+    """echo '[opcache]
+opcache.enable=1
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=10000
+opcache.revalidate_freq=0
+opcache.validate_timestamps=0
+opcache.fast_shutdown=1
+opcache.enable_cli=0
+opcache.preload=/app/preload.php
+opcache.preload_user=root
+[zlib]
+zlib.output_compression=On
+zlib.output_compression_level=6
+[session]
+session.save_path=/tmp
+[realpath_cache]
+realpath_cache_size=4096k
+realpath_cache_ttl=600
+' > /tmp/php-optimize.ini"""
+]
+
+[start]
+cmd = "php -c /tmp/php-optimize.ini -S 0.0.0.0:${PORT:-8080} -t . router.php"

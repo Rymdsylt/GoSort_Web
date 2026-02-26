@@ -44,6 +44,15 @@ def save_config(config):
     with open('gosort_config.json', 'w') as f:
         json.dump(config, f)
 
+def get_base_path(ip_address):
+    """Determine the correct base path based on whether it's a local IP or domain"""
+    # If it's a local IP (contains dots and no dots at end, or starts with 192., 10., etc.)
+    if ip_address.replace('.', '').isdigit() or ip_address.startswith(('192.', '10.', '172.')):
+        return f"http://{ip_address}/GoSort_Web"
+    else:
+        # It's a domain name
+        return f"http://{ip_address}"
+
 def scan_network():
     print("\nScanning network for available devices...")
     available_ips = []
@@ -71,7 +80,7 @@ def scan_network():
             print(f"\rScanning network... {progress:.1f}% complete", end="", flush=True)
     def check_ip(ip):
         try:
-            response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", timeout=0.5)
+            response = requests.get(f"http://{ip}/gs_DB/trash_detected.php", timeout=0.5)
             if response.status_code == 200 or (
                 response.status_code == 400 and "No trash type provided" in response.text
             ):
@@ -92,7 +101,8 @@ def scan_network():
 def check_server(ip):
     print("\rChecking server...", end="", flush=True)
     try:
-        response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", timeout=5)
+        base_path = get_base_path(ip)
+        response = requests.get(f"{base_path}/gs_DB/trash_detected.php", timeout=5)
         if response.status_code == 200 or (response.status_code == 400 and "No trash type provided" in response.text):
             print("\r✅ Server connection successful!")
             return True
@@ -312,37 +322,49 @@ def map_category_to_command(waste_type, mapping):
 
 def check_maintenance_mode(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance.php"
+        url = f"http://{ip_address}/gs_DB/check_maintenance.php"
         response = requests.post(
             url,
             json={'identity': device_identity},
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            timeout=5
         )
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
                 return data.get('maintenance_mode') == 1
         return False
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        # Silently fail on timeouts - maintenance mode remains unchanged
+        return False
     except Exception as e:
-        print(f"\n❌ Error checking maintenance mode: {e}")
+        # Only print unexpected errors
+        if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+            print(f"\n⚠️ Maintenance mode check failed: {type(e).__name__}")
         return False
 
 def send_heartbeat(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php"
-        response = requests.post(url, json={'identity': device_identity})
+        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
+        response = requests.post(url, json={'identity': device_identity}, timeout=5)
         return response.status_code == 200
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error sending heartbeat: {e}")
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        # Silently fail on timeouts - continue running
+        return False
+    except Exception as e:
+        # Only print unexpected errors
+        if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+            print(f"⚠️ Heartbeat error: {type(e).__name__}")
         return False
 
 def request_registration(ip_address, identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php"
+        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
         response = requests.post(
             url,
             json={'identity': identity},
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            timeout=5
         )
         if response.status_code == 200:
             data = response.json()
@@ -351,8 +373,9 @@ def request_registration(ip_address, identity):
                     return True, None
                 else:
                     response = requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/add_waiting_device.php",
-                        json={'identity': identity}
+                        f"http://{ip_address}/gs_DB/add_waiting_device.php",
+                        json={'identity': identity},
+                        timeout=5
                     )
                     if response.status_code == 200:
                         data = response.json()
@@ -498,9 +521,9 @@ def main():
     fps = 0
     fps_time = time.time()
     frame_count = 0
-    mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
+    mapping_url = f"http://{ip_address}/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
     try:
-        resp = requests.get(mapping_url)
+        resp = requests.get(mapping_url, timeout=5)
         mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
     except Exception as e:
         print(f"Warning: Could not fetch mapping, using default. {e}")
@@ -526,7 +549,7 @@ def main():
             else:
                 print("\n Exiting maintenance mode - Detection resumed")
                 try:
-                    resp = requests.get(mapping_url)
+                    resp = requests.get(mapping_url, timeout=5)
                     mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
                 except Exception as e:
                     print(f"Warning: Could not fetch mapping, using default. {e}")
@@ -571,7 +594,7 @@ def main():
                             image_base64 = base64.b64encode(buffer).decode('utf-8')
                             detected_classes = [detected_item]
                             trash_class_str = ', '.join(detected_classes)
-                            url = f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php"
+                            url = f"http://{ip_address}/gs_DB/record_sorting.php"
                             response = requests.post(url, json={
                                 'device_identity': sorter_id,
                                 'trash_type': trash_type,
@@ -579,7 +602,7 @@ def main():
                                 'confidence': float(conf),
                                 'image_data': image_base64,
                                 'is_maintenance': False
-                            })
+                            }, timeout=5)
                             if response.status_code == 200:
                                 print(f"✅ Sorting operation recorded")
                                 timestamp = datetime.now().strftime("%H:%M:%S")
