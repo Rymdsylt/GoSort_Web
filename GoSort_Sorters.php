@@ -827,7 +827,22 @@ $currentSortLabel = match($sort) {
     const statusMessage = document.getElementById('statusMessage');
     const progressBar = document.querySelector('#statusModal .progress');
     const addDeviceModal = document.getElementById('addDeviceModal');
-    
+
+    // Flag: reopen the Add Device modal after the status/error modal is closed
+    let reopenAddModalAfterStatus = false;
+    document.getElementById('statusModal').addEventListener('hidden.bs.modal', function () {
+        if (reopenAddModalAfterStatus) {
+            reopenAddModalAfterStatus = false;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('addDeviceModal')).show();
+        }
+    });
+
+    // Clear the form every time the Add Device card is clicked
+    document.querySelector('.add-device-card').addEventListener('click', function () {
+        const form = document.getElementById('addDeviceForm');
+        if (form) form.reset();
+    });
+
     addDeviceModal.addEventListener('show.bs.modal', function (event) {
         const backdrop = document.querySelector('.modal-backdrop');
         if (backdrop) {
@@ -964,10 +979,17 @@ $currentSortLabel = match($sort) {
             location.reload();
         }, 2000);
     } else {
+        // Close add-device modal so the error modal isn't hidden behind it
+        const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
+        if (addModal) addModal.hide();
+        reopenAddModalAfterStatus = true;
         showStatus(`❌ ${data.message}`, true, false);
     }
 })
         .catch(error => {
+            const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
+            if (addModal) addModal.hide();
+            reopenAddModalAfterStatus = true;
             showStatus(`❌ Server error: ${error.message}. Please try again or contact support.`, true, false);
             console.error('Error:', error);
         });
