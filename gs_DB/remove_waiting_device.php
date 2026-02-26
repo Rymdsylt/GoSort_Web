@@ -3,8 +3,19 @@ require_once 'connection.php';
 
 header('Content-Type: application/json');
 
-// Get the POST data
-$data = json_decode(file_get_contents('php://input'), true);
+// Accept both GET and POST requests
+$data = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $json_input = json_decode(file_get_contents('php://input'), true);
+    if (is_array($json_input)) {
+        $data = $json_input;
+    } else {
+        $data = $_POST;
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $data = $_GET;
+}
 
 if (!isset($data['identity'])) {
     echo json_encode(['success' => false, 'message' => 'Device identity not provided']);

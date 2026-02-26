@@ -1,5 +1,1 @@
-<<<<<<< Updated upstream
-{"ip_address": "192.168.1.7", "sorter_id": "tae", "device_mode": "cpu"}
-=======
-{"ip_address": "192.168.1.19", "sorter_id": "tae"}
->>>>>>> Stashed changes
+{"ip_address": "gosortweb-production.up.railway.app", "sorter_id": "tae"}

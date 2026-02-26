@@ -51,6 +51,15 @@ def save_config(config):
     with open('gosort_config.json', 'w') as f:
         json.dump(config, f)
 
+def get_base_path(ip_address):
+    """Determine the correct base path based on whether it's a local IP or domain"""
+    # If it's a local IP (contains dots and no dots at end, or starts with 192., 10., etc.)
+    if ip_address.replace('.', '').isdigit() or ip_address.startswith(('192.', '10.', '172.')):
+        return f"http://{ip_address}/GoSort_Web"
+    else:
+        # It's a domain name
+        return f"http://{ip_address}"
+
 def scan_network():
     print("\nScanning network for available devices...")
     available_ips = []
@@ -81,7 +90,7 @@ def scan_network():
 
     def check_ip(ip):
         try:
-            response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", 
+            response = requests.get(f"http://{ip}/gs_DB/trash_detected.php", 
                                  timeout=0.5)
             if response.status_code == 200 or (
                 response.status_code == 400 and 
@@ -107,7 +116,8 @@ def scan_network():
 def check_server(ip):
     print("\rChecking server...", end="", flush=True)
     try:
-        response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", timeout=5)
+        base_path = get_base_path(ip)
+        response = requests.get(f"{base_path}/gs_DB/trash_detected.php", timeout=5)
         # The server returns 400 with "No trash type provided" if it exists
         if response.status_code == 200 or (response.status_code == 400 and "No trash type provided" in response.text):
             print("\r✅ Server connection successful!")
@@ -323,7 +333,7 @@ def check_maintenance_command():
 # Function to check server connection - returns True if server is reachable
 def check_server_connection(ip_address):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php"
+        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
         response = requests.post(url, json={'identity': ''})
         return response.status_code == 200
     except:
@@ -350,7 +360,7 @@ def map_category_to_command(waste_type, mapping):
 
 def check_maintenance_mode(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance.php"
+        url = f"http://{ip_address}/gs_DB/check_maintenance.php"
         response = requests.post(
             url,
             json={'identity': device_identity},
@@ -367,7 +377,7 @@ def check_maintenance_mode(ip_address, device_identity):
 
 def send_heartbeat(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php"
+        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
         response = requests.post(url, json={'identity': device_identity})
         return response.status_code == 200
     except requests.exceptions.RequestException as e:
@@ -376,7 +386,7 @@ def send_heartbeat(ip_address, device_identity):
 
 def add_to_waiting_devices(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/add_waiting_device.php"
+        url = f"http://{ip_address}/gs_DB/add_waiting_device.php"
         response = requests.post(url, json={
             'identity': device_identity
         })
@@ -393,7 +403,7 @@ def add_to_waiting_devices(ip_address, device_identity):
 def request_registration(ip_address, identity):
     try:
         # First check if device is in sorters table
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php"
+        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
         response = requests.post(
             url,
             json={'identity': identity},
@@ -407,7 +417,7 @@ def request_registration(ip_address, identity):
                 else:
                     # Try to add to waiting devices
                     response = requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/add_waiting_device.php",
+                        f"http://{ip_address}/gs_DB/add_waiting_device.php",
                         json={'identity': identity}
                     )
                     if response.status_code == 200:
@@ -431,7 +441,7 @@ def restart_program():
 
 def remove_from_waiting_devices(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/remove_waiting_device.php"
+        url = f"http://{ip_address}/gs_DB/remove_waiting_device.php"
         response = requests.post(url, json={'identity': device_identity}, headers={'Content-Type': 'application/json'})
         if response.status_code == 200:
             data = response.json()
@@ -506,7 +516,7 @@ def process_bin_fullness(data, ip_address, device_identity):
             # Send data to backend using form data
             try:
                 response = requests.post(
-                    f"http://{ip_address}/GoSort_Web/gs_DB/update_bin_fullness.php",
+                    f"http://{ip_address}/gs_DB/update_bin_fullness.php",
                     data={
                         'device_identity': device_identity,
                         'bin_name': bin_name,
@@ -960,7 +970,7 @@ def main():
     frame_count = 0
 
 
-    mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
+    mapping_url = f"http://{ip_address}/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
     try:
         resp = requests.get(mapping_url)
         mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
@@ -1043,7 +1053,7 @@ def main():
             else:
                 try:
                     response = requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance_commands.php",
+                        f"http://{ip_address}/gs_DB/check_maintenance_commands.php",
                         json={'device_identity': sorter_id},
                         headers={'Content-Type': 'application/json'}
                     )
@@ -1060,7 +1070,7 @@ def main():
             
                                 try:
                                     requests.post(
-                                        f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
+                                        f"http://{ip_address}/gs_DB/mark_command_executed.php",
                                         json={'device_identity': sorter_id, 'command': command}
                                     )
                                 except Exception as e:
@@ -1117,7 +1127,7 @@ def main():
                                         if trash_type:
                                             try:
                                                 requests.post(
-                                                    f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
+                                                    f"http://{ip_address}/gs_DB/record_sorting.php",
                                                     json={
                                                         'device_identity': sorter_id,
                                                         'trash_type': trash_type,
@@ -1143,7 +1153,7 @@ def main():
                                     
                                     # Mark command as executed
                                     requests.post(
-                                        f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
+                                        f"http://{ip_address}/gs_DB/mark_command_executed.php",
                                         json={'device_identity': sorter_id, 'command': command}
                                     )
                 except Exception as e:
@@ -1222,7 +1232,7 @@ def main():
                             trash_class_str = ', '.join(detected_classes)
                             
                             # Record sorting operation
-                            url = f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php"
+                            url = f"http://{ip_address}/gs_DB/record_sorting.php"
                             response = requests.post(url, json={
                                 'device_identity': sorter_id,
                                 'trash_type': trash_type,

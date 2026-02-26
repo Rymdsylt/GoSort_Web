@@ -1,7 +1,22 @@
 <?php
 require_once 'connection.php';
 
-$data = json_decode(file_get_contents('php://input'), true);
+header('Content-Type: application/json');
+
+// Accept both GET and POST requests
+$data = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $json_input = json_decode(file_get_contents('php://input'), true);
+    if (is_array($json_input)) {
+        $data = $json_input;
+    } else {
+        $data = $_POST;
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $data = $_GET;
+}
+
 $device_identity = $data['identity'] ?? null;
 
 if (!$device_identity) {

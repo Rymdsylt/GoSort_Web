@@ -11,9 +11,11 @@ import ipaddress
 import msvcrt
 import sys
 
-def check_maintenance_mode(ip_address, device_identity):
+def check_maintenance_mode(ip_address, device_identity, base_path=None):
+    if base_path is None:
+        base_path = get_base_path(ip_address)
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance.php"
+        url = f"{base_path}/gs_DB/check_maintenance.php"
         response = requests.post(
             url,
             json={'identity': device_identity},
@@ -27,6 +29,15 @@ def check_maintenance_mode(ip_address, device_identity):
     except Exception as e:
         print(f"\n❌ Error checking maintenance mode: {e}")
         return False
+
+def get_base_path(ip_address):
+    """Determine the correct base path based on whether it's a local IP or domain"""
+    # If it's a local IP (contains dots and no dots at end, or starts with 192., 10., etc.)
+    if ip_address.replace('.', '').isdigit() or ip_address.startswith(('192.', '10.', '172.')):
+        return f"http://{ip_address}/GoSort_Web"
+    else:
+        # It's a domain name
+        return f"http://{ip_address}"
 
 def load_config():
     config_file = 'gosort_config.json'
@@ -69,7 +80,8 @@ def scan_network():
 
     def check_ip(ip):
         try:
-            response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", 
+            base_path = get_base_path(ip)
+            response = requests.get(f"{base_path}/gs_DB/trash_detected.php", 
                                  timeout=0.5)
             if response.status_code == 200 or (
                 response.status_code == 400 and 
@@ -94,7 +106,8 @@ def scan_network():
 def check_server(ip):
     print("\rChecking server...", end="", flush=True)
     try:
-        response = requests.get(f"http://{ip}/GoSort_Web/gs_DB/trash_detected.php", timeout=5)
+        base_path = get_base_path(ip)
+        response = requests.get(f"{base_path}/gs_DB/trash_detected.php", timeout=5)
         if response.status_code == 200 or (response.status_code == 400 and "No trash type provided" in response.text):
             print("\r✅ Server connection successful!")
             return True
@@ -197,7 +210,7 @@ def connect_to_arduino(port):
 
 def add_to_waiting_devices(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/add_waiting_device.php"
+        url = f"http://{ip_address}/gs_DB/add_waiting_device.php"
         response = requests.post(url, json={
             'identity': device_identity
         })
@@ -214,7 +227,7 @@ def add_to_waiting_devices(ip_address, device_identity):
 def request_registration(ip_address, identity):
     try:
         # First check if device is in sorters table
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php"
+        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
         response = requests.post(
             url,
             json={'identity': identity},
@@ -228,7 +241,7 @@ def request_registration(ip_address, identity):
                 else:
                     # Try to add to waiting devices
                     response = requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/add_waiting_device.php",
+                        f"http://{ip_address}/gs_DB/add_waiting_device.php",
                         json={'identity': identity}
                     )
                     if response.status_code == 200:
@@ -250,7 +263,7 @@ def restart_program():
 
 def remove_from_waiting_devices(ip_address, device_identity):
     try:
-        url = f"http://{ip_address}/GoSort_Web/gs_DB/remove_waiting_device.php"
+        url = f"http://{ip_address}/gs_DB/remove_waiting_device.php"
         response = requests.post(url, json={'identity': device_identity}, headers={'Content-Type': 'application/json'})
         if response.status_code == 200:
             data = response.json()
@@ -273,7 +286,7 @@ def process_bin_fullness(data, ip_address, device_identity):
             # Send data to database using form data
             try:
                 response = requests.post(
-                    f"http://{ip_address}/GoSort_Web/gs_DB/update_bin_fullness.php",
+                    f"http://{ip_address}/gs_DB/update_bin_fullness.php",
                     data={
                         'device_identity': device_identity,
                         'bin_name': bin_name,
@@ -298,6 +311,9 @@ def main():
     # First get IP address
     ip_address = get_ip_address()
     print(f"\nUsing GoSort server at: {ip_address}")
+    
+    # Get base path for this server
+    base_path = get_base_path(ip_address)
 
     # Then get or set identity
     config = load_config()
@@ -316,7 +332,7 @@ def main():
     }
     
     # Fetch mapping from backend
-    mapping_url = f"http://{ip_address}/GoSort_Web/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
+    mapping_url = f"{base_path}/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
     try:
         resp = requests.get(mapping_url, timeout=5)
         server_mapping = resp.json().get('mapping', {})
@@ -532,7 +548,7 @@ def main():
                     
                     # Send heartbeat to update last_active
                     requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/verify_sorter.php",
+                        f"http://{ip_address}/gs_DB/verify_sorter.php",
                         json={'identity': config['sorter_id']},
                         headers={'Content-Type': 'application/json'}
                     )
@@ -549,7 +565,7 @@ def main():
                 break
 
         # Check maintenance mode periodically
-        current_maintenance = check_maintenance_mode(ip_address, config['sorter_id'])
+        current_maintenance = check_maintenance_mode(ip_address, config['sorter_id'], base_path)
         
         # If maintenance status changed, notify user
         if current_maintenance != last_maintenance_status:
@@ -586,7 +602,7 @@ def main():
                 
             try:
                 response = requests.post(
-                    f"http://{ip_address}/GoSort_Web/gs_DB/check_maintenance_commands.php",
+                    f"http://{ip_address}/gs_DB/check_maintenance_commands.php",
                     json={'device_identity': config['sorter_id']},
                     headers={'Content-Type': 'application/json'}
                 )
@@ -642,7 +658,7 @@ def main():
                             if trash_type:
                                 try:
                                     requests.post(
-                                        f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php",
+                                        f"http://{ip_address}/gs_DB/record_sorting.php",
                                         json={
                                             'device_identity': config['sorter_id'],
                                             'trash_type': trash_type,
@@ -654,7 +670,7 @@ def main():
                         
                         # Mark command as executed
                         requests.post(
-                            f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
+                            f"http://{ip_address}/gs_DB/mark_command_executed.php",
                             json={'device_identity': config['sorter_id'], 'command': command}
                         )
                         if command == 'shutdown':
@@ -662,7 +678,7 @@ def main():
                             # Mark command as executed before shutdown
                             try:
                                 requests.post(
-                                    f"http://{ip_address}/GoSort_Web/gs_DB/mark_command_executed.php",
+                                    f"http://{ip_address}/gs_DB/mark_command_executed.php",
                                     json={'device_identity': config['sorter_id'], 'command': command}
                                 )
                             except Exception as e:
@@ -716,7 +732,7 @@ def main():
                             
                             # Record the sorting action
                             try:
-                                sorting_url = f"http://{ip_address}/GoSort_Web/gs_DB/record_sorting.php"
+                                sorting_url = f"http://{ip_address}/gs_DB/record_sorting.php"
                                 response = requests.post(
                                     sorting_url,
                                     json={
@@ -765,7 +781,7 @@ def main():
                 # Send first reading (9cm)
                 try:
                     response = requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/update_bin_fullness.php",
+                        f"http://{ip_address}/gs_DB/update_bin_fullness.php",
                         data={
                             'device_identity': config['sorter_id'],
                             'bin_name': bin_type,
@@ -790,7 +806,7 @@ def main():
                 # Send second reading (10cm)
                 try:
                     response = requests.post(
-                        f"http://{ip_address}/GoSort_Web/gs_DB/update_bin_fullness.php",
+                        f"http://{ip_address}/gs_DB/update_bin_fullness.php",
                         data={
                             'device_identity': config['sorter_id'],
                             'bin_name': bin_type,
@@ -815,7 +831,7 @@ def main():
                     bin_label = trash_labels.get(bin_type, bin_type).title()
                     notification_message = f"{bin_label} bin is full"
                     requests.post(
-                        f"http://{ip_address}/GoSort_Web/api/add_bin_notification.php",
+                        f"http://{ip_address}/api/add_bin_notification.php",
                         json={
                             'message': notification_message,
                             'type': 'bin_full',
