@@ -33,7 +33,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 throw new Exception('Not authorized');
             }
 
-            $users_query = "SELECT id, userName, lastName, role, assigned_floor FROM users";
+            $users_query = "SELECT id, userName, lastName, email, role, assigned_floor FROM users";
             $result = $conn->query($users_query);
             $users = [];
             while ($row = $result->fetch_assoc()) {
@@ -204,6 +204,8 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             $user_id_to_update = $_PUT['user_id'] ?? null;
             $userName = $_PUT['userName'] ?? '';
             $lastName = $_PUT['lastName'] ?? '';
+            $email = $_PUT['email'] ?? '';
+            $password = $_PUT['password'] ?? '';
             $role = $_PUT['role'] ?? '';
             $assigned_floor = $_PUT['assigned_floor'] ?? '';
 
@@ -227,9 +229,34 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 throw new Exception('Full name is required');
             }
 
-            // Update user
-            $stmt = $conn->prepare("UPDATE users SET userName = ?, lastName = ?, role = ?, assigned_floor = ? WHERE id = ?");
-            $stmt->bind_param("ssssi", $userName, $lastName, $role, $assigned_floor, $user_id_to_update);
+            if (!$email) {
+                throw new Exception('Email is required');
+            }
+
+            // Validate email format
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new Exception('Invalid email format');
+            }
+
+            // Check if email is already used by another user
+            $check_email = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+            $check_email->bind_param("si", $email, $user_id_to_update);
+            $check_email->execute();
+            if ($check_email->get_result()->num_rows > 0) {
+                throw new Exception('Email is already in use');
+            }
+
+            // Build update query based on whether password is being changed
+            if (!empty($password)) {
+                // Password is being updated
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("UPDATE users SET userName = ?, lastName = ?, email = ?, password = ?, role = ?, assigned_floor = ? WHERE id = ?");
+                $stmt->bind_param("ssssssi", $userName, $lastName, $email, $hashedPassword, $role, $assigned_floor, $user_id_to_update);
+            } else {
+                // Password is not being updated
+                $stmt = $conn->prepare("UPDATE users SET userName = ?, lastName = ?, email = ?, role = ?, assigned_floor = ? WHERE id = ?");
+                $stmt->bind_param("sssssi", $userName, $lastName, $email, $role, $assigned_floor, $user_id_to_update);
+            }
             $stmt->execute();
 
             if ($stmt->affected_rows === 0) {
@@ -720,27 +747,50 @@ if ($sorters_result) {
                                 </div>
                                 <div class="modal-body">
                                     <form id="editUserForm">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-semibold">Full Name</label>
-                                            <input type="text" class="form-control" id="editName">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">First Name</label>
+                                                <input type="text" class="form-control" id="editFirstName">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Last Name</label>
+                                                <input type="text" class="form-control" id="editLastName">
+                                            </div>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-semibold">Role</label>
-                                            <select class="form-select" id="editRole">
-                                                <option>Administrator</option>
-                                                <option>Utility Member</option>
-                                            </select>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Email</label>
+                                                <input type="email" class="form-control" id="editEmail">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Password</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" id="editPassword" placeholder="Leave empty to keep current">
+                                                    <button class="btn btn-outline-secondary" type="button" id="toggleEditPassword">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-semibold">Assigned Floor</label>
-                                            <select class="form-select" id="editFloor" required>
-                                                <option value="">Select Floor</option>
-                                                <option value="Floor 1">Floor 1</option>
-                                                <option value="Floor 2">Floor 2</option>
-                                                <option value="Floor 3">Floor 3</option>
-                                                <option value="Floor 4">Floor 4</option>
-                                                <option value="Floor 5">Floor 5</option>
-                                            </select>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Role</label>
+                                                <select class="form-select" id="editRole">
+                                                    <option>Administrator</option>
+                                                    <option>Utility Member</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Assigned Floor</label>
+                                                <select class="form-select" id="editFloor" required>
+                                                    <option value="">Select Floor</option>
+                                                    <option value="Floor 1">Floor 1</option>
+                                                    <option value="Floor 2">Floor 2</option>
+                                                    <option value="Floor 3">Floor 3</option>
+                                                    <option value="Floor 4">Floor 4</option>
+                                                    <option value="Floor 5">Floor 5</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </form>
                                 </div>
@@ -829,7 +879,7 @@ if ($sorters_result) {
                             <td>${role}</td>
                             <td>${floor}</td>
                             <td>
-                                <button class="action-btn edit" onclick="openEditModal('${fullName.replace(/'/g, "\\'")}', '${user.role}', '${floor.replace(/'/g, "\\'")}', ${user.id})">
+                                <button class="action-btn edit" onclick="openEditModal('${user.userName.replace(/'/g, "\\'")}', '${user.lastName.replace(/'/g, "\\'")}', '${(user.email || '').replace(/'/g, "\\'")}', '${user.role}', '${floor.replace(/'/g, "\\'")}', ${user.id})">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
                                 <button class="action-btn delete" onclick="openDeleteModal('${fullName.replace(/'/g, "\\'")}', ${user.id})">
@@ -854,11 +904,14 @@ if ($sorters_result) {
         accountsButton.addEventListener('click', loadUsers);
     }
 
-    function openEditModal(name, role, floor, userId) {
-        document.getElementById('editName').value = name;
+    function openEditModal(firstName, lastName, email, role, floor, userId) {
+        document.getElementById('editFirstName').value = firstName;
+        document.getElementById('editLastName').value = lastName;
+        document.getElementById('editEmail').value = email;
+        document.getElementById('editPassword').value = '';
         document.getElementById('editRole').value = role === 'admin' ? 'Administrator' : 'Utility Member';
         document.getElementById('editFloor').value = floor;
-        currentUser = { name, role, floor, userId };
+        currentUser = { firstName, lastName, email, role, floor, userId };
         editUserModal.show();
     }
 
@@ -869,13 +922,33 @@ if ($sorters_result) {
         }
 
         const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
-        const fullName = document.getElementById('editName').value.trim();
+        const userName = document.getElementById('editFirstName').value.trim();
+        const lastName = document.getElementById('editLastName').value.trim();
+        const email = document.getElementById('editEmail').value.trim();
+        const password = document.getElementById('editPassword').value;
         const editedRole = document.getElementById('editRole').value === 'Administrator' ? 'admin' : 'utility';
         const editedFloor = document.getElementById('editFloor').value;
 
-        // Validate full name
-        if (!fullName) {
-            alert('Please enter a full name');
+        // Validate required fields
+        if (!userName) {
+            alert('Please enter a first name');
+            return;
+        }
+
+        if (!lastName) {
+            alert('Please enter a last name');
+            return;
+        }
+
+        if (!email) {
+            alert('Please enter an email');
+            return;
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            alert('Please enter a valid email address');
             return;
         }
 
@@ -885,14 +958,12 @@ if ($sorters_result) {
             return;
         }
 
-        // Split full name into firstName and lastName
-        const nameParts = fullName.split(' ');
-        const userName = nameParts[0];
-        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-
-        if (!lastName) {
-            alert('Please enter both first and last name (e.g., "John Doe")');
-            return;
+        // Build request body
+        let body = `user_id=${currentUser.userId}&userName=${encodeURIComponent(userName)}&lastName=${encodeURIComponent(lastName)}&email=${encodeURIComponent(email)}&role=${editedRole}&assigned_floor=${encodeURIComponent(editedFloor)}`;
+        
+        // Only include password if it's not empty
+        if (password) {
+            body += `&password=${encodeURIComponent(password)}`;
         }
 
         // Send PUT request
@@ -903,7 +974,7 @@ if ($sorters_result) {
                 'Accept': 'application/json',
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: `user_id=${currentUser.userId}&userName=${encodeURIComponent(userName)}&lastName=${encodeURIComponent(lastName)}&role=${editedRole}&assigned_floor=${encodeURIComponent(editedFloor)}`
+            body: body
         })
         .then(response => response.json())
         .then(data => {
@@ -1179,9 +1250,25 @@ if ($sorters_result) {
         });
     }
 
-    // Add password toggle functionality
+    // Add password toggle functionality for add user modal
     document.getElementById('togglePassword').addEventListener('click', function() {
         const passwordInput = document.getElementById('addPassword');
+        const icon = this.querySelector('i');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    });
+
+    // Add password toggle functionality for edit user modal
+    document.getElementById('toggleEditPassword').addEventListener('click', function() {
+        const passwordInput = document.getElementById('editPassword');
         const icon = this.querySelector('i');
         
         if (passwordInput.type === 'password') {
