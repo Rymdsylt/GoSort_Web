@@ -40,14 +40,8 @@ $stmt = $pdo->prepare("SELECT
 $stmt->execute();
 $today_stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Get recent activities (last 10)
-$stmt = $pdo->prepare("SELECT sh.*, s.device_name 
-                       FROM sorting_history sh
-                       JOIN sorters s ON sh.device_identity = s.device_identity
-                       ORDER BY sh.sorted_at DESC 
-                       LIMIT 10");
-$stmt->execute();
-$recent_activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Get recent activities (last 10 activity logs)
+$recent_activities = get_activity_logs(null, null, 10, 0);
 
 // Get system alerts (Note: this system alerts backend must be changed)
 $stmt = $pdo->prepare("SELECT * FROM sorters WHERE status = 'offline' OR status = 'maintenance'");
@@ -579,7 +573,7 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
                             <i class="bi bi-hdd-rack"></i>
                         </div>
                         <div class="welcome-stat-info">
-                            <h3><?php echo $system_stats['online_devices']; ?>/<?php echo $system_stats['total_devices']; ?></h3>
+                            <h3><?php echo $system_stats['online_devices'] ?? 0; ?></h3>
                             <p>Devices Online</p>
                         </div>
                     </div>
@@ -684,6 +678,7 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
             <div class="row g-4">
                 <!-- Left Column: About GoSort + Additional Cards -->
                 <div class="col-lg-8">
+                    <?php if(false): ?>
                     <!-- About GoSort -->
                     <div class="about-card mb-4">
                         <div class="about-header">
@@ -840,10 +835,11 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
                             <li>Carbon footprint reduced by <b>8%</b> 🌏</li>
                         </ul>
                     </div>
+                    <?php endif; ?>
                 </div>
 
-                <!-- Right Column: System Alerts & Recent Activity -->
-                <div class="col-lg-4">
+                <!-- System Alerts & Recent Activity -->
+                <div class="col-lg-12">
                     <!-- System Alerts -->
                     <div class="alert-card mb-4">
                         <div class="stat-card-header mb-3">
@@ -878,42 +874,60 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
 
                     <!-- Recent Activity -->
                     <div class="stat-card">
-                        <div class="stat-card-header mb-3">
+                        <div class="stat-card-header mb-4">
                             <h5 class="stat-card-title">Recent Activity</h5>
                             <div class="stat-icon">
                                 <i class="bi bi-activity"></i>
                             </div>
                         </div>
-                        <div class="activity-log">
-                            <?php foreach ($recent_activities as $activity): ?>
-                                <div class="activity-item">
-                                    <div class="activity-icon <?php echo htmlspecialchars($activity['trash_type']); ?>">
-                                        <i class="bi bi-trash"></i>
-                                    </div>
-                                    <div class="activity-details">
-                                        <div class="activity-device"><?php echo htmlspecialchars($activity['device_name']); ?></div>
-                                        <div class="activity-type"><?php echo ucfirst($activity['trash_type']); ?> waste</div>
-                                    </div>
-                                    <div class="activity-time">
-                                        <?php 
-                                        $sorted_time = new DateTime($activity['sorted_at']);
-                                        $now = new DateTime();
-                                        $interval = $now->diff($sorted_time);
-                                        
-                                        if ($interval->days == 0) {
-                                            if ($interval->h == 0) {
-                                                echo $interval->i . 'm ago';
-                                            } else {
-                                                echo $interval->h . 'h ago';
-                                            }
-                                        } else {
-                                            echo $interval->days . 'd ago';
-                                        }
-                                        ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                        <?php if (count($recent_activities) > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" style="border-collapse: separate; border-spacing: 0 8px;">
+                                    <thead>
+                                        <tr style="background-color: transparent;">
+                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Date</th>
+                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">User</th>
+                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Device</th>
+                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Action</th>
+                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($recent_activities as $activity): ?>
+                                            <tr style="background-color: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s;">
+                                                <td style="font-size: 0.9rem; color: var(--medium-gray); padding: 1rem; border: none; vertical-align: middle; font-weight: 600;">
+                                                    <?php 
+                                                    $activity_time = new DateTime($activity['created_at']);
+                                                    echo $activity_time->format('M d, Y g:i A');
+                                                    ?>
+                                                </td>
+                                                <td style="font-size: 0.95rem; font-weight: 600; color: var(--dark-gray); padding: 1rem; border: none; vertical-align: middle;">
+                                                    <i class="bi bi-person-circle" style="margin-right: 0.5rem; color: var(--primary-green);"></i><?php echo htmlspecialchars($activity['username'] ?? 'System'); ?>
+                                                </td>
+                                                <td style="font-size: 0.95rem; color: var(--medium-gray); padding: 1rem; border: none; vertical-align: middle;">
+                                                    <?php if($activity['device_name']): ?>
+                                                        <i class="bi bi-hdd-rack" style="margin-right: 0.5rem; color: var(--primary-green);"></i><?php echo htmlspecialchars($activity['device_name']); ?>
+                                                    <?php else: ?>
+                                                        <span style="color: var(--medium-gray);">—</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="font-size: 0.95rem; color: var(--dark-gray); padding: 1rem; border: none; vertical-align: middle;">
+                                                    <?php echo htmlspecialchars($activity['action']); ?>
+                                                </td>
+                                                <td style="font-size: 0.9rem; color: var(--medium-gray); padding: 1rem; border: none; vertical-align: middle;">
+                                                    <?php echo htmlspecialchars($activity['details'] ?? '—'); ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="no-alerts">
+                                <i class="bi bi-check-circle"></i>
+                                <p>No recent activity</p>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
