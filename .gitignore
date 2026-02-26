@@ -1,17 +1,4 @@
 
-# Ignore dev/test scripts and sensitive files
-GoSort.ino
-GoSort.py
-GoSort_Detect.py
-GoSort_Detect_Simulation.py
-GoSort_Simulation.py
-test_mapping.py
-installer.bat
-run_dev.bat
-run.bat
-maintenance_command.txt
-python_maintenance_mode.txt
-best885.pt
 
 # Ignore config and secrets (uncomment if you use Railway ENV vars)
 # gosort_config.json
