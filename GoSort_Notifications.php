@@ -84,30 +84,151 @@ if (!$user) {
             margin: 0;
             margin-left: 6px;
         }
+
+        .unread-badge {
+            background-color: #7AF146;
+            color: #1a3a0a;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+        }
+
         .notification-item {
-            border-left: 4px solid #7AF146;
-            margin-bottom: 15px;
-            padding: 15px;
+            border-left: 4px solid #d0d0d0;
+            margin-bottom: 12px;
+            padding: 16px 20px;
             background-color: #fff;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            transition: all 0.2s ease;
+        }
+        .notification-item:hover {
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
         }
         .notification-item.unread {
+            border-left-color: #7AF146;
             background-color: #f8fff5;
         }
+        .notification-item.read {
+            opacity: 0.75;
+        }
+
+        .notif-message {
+            font-size: 0.93rem;
+            font-weight: 500;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .notif-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .notif-meta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.78rem;
+            color: #555;
+            background: #f0f0f0;
+            padding: 0.2rem 0.55rem;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+
         .notification-time {
             color: #6c757d;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
         }
+
+        .mark-read-btn {
+            border-radius: 6px;
+            font-size: 0.78rem;
+            padding: 0.2rem 0.5rem;
+            border-color: #368137;
+            color: #368137;
+        }
+        .mark-read-btn:hover {
+            background-color: #368137;
+            color: #fff;
+        }
+
+        .mark-all-btn {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #368137;
+            border: 1px solid #368137;
+            border-radius: 8px;
+            padding: 0.35rem 0.9rem;
+            transition: all 0.2s ease;
+        }
+        .mark-all-btn:hover {
+            background-color: #368137;
+            color: #fff;
+        }
+
+        .view-read-btn {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #6c757d;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            padding: 0.35rem 0.9rem;
+            transition: all 0.2s ease;
+        }
+        .view-read-btn:hover {
+            background-color: #6c757d;
+            color: #fff;
+        }
+
+        #readNotificationsModal .notification-item {
+            border-left-color: #d0d0d0;
+            opacity: 0.85;
+            margin-bottom: 10px;
+        }
+
+        #readNotificationsModal .modal-header {
+            font-family: 'Inter', sans-serif;
+        }
+
         .delete-btn {
-            float: right;
             color: #dc3545;
             cursor: pointer;
             padding: 5px;
             transition: color 0.2s;
+            font-size: 1rem;
         }
         .delete-btn:hover {
             color: #bd2130;
+        }
+
+        .pagination .page-link {
+            color: #368137;
+            border-color: #ddd;
+            font-size: 0.88rem;
+        }
+        .pagination .page-item.active .page-link {
+            background-color: #368137;
+            border-color: #368137;
+            color: #fff;
+        }
+        .pagination .page-link:hover {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .pagination .page-item.disabled .page-link {
+            color: #aaa;
+        }
+
+        @media (max-width: 992px) {
+            #main-content-wrapper {
+                margin-left: 0;
+                padding: 12px;
+            }
         }
     </style>
 </head>
@@ -119,6 +240,15 @@ if (!$user) {
             <div class="page-header">
                 <div class="header-left">
                     <h1 class="page-title">Notifications</h1>
+                    <span class="unread-badge" id="unreadBadge" style="display:none;">0 unread</span>
+                </div>
+                <div>
+                    <button class="btn view-read-btn me-2" id="viewReadBtn" style="display:none;">
+                        <i class="bi bi-envelope-open me-1"></i>Read <span id="readCountBadge" class="badge bg-secondary ms-1">0</span>
+                    </button>
+                    <button class="btn mark-all-btn" id="markAllReadBtn" style="display:none;">
+                        <i class="bi bi-check2-all me-1"></i>Mark All as Read
+                    </button>
                 </div>
             </div>
 
@@ -150,9 +280,33 @@ if (!$user) {
         </div>
     </div>
 
+    <!-- Read Notifications Modal -->
+    <div class="modal fade" id="readNotificationsModal" tabindex="-1" aria-labelledby="readNotificationsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
+                    <h5 class="modal-title" id="readNotificationsModalLabel">
+                        <i class="bi bi-envelope-open me-2" style="color: #368137;"></i>Read Notifications
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="max-height: 65vh; overflow-y: auto; padding: 1.25rem;">
+                    <div class="read-notification-container">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-success" role="status"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let currentPage = 1;
+        let readModalPage = 1;
+
         function showError(message) {
             $('.notification-container').html(`
                 <div class="alert alert-danger" role="alert">
@@ -162,13 +316,34 @@ if (!$user) {
             `);
         }
 
-        function loadNotifications() {
+        function loadNotifications(page) {
+            page = page || currentPage;
             $.ajax({
                 url: 'gs_DB/get_bin_notifications.php',
                 method: 'GET',
+                data: { page: page, filter: 'unread' },
                 success: function(response) {
                     try {
                         $('.notification-container').html(response);
+                        var info = $('.notification-container #pagination-info');
+                        if (info.length) {
+                            currentPage = parseInt(info.attr('data-page'));
+                            var unread = parseInt(info.attr('data-unread'));
+                            var readCount = parseInt(info.attr('data-read-count'));
+                            if (unread > 0) {
+                                $('#unreadBadge').text(unread + ' unread').show();
+                                $('#markAllReadBtn').show();
+                            } else {
+                                $('#unreadBadge').hide();
+                                $('#markAllReadBtn').hide();
+                            }
+                            if (readCount > 0) {
+                                $('#readCountBadge').text(readCount);
+                                $('#viewReadBtn').show();
+                            } else {
+                                $('#viewReadBtn').hide();
+                            }
+                        }
                     } catch (e) {
                         showError('Error displaying notifications. Please try refreshing the page.');
                         console.error('Error parsing notifications:', e);
@@ -181,12 +356,57 @@ if (!$user) {
             });
         }
 
-        // Handle marking notifications as read
-        $(document).on('click', '.notification-item.unread', function(e) {
-            if ($(e.target).hasClass('delete-btn') || $(e.target).closest('.delete-btn').length) {
-                return; // Don't mark as read if clicking delete button
+        function loadReadNotifications(page) {
+            page = page || 1;
+            $.ajax({
+                url: 'gs_DB/get_bin_notifications.php',
+                method: 'GET',
+                data: { page: page, filter: 'read' },
+                success: function(response) {
+                    $('.read-notification-container').html(response);
+                    var info = $('.read-notification-container #pagination-info');
+                    if (info.length) {
+                        readModalPage = parseInt(info.attr('data-page'));
+                    }
+                },
+                error: function() {
+                    $('.read-notification-container').html('<div class="alert alert-danger">Failed to load read notifications.</div>');
+                }
+            });
+        }
+
+        // Main page pagination
+        $(document).on('click', '.unread-pagination .page-link', function(e) {
+            e.preventDefault();
+            var page = parseInt($(this).attr('data-page'));
+            if (page && !$(this).closest('.page-item').hasClass('disabled') && !$(this).closest('.page-item').hasClass('active')) {
+                loadNotifications(page);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
-            const notificationId = $(this).data('id');
+        });
+
+        // Modal pagination
+        $(document).on('click', '.read-pagination .page-link', function(e) {
+            e.preventDefault();
+            var page = parseInt($(this).attr('data-page'));
+            if (page && !$(this).closest('.page-item').hasClass('disabled') && !$(this).closest('.page-item').hasClass('active')) {
+                loadReadNotifications(page);
+            }
+        });
+
+        // Open read notifications modal
+        $('#viewReadBtn').on('click', function() {
+            readModalPage = 1;
+            loadReadNotifications(1);
+            var modal = new bootstrap.Modal(document.getElementById('readNotificationsModal'));
+            modal.show();
+        });
+
+        // Handle mark-as-read button click
+        $(document).on('click', '.mark-read-btn', function(e) {
+            e.stopPropagation();
+            const btn = $(this);
+            const notificationId = btn.closest('.notification-item').data('id');
             $.ajax({
                 url: 'gs_DB/mark_bin_notification_read.php',
                 method: 'POST',
@@ -195,7 +415,26 @@ if (!$user) {
                     try {
                         const result = JSON.parse(response);
                         if (result.success) {
-                            loadNotifications(); // Refresh the notifications
+                            loadNotifications(currentPage);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                    }
+                }
+            });
+        });
+
+        // Handle mark all as read
+        $('#markAllReadBtn').on('click', function() {
+            $.ajax({
+                url: 'gs_DB/mark_bin_notification_read.php',
+                method: 'POST',
+                data: { mark_all: true },
+                success: function(response) {
+                    try {
+                        const result = JSON.parse(response);
+                        if (result.success) {
+                            loadNotifications(1);
                         }
                     } catch (e) {
                         console.error('Error parsing response:', e);
@@ -209,7 +448,7 @@ if (!$user) {
 
         // Handle deleting notifications
         $(document).on('click', '.delete-btn', function(e) {
-            e.stopPropagation(); // Prevent triggering the mark as read event
+            e.stopPropagation();
             currentNotificationId = $(this).closest('.notification-item').data('id');
             deleteModal.show();
         });
@@ -228,7 +467,11 @@ if (!$user) {
                 success: function(response) {
                     if (response.success) {
                         deleteModal.hide();
-                        loadNotifications(); // Refresh the notifications
+                        loadNotifications(currentPage);
+                        // Also refresh the read modal if it's open
+                        if ($('#readNotificationsModal').hasClass('show')) {
+                            loadReadNotifications(readModalPage);
+                        }
                     } else {
                         showError(response.message || 'Failed to delete notification. Please try again.');
                     }
@@ -241,9 +484,8 @@ if (!$user) {
 
         // Load notifications when page loads
         $(document).ready(function() {
-            loadNotifications();
-            // Refresh notifications every 30 seconds
-            setInterval(loadNotifications, 30000);
+            loadNotifications(1);
+            setInterval(function() { loadNotifications(currentPage); }, 30000);
         });
     </script>
 </body>

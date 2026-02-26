@@ -359,8 +359,48 @@ body.dark-mode #deleteModal .modal-footer {
     background: var(--dm-bg-tertiary) !important;
 }
 
+body.dark-mode #addDeviceModal .form-text {
+    color: var(--dm-text-secondary) !important;
+}
+
+body.dark-mode #addDeviceModal .form-label {
+    color: #66bb6a !important;
+}
+
 body.dark-mode .shadow-dark {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* List/Table view dark mode */
+body.dark-mode #listContainer {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode #listContainer table {
+    border-color: var(--dm-border) !important;
+}
+
+body.dark-mode #listContainer thead th {
+    background-color: var(--dm-bg-tertiary) !important;
+    color: #66bb6a !important;
+    border-color: var(--dm-border) !important;
+}
+
+body.dark-mode #listContainer tbody tr {
+    background-color: var(--dm-bg-secondary) !important;
+}
+
+body.dark-mode #listContainer tbody tr:hover {
+    background-color: var(--dm-bg-hover) !important;
+}
+
+body.dark-mode #listContainer td {
+    border-top-color: var(--dm-border) !important;
+    color: var(--dm-text-primary) !important;
+}
+
+body.dark-mode #listContainer td:first-child {
+    color: var(--dm-text-primary) !important;
 }
 
 /* Badge status colors */
@@ -784,10 +824,94 @@ body.dark-mode .notification-item {
 
 body.dark-mode .notification-item.unread {
     background: var(--dm-bg-tertiary) !important;
+    border-left-color: #7AF146 !important;
+}
+
+body.dark-mode .notification-item.read {
+    opacity: 0.7;
+}
+
+body.dark-mode .notif-message {
+    color: var(--dm-text-primary) !important;
+}
+
+body.dark-mode .notif-meta-tag {
+    background: var(--dm-bg-primary) !important;
+    color: var(--dm-text-secondary) !important;
 }
 
 body.dark-mode .notification-time {
     color: var(--dm-text-secondary);
+}
+
+body.dark-mode .unread-badge {
+    background-color: rgba(122, 241, 70, 0.2);
+    color: #7AF146;
+}
+
+body.dark-mode .mark-all-btn {
+    color: #7AF146;
+    border-color: #7AF146;
+}
+
+body.dark-mode .mark-all-btn:hover {
+    background-color: rgba(122, 241, 70, 0.15);
+    color: #7AF146;
+}
+
+body.dark-mode .mark-read-btn {
+    border-color: #7AF146;
+    color: #7AF146;
+}
+
+body.dark-mode .mark-read-btn:hover {
+    background-color: #7AF146;
+    color: #1a3a0a;
+}
+
+body.dark-mode .pagination .page-link {
+    background: var(--dm-bg-secondary);
+    border-color: var(--dm-border);
+    color: var(--dm-text-primary);
+}
+
+body.dark-mode .pagination .page-item.active .page-link {
+    background-color: #368137;
+    border-color: #368137;
+    color: #fff;
+}
+
+body.dark-mode .pagination .page-link:hover {
+    background: var(--dm-bg-tertiary);
+    color: #7AF146;
+}
+
+body.dark-mode .view-read-btn {
+    color: var(--dm-text-secondary);
+    border-color: var(--dm-border);
+}
+
+body.dark-mode .view-read-btn:hover {
+    background-color: var(--dm-bg-tertiary);
+    color: var(--dm-text-primary);
+}
+
+body.dark-mode #readNotificationsModal .modal-content {
+    background: var(--dm-bg-primary);
+    color: var(--dm-text-primary);
+}
+
+body.dark-mode #readNotificationsModal .modal-header {
+    background: var(--dm-bg-secondary) !important;
+    border-bottom-color: var(--dm-border) !important;
+}
+
+body.dark-mode #readNotificationsModal .modal-title {
+    color: var(--dm-text-primary);
+}
+
+body.dark-mode #readNotificationsModal .btn-close {
+    filter: invert(1);
 }
 
 /* ===== CORRECTED WASTE PAGE ===== */
