@@ -27,7 +27,9 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="css/dark-mode-global.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/theme-manager.js"></script>
     <style>
         body {
             font-family: "Inter", sans-serif;
@@ -215,6 +217,8 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
             display: none;
             opacity: 0;
         }
+
+        /* Dark mode styles are handled by css/dark-mode-global.css */
     </style>
 </head>
 <body>
@@ -231,37 +235,51 @@ $accountLogo = $user['logo'] ?? "images/logos/pcs.svg";
     
     <ul class="nav flex-column flex-grow-1">
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_Dashboard.php') {echo 'active';} ?>" href="GoSort_Dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_Dashboard.php') {
+    echo 'active';
+}?>" href="GoSort_Dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
                 <i class="bi bi-columns-gap"></i> <span>Dashboard</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_Sorters.php') {echo 'active';} ?>" href="GoSort_Sorters.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Devices">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_Sorters.php') {
+    echo 'active';
+}?>" href="GoSort_Sorters.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Devices">
                 <i class="bi bi-plus-circle"></i> <span>Devices</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_AnalyticsNavpage.php' || $currentPage == 'GoSort_Statistics.php') {echo 'active';} ?>" href="GoSort_AnalyticsNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Analytics">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_AnalyticsNavpage.php' || $currentPage == 'GoSort_Statistics.php') {
+    echo 'active';
+}?>" href="GoSort_AnalyticsNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Analytics">
                 <i class="bi bi-bar-chart"></i> <span>Analytics</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_MaintenanceNavpage.php' || $currentPage == 'GoSort_Maintenance.php') {echo 'active';} ?>" href="GoSort_MaintenanceNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Maintenance">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_MaintenanceNavpage.php' || $currentPage == 'GoSort_Maintenance.php') {
+    echo 'active';
+}?>" href="GoSort_MaintenanceNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Maintenance">
                 <i class="bi bi-clock-history"></i> <span>Maintenance</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_WasteMonitoringNavpage.php' || $currentPage == 'GoSort_LiveMonitor.php') {echo 'active';} ?>" href="GoSort_WasteMonitoringNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Waste Monitoring">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_WasteMonitoringNavpage.php' || $currentPage == 'GoSort_LiveMonitor.php') {
+    echo 'active';
+}?>" href="GoSort_WasteMonitoringNavpage.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Waste Monitoring">
                 <i class="bi bi-trash"></i> <span>Waste Monitoring</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_Notifications.php') {echo 'active';} ?>" href="GoSort_Notifications.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Notifications">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_Notifications.php') {
+    echo 'active';
+}?>" href="GoSort_Notifications.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Notifications">
                 <i class="bi bi-bell"></i> <span>Notifications</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php if ($currentPage == 'GoSort_Settings.php') {echo 'active';} ?>" href="GoSort_Settings.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Settings">
+            <a class="nav-link <?php if ($currentPage == 'GoSort_Settings.php') {
+    echo 'active';
+}?>" href="GoSort_Settings.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Settings">
                 <i class="bi bi-gear"></i> <span>Settings</span>
             </a>
         </li>

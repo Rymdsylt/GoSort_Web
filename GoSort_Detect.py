@@ -273,23 +273,41 @@ class VideoStream:
 
 def list_available_cameras(max_cams=10):
     available = []
-
-    cap = cv2.VideoCapture(0)
-    if cap.isOpened():
-        ret, _ = cap.read()
-        if ret:
-            print("Camera 0 is available (default backend)")
-            available.append(0)
-        cap.release()
-
-    if not available:
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    
+    print("Scanning for available cameras...")
+    
+    # Try each camera index
+    for i in range(max_cams):
+        found = False
+        
+        # Try default backend first
+        cap = cv2.VideoCapture(i)
         if cap.isOpened():
-            ret, _ = cap.read()
-            if ret:
-                print("Camera 0 is available (DirectShow)")
-                available.append(0)
+            ret, frame = cap.read()
+            if ret and frame is not None and frame.size > 0:
+                print(f"✅ Camera {i} is available (default backend)")
+                available.append(i)
+                found = True
             cap.release()
+        
+        # If not found with default, try DirectShow (Windows)
+        if not found:
+            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret and frame is not None and frame.size > 0:
+                    print(f"✅ Camera {i} is available (DirectShow)")
+                    available.append(i)
+                    found = True
+                cap.release()
+        
+        # Small delay to avoid resource conflicts
+        time.sleep(0.1)
+    
+    if available:
+        print(f"\n🎥 Found {len(available)} camera(s): {available}")
+    else:
+        print("\n❌ No cameras found!")
     
     return available
 
@@ -341,7 +359,7 @@ def check_maintenance_mode(ip_address, device_identity):
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                return data.get('maintenance_mode') == 1
+                return data.get('maintenance_mode') == 11
         return False
     except Exception as e:
         print(f"\n❌ Error checking maintenance mode: {e}")
@@ -927,6 +945,7 @@ def main():
         return
 
     cam_index = available_cams[0]
+    current_cam_idx = 0  # Index into available_cams list
     print(f"Using camera index: {cam_index}")
 
    
@@ -1259,13 +1278,18 @@ def main():
         cv2.rectangle(ui_panel, (170, 10), (310, 40), (0, 255, 0), -1)
         cv2.putText(ui_panel, "Change ID", (190, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
         
+        # Switch Camera button
+        cv2.rectangle(ui_panel, (330, 10), (490, 40), (100, 200, 255), -1)  # Orange color
+        camera_label = f"Camera ({current_cam_idx + 1}/{len(available_cams)})"
+        cv2.putText(ui_panel, camera_label, (345, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        
         # Reconfigure All button
-        cv2.rectangle(ui_panel, (330, 10), (470, 40), (0, 255, 0), -1)
-        cv2.putText(ui_panel, "Reconfig All", (340, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        cv2.rectangle(ui_panel, (510, 10), (650, 40), (0, 255, 0), -1)
+        cv2.putText(ui_panel, "Reconfig All", (520, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
         
         # Exit button
-        cv2.rectangle(ui_panel, (490, 10), (630, 40), (0, 0, 255), -1)
-        cv2.putText(ui_panel, "Exit", (535, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.rectangle(ui_panel, (670, 10), (810, 40), (0, 0, 255), -1)
+        cv2.putText(ui_panel, "Exit", (715, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
         cv2.putText(frame, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         device_text = f"GPU: {device_name}" if torch.cuda.is_available() else f"CPU: {device_name}"
@@ -1324,6 +1348,7 @@ def main():
         
         # Handle mouse events
         def mouse_callback(event, x, y, flags, param):
+            nonlocal current_cam_idx, stream, ip_address
             if event == cv2.EVENT_LBUTTONDOWN:
                 # Adjust y coordinate to account for the main frame
                 y = y - frame.shape[0]
@@ -1348,7 +1373,19 @@ def main():
                         if command_handler:
                             command_handler.stop()
                         exit()
-                    elif 330 <= x <= 470:  # Reconfigure All button
+                    elif 330 <= x <= 490:  # Switch Camera button
+                        if len(available_cams) > 1:
+                            print("\n🔄 Switching camera...")
+                            stream.stop()
+                            current_cam_idx = (current_cam_idx + 1) % len(available_cams)
+                            cam_index = available_cams[current_cam_idx]
+                            print(f"Switched to camera {current_cam_idx + 1}/{len(available_cams)} (Index: {cam_index})")
+                            # Restart video stream with new camera
+                            stream = VideoStream(cam_index).start()
+                            time.sleep(1.0)
+                        else:
+                            print("\n⚠️ Only one camera available")
+                    elif 510 <= x <= 650:  # Reconfigure All button
                         print("\nReconfiguring All Settings")
                         # Clear all configuration
                         config = {}
@@ -1359,7 +1396,7 @@ def main():
                         if command_handler:
                             command_handler.stop()
                         exit()
-                    elif 490 <= x <= 630:  # Exit button
+                    elif 670 <= x <= 810:  # Exit button
                         cv2.destroyAllWindows()
                         stream.stop()
                         if command_handler:

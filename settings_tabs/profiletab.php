@@ -17,6 +17,18 @@ if ($user_id) {
 <html lang="en">
 <head>
     <style>
+        :root {
+            --primary-green: #2e7d32;
+            --light-green: #66bb6a;
+            --dark-gray: #333;
+            --medium-gray: #6b7280;
+            --light-gray: #f9fafb;
+        }
+
+        body {
+            background-color: var(--light-gray);
+        }
+
         .section-header {
             font-size: 1.1rem;
             font-weight: 700;
@@ -26,6 +38,8 @@ if ($user_id) {
             padding-bottom: 0.5rem;
             border-bottom: 1px solid #0a0a0aff;
         }
+
+        /* Dark mode styles are handled by css/dark-mode-global.css */
 
         .theme-switch-wrapper {
             display: flex;
@@ -429,21 +443,35 @@ if ($user_id) {
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('theme') ||
-                              (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            if (savedTheme === 'dark') {
-                document.body.classList.add('dark-mode');
-                document.getElementById('theme-toggle').checked = true;
+            // If global theme manager exists, use it; otherwise use local storage
+            if (window.themeManager) {
+                const currentTheme = window.themeManager.getCurrentTheme();
+                document.getElementById('theme-toggle').checked = currentTheme === 'dark';
+            } else {
+                const savedTheme = localStorage.getItem('gosort-theme') || localStorage.getItem('theme') ||
+                                  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                if (savedTheme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                    document.getElementById('theme-toggle').checked = true;
+                }
             }
         });
 
         function toggleTheme() {
-            if (document.getElementById('theme-toggle').checked) {
-                document.body.classList.add('dark-mode');
-                localStorage.setItem('theme', 'dark');
+            // Use global theme manager if available
+            if (window.themeManager) {
+                window.themeManager.toggleTheme();
             } else {
-                document.body.classList.remove('dark-mode');
-                localStorage.setItem('theme', 'light');
+                // Fallback to local storage
+                if (document.getElementById('theme-toggle').checked) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('gosort-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('gosort-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
             }
             console.log("Theme toggled.");
         }

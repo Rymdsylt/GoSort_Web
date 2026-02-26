@@ -101,6 +101,8 @@
             background-color: #1f3a13;
         }
 
+        /* Dark mode styles are handled by css/dark-mode-global.css */
+
     </style>
 </head>
 <body>
