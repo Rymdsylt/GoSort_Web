@@ -16,15 +16,21 @@ def check_maintenance_mode(ip_address, device_identity):
         response = requests.post(
             url,
             json={'identity': device_identity},
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            timeout=5
         )
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
                 return data.get('maintenance_mode') == 1
         return False
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        # Silently fail on timeouts - maintenance mode remains unchanged
+        return False
     except Exception as e:
-        print(f"\n❌ Error checking maintenance mode: {e}")
+        # Only print unexpected errors, not timeout/connection errors
+        if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+            print(f"\n⚠️ Maintenance mode check failed: {type(e).__name__}")
         return False
 
 def get_base_path(ip_address):
@@ -171,7 +177,7 @@ def add_to_waiting_devices(ip_address, device_identity):
         url = f"{base_path}/gs_DB/add_waiting_device.php"
         response = requests.post(url, json={
             'identity': device_identity
-        })
+        }, timeout=5)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
@@ -212,7 +218,8 @@ def request_registration(ip_address, identity):
                     # Try to add to waiting devices
                     response = requests.post(
                         f"{base_path}/gs_DB/add_waiting_device.php",
-                        json={'identity': identity}
+                        json={'identity': identity},
+                        timeout=5
                     )
                     if response.status_code == 200:
                         data = response.json()
@@ -237,7 +244,7 @@ def remove_from_waiting_devices(ip_address, device_identity):
     try:
         base_path = get_base_path(ip_address)
         url = f"{base_path}/gs_DB/remove_waiting_device.php"
-        response = requests.post(url, json={'identity': device_identity}, headers={'Content-Type': 'application/json'})
+        response = requests.post(url, json={'identity': device_identity}, headers={'Content-Type': 'application/json'}, timeout=5)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
@@ -265,7 +272,8 @@ def process_bin_fullness(data, ip_address, device_identity):
                         'device_identity': device_identity,
                         'bin_name': bin_name,
                         'distance': distance
-                    }
+                    },
+                    timeout=5
                 )
                 
                 if response.status_code == 200 and "Record inserted" in response.text:
@@ -447,13 +455,17 @@ def main():
                     requests.post(
                         f"{base_path}/gs_DB/verify_sorter.php",
                         json={'identity': config['sorter_id']},
-                        headers={'Content-Type': 'application/json'}
+                        headers={'Content-Type': 'application/json'},
+                        timeout=5
                     )
                     last_heartbeat = current_time
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                    # Silently fail on timeouts/connection errors for heartbeat
+                    last_heartbeat = current_time
                 except Exception as e:
-                    print(f"\n⚠️ Heartbeat error: {e}")
-                    # Remove from waiting devices if heartbeat fails
-                    remove_from_waiting_devices(ip_address, config['sorter_id'])
+                    # Only print unexpected errors
+                    if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+                        print(f"\n⚠️ Heartbeat error: {type(e).__name__}")
             else:
                 # Arduino disconnected, stop sending heartbeats
                 print("\n⚠️ Arduino (Simulated) disconnected - stopping heartbeats")
@@ -501,7 +513,8 @@ def main():
                 response = requests.post(
                     f"{base_path}/gs_DB/check_maintenance_commands.php",
                     json={'device_identity': config['sorter_id']},
-                    headers={'Content-Type': 'application/json'}
+                    headers={'Content-Type': 'application/json'},
+                    timeout=5
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -545,7 +558,8 @@ def main():
                                             'device_identity': config['sorter_id'],
                                             'trash_type': trash_type,
                                             'is_maintenance': True
-                                        }
+                                        },
+                                        timeout=5
                                     )
                                 except Exception as e:
                                     print(f"\n⚠️ Error recording sorting: {e}")
@@ -553,7 +567,8 @@ def main():
                         # Mark command as executed
                         requests.post(
                             f"{base_path}/gs_DB/mark_command_executed.php",
-                            json={'device_identity': config['sorter_id'], 'command': command}
+                            json={'device_identity': config['sorter_id'], 'command': command},
+                            timeout=5
                         )
                         if command == 'shutdown':
                             print("\n⚠️ Shutdown command received. Shutting down computer...")
@@ -561,7 +576,8 @@ def main():
                             try:
                                 requests.post(
                                     f"{base_path}/gs_DB/mark_command_executed.php",
-                                    json={'device_identity': config['sorter_id'], 'command': command}
+                                    json={'device_identity': config['sorter_id'], 'command': command},
+                                    timeout=5
                                 )
                             except Exception as e:
                                 print(f"\n⚠️ Error marking shutdown command as executed: {e}")

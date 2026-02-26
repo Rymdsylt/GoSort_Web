@@ -326,24 +326,35 @@ def check_maintenance_mode(ip_address, device_identity):
         response = requests.post(
             url,
             json={'identity': device_identity},
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            timeout=5
         )
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
                 return data.get('maintenance_mode') == 1
         return False
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        # Silently fail on timeouts - maintenance mode remains unchanged
+        return False
     except Exception as e:
-        print(f"\n❌ Error checking maintenance mode: {e}")
+        # Only print unexpected errors
+        if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+            print(f"\n⚠️ Maintenance mode check failed: {type(e).__name__}")
         return False
 
 def send_heartbeat(ip_address, device_identity):
     try:
         url = f"http://{ip_address}/gs_DB/verify_sorter.php"
-        response = requests.post(url, json={'identity': device_identity})
+        response = requests.post(url, json={'identity': device_identity}, timeout=5)
         return response.status_code == 200
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error sending heartbeat: {e}")
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        # Silently fail on timeouts - continue running
+        return False
+    except Exception as e:
+        # Only print unexpected errors
+        if not any(err in str(type(e).__name__) for err in ['Timeout', 'ConnectionError']):
+            print(f"⚠️ Heartbeat error: {type(e).__name__}")
         return False
 
 def request_registration(ip_address, identity):
@@ -352,7 +363,8 @@ def request_registration(ip_address, identity):
         response = requests.post(
             url,
             json={'identity': identity},
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            timeout=5
         )
         if response.status_code == 200:
             data = response.json()
@@ -362,7 +374,8 @@ def request_registration(ip_address, identity):
                 else:
                     response = requests.post(
                         f"http://{ip_address}/gs_DB/add_waiting_device.php",
-                        json={'identity': identity}
+                        json={'identity': identity},
+                        timeout=5
                     )
                     if response.status_code == 200:
                         data = response.json()
@@ -510,7 +523,7 @@ def main():
     frame_count = 0
     mapping_url = f"http://{ip_address}/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
     try:
-        resp = requests.get(mapping_url)
+        resp = requests.get(mapping_url, timeout=5)
         mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
     except Exception as e:
         print(f"Warning: Could not fetch mapping, using default. {e}")
@@ -536,7 +549,7 @@ def main():
             else:
                 print("\n Exiting maintenance mode - Detection resumed")
                 try:
-                    resp = requests.get(mapping_url)
+                    resp = requests.get(mapping_url, timeout=5)
                     mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
                 except Exception as e:
                     print(f"Warning: Could not fetch mapping, using default. {e}")
@@ -589,7 +602,7 @@ def main():
                                 'confidence': float(conf),
                                 'image_data': image_base64,
                                 'is_maintenance': False
-                            })
+                            }, timeout=5)
                             if response.status_code == 200:
                                 print(f"✅ Sorting operation recorded")
                                 timestamp = datetime.now().strftime("%H:%M:%S")
