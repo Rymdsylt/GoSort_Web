@@ -195,6 +195,15 @@ if (!$user) {
             font-family: 'Inter', sans-serif;
         }
 
+        /* Ensure delete confirm modal always appears above other modals */
+        #deleteConfirmModal {
+            z-index: 1065;
+        }
+        #deleteConfirmModal + .modal-backdrop,
+        .modal-backdrop ~ .modal-backdrop {
+            z-index: 1060;
+        }
+
         .delete-btn {
             color: #dc3545;
             cursor: pointer;
@@ -444,13 +453,33 @@ if (!$user) {
         });
 
         let currentNotificationId = null;
-        const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        let deleteFromReadModal = false;
+        const deleteModalEl = document.getElementById('deleteConfirmModal');
+        const deleteModal = new bootstrap.Modal(deleteModalEl);
 
         // Handle deleting notifications
         $(document).on('click', '.delete-btn', function(e) {
             e.stopPropagation();
             currentNotificationId = $(this).closest('.notification-item').data('id');
+            deleteFromReadModal = $('#readNotificationsModal').hasClass('show');
             deleteModal.show();
+        });
+
+        // Fix backdrop z-index when delete modal opens on top of read modal
+        deleteModalEl.addEventListener('shown.bs.modal', function() {
+            // Ensure the latest backdrop is above the read modal
+            var backdrops = document.querySelectorAll('.modal-backdrop');
+            if (backdrops.length > 1) {
+                backdrops[backdrops.length - 1].style.zIndex = '1060';
+            }
+        });
+
+        // Restore body scroll when delete modal closes and read modal is still open
+        deleteModalEl.addEventListener('hidden.bs.modal', function() {
+            if (deleteFromReadModal && $('#readNotificationsModal').hasClass('show')) {
+                document.body.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
+            }
         });
 
         // Handle delete confirmation
