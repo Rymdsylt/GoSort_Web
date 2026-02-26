@@ -542,6 +542,302 @@ if ($sorters_result) {
         body:not(.modal-open) .modal-backdrop {
             display: none;
         }
+
+        /* ===== About Tab Styles ===== */
+        .about-card,
+        .team-card,
+        .dev-card,
+        .insight-card,
+        .stat-card,
+        .info-card {
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .about-card:hover,
+        .team-card:hover,
+        .dev-card:hover,
+        .insight-card:hover,
+        .stat-card:hover,
+        .info-card:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            border-color: var(--primary-green);
+        }
+
+        /* About Header */
+        .about-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .about-icon {
+            font-size: 2.5rem;
+            color: var(--primary-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .about-title {
+            margin: 0;
+            color: var(--dark-gray);
+            font-weight: 700;
+            font-size: 1.75rem;
+        }
+
+        .about-content p {
+            margin-bottom: 1rem;
+            line-height: 1.8;
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .about-content p strong {
+            color: var(--primary-green);
+            font-weight: 700;
+        }
+
+        /* Feature List */
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .feature-item {
+            text-align: center;
+            padding: 1.25rem;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #f8fdf6 0%, #f0f9eb 100%);
+            border: 1px solid #d4e8d4;
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
+            background: linear-gradient(135deg, #f0f9eb 0%, #e8f5e0 100%);
+            border-color: var(--primary-green);
+            transform: translateY(-4px);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--primary-green);
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .feature-text h6 {
+            font-weight: 700;
+            margin: 0.75rem 0 0.5rem;
+            color: var(--dark-gray);
+            font-size: 0.95rem;
+        }
+
+        .feature-text p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: #888;
+            line-height: 1.4;
+        }
+
+        /* Stat Card Header */
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--light-green);
+        }
+
+        .stat-card-title {
+            margin: 0;
+            font-weight: 700;
+            color: var(--dark-gray);
+            font-size: 1.1rem;
+        }
+
+        .stat-icon {
+            font-size: 1.75rem;
+            color: var(--primary-green);
+        }
+
+        /* Team List */
+        .team-list,
+        .dev-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .team-member,
+        .dev-member {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: linear-gradient(90deg, #f8fdf6 0%, #ffffff 100%);
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .team-member:hover,
+        .dev-member:hover {
+            background: #f0f9eb;
+            border-color: var(--primary-green);
+            transform: translateX(4px);
+        }
+
+        .team-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary-green);
+        }
+
+        .dev-icon {
+            font-size: 2.5rem;
+            color: var(--primary-green);
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .team-member h6,
+        .dev-member h6 {
+            margin: 0;
+            font-weight: 700;
+            color: var(--dark-gray);
+            font-size: 0.95rem;
+        }
+
+        .team-member p,
+        .dev-member p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        /* Insights List */
+        .insight-list {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        .insight-list li {
+            padding: 0.75rem 0 0.75rem 1.75rem;
+            position: relative;
+            color: #666;
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .insight-list li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary-green);
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .insight-list li b {
+            color: var(--primary-green);
+            font-weight: 700;
+        }
+
+        /* Statistics Items */
+        .stat-items {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1.25rem;
+            background: linear-gradient(135deg, #f8fdf6 0%, #f0f9eb 100%);
+            border-radius: 10px;
+            border: 1px solid #d4e8d4;
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary-green);
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary-green);
+        }
+
+        /* Info Content */
+        .info-content,
+        .release-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .info-content p,
+        .release-info p {
+            margin: 0;
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .info-content p i,
+        .release-info p i {
+            color: var(--primary-green);
+            font-size: 1.1rem;
+            min-width: 20px;
+        }
+
+        .info-content strong,
+        .release-info strong {
+            color: var(--dark-gray);
+            font-weight: 700;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .feature-list {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-items {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .about-title {
+                font-size: 1.4rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -568,6 +864,9 @@ if ($sorters_result) {
                 </button>
                 <button class="tab-btn" onclick="switchTab('history')">
                     <i class="bi bi-clock-history me-2"></i>Activity Logs
+                </button>
+                <button class="tab-btn" onclick="switchTab('about')">
+                    <i class="bi bi-info-circle me-2"></i>About GoSort
                 </button>
                 <button class="tab-btn" onclick="switchTab('support')">
                     <i class="bi bi-question-circle me-2"></i>Help/Support
@@ -776,8 +1075,15 @@ if ($sorters_result) {
                 <div id="history" class="tab-content">
                     <?php include 'settings_tabs/historytab.php'; ?>
                 </div>
+                
+                <!-- Tab 4: About -->
+                <div id="about" class="tab-content">
+                    <div class="content-area">
+                        <?php include 'settings_tabs/abouttab.php'; ?>
+                    </div>
+                </div>
 
-                <!-- Tab 4: Help/Support -->
+                <!-- Tab 5: Help/Support -->
                 <div id="support" class="tab-content">
                     <?php include 'settings_tabs/supporttab.php'; ?>
                 </div>
