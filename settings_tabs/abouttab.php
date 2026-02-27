@@ -1,7 +1,11 @@
 <?php
 //TO UPDATE BACKEND AND STATIC TEXTS
 ?>
-
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+</head>
+<body
 <!-- Main Content Grid -->
     <!-- Left Column: About GoSort + Additional Cards -->
     <div class="col-lg-12">
@@ -150,3 +154,5 @@
             </div>
         </div>
     </div>
+</body>
+</html>
