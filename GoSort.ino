@@ -377,12 +377,14 @@ void loop() {
       // Maintenance mode commands
       else if (inputString == "maintmode") {
         maintenanceMode = true;
+        sensorsActive = false;  // Pause sensor reading during maintenance
         maintenanceScrollPos = 0;
         lcd.clear();
         Serial.println("Entered maintenance mode");
       }
       else if (inputString == "maintend") {
         maintenanceMode = false;
+        sensorsActive = true;  // Resume sensor reading after maintenance
         lcd.clear();
         lcd.setCursor(0, 0);
         lcd.print("Ready             ");
