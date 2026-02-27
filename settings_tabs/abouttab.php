@@ -3,7 +3,6 @@
 ?>
 
 <!-- Main Content Grid -->
-<div class="row g-4">
     <!-- Left Column: About GoSort + Additional Cards -->
     <div class="col-lg-12">
         <!-- About GoSort -->
@@ -66,84 +65,88 @@
             </div>
         </div>
 
-        <!-- Custodial Team -->
-        <div class="team-card mb-4">
-            <div class="stat-card-header mb-3">
-                <h5 class="stat-card-title">Custodial Team</h5>
-                <div class="stat-icon">
-                    <i class="bi bi-people"></i>
+        <div class="row">
+            <!-- Custodial Team -->
+            <div class="col-lg-6">
+                <div class="team-card mb-4">
+                    <div class="stat-card-header mb-3">
+                        <h5 class="stat-card-title">Custodial Team</h5>
+                        <div class="stat-icon">
+                            <i class="bi bi-people"></i>
+                        </div>
+                    </div>
+                    <div class="team-list">
+                        <div class="team-member">
+                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
+                            <div>
+                                <h6>Marlon Lagramada</h6>
+                                <p>Utility Head</p>
+                            </div>
+                        </div>
+                        <div class="team-member">
+                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
+                            <div>
+                                <h6>Digna De Cagayunan</h6>
+                                <p>Utility Member</p>
+                            </div>
+                        </div>
+                        <div class="team-member">
+                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
+                            <div>
+                                <h6>Janice Ison</h6>
+                                <p>Utility Member</p>
+                            </div>
+                        </div>
+                        <div class="team-member">
+                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
+                            <div>
+                                <h6>Mira Luna Villadares</h6>
+                                <p>Utility Member</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="team-list">
-                <div class="team-member">
-                    <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                    <div>
-                        <h6>Marlon Lagramada</h6>
-                        <p>Utility Head</p>
-                    </div>
-                </div>
-                <div class="team-member">
-                    <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                    <div>
-                        <h6>Digna De Cagayunan</h6>
-                        <p>Utility Member</p>
-                    </div>
-                </div>
-                <div class="team-member">
-                    <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                    <div>
-                        <h6>Janice Ison</h6>
-                        <p>Utility Member</p>
-                    </div>
-                </div>
-                <div class="team-member">
-                    <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                    <div>
-                        <h6>Mira Luna Villadares</h6>
-                        <p>Utility Member</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Developers Behind GoSort -->
-        <div class="dev-card mb-4">
-            <div class="stat-card-header mb-3">
-                <h5 class="stat-card-title">Developers Behind GoSort</h5>
-                <div class="stat-icon">
-                    <i class="bi bi-code-slash"></i>
-                </div>
-            </div>
-            <div class="dev-list">
-                <div class="dev-member">
-                    <i class="bi bi-person-circle dev-icon"></i>
-                    <div>
-                        <h6>Gwyneth Beatrice Landero</h6>
-                        <p>Project Manager, UI/UX Designer</p>
+            <div class="col-lg-6">
+                <div class="dev-card mb-4">
+                    <div class="stat-card-header mb-3">
+                        <h5 class="stat-card-title">Developers Behind GoSort</h5>
+                        <div class="stat-icon">
+                            <i class="bi bi-code-slash"></i>
+                        </div>
                     </div>
-                </div>
-                <div class="dev-member">
-                    <i class="bi bi-person-circle dev-icon"></i>
-                    <div>
-                        <h6>Michael Josh Bargabino</h6>
-                        <p>Mobile App Developer</p>
-                    </div>
-                </div>
-                <div class="dev-member">
-                    <i class="bi bi-person-circle dev-icon"></i>
-                    <div>
-                        <h6>Miguel Roberto Sta. Maria</h6>
-                        <p>Web Developer</p>
-                    </div>
-                </div>
-                <div class="dev-member">
-                    <i class="bi bi-person-circle dev-icon"></i>
-                    <div>
-                        <h6>Diosdado Tempra Jr.</h6>
-                        <p>Tester, Researcher</p>
+                    <div class="dev-list">
+                        <div class="dev-member">
+                            <i class="bi bi-person-circle dev-icon"></i>
+                            <div>
+                                <h6>Gwyneth Beatrice Landero</h6>
+                                <p>Project Manager, UI/UX Designer</p>
+                            </div>
+                        </div>
+                        <div class="dev-member">
+                            <i class="bi bi-person-circle dev-icon"></i>
+                            <div>
+                                <h6>Michael Josh Bargabino</h6>
+                                <p>Mobile App Developer</p>
+                            </div>
+                        </div>
+                        <div class="dev-member">
+                            <i class="bi bi-person-circle dev-icon"></i>
+                            <div>
+                                <h6>Miguel Roberto Sta. Maria</h6>
+                                <p>Web Developer</p>
+                            </div>
+                        </div>
+                        <div class="dev-member">
+                            <i class="bi bi-person-circle dev-icon"></i>
+                            <div>
+                                <h6>Diosdado Tempra Jr.</h6>
+                                <p>Tester, Researcher</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
