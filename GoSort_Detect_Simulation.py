@@ -23,6 +23,62 @@ try:
 except ImportError:
     PYGAME_AVAILABLE = False
 
+class SortingRecord:
+    def __init__(self, sorter_id, trash_type, trash_class, confidence, image_base64, is_maintenance):
+        self.sorter_id = sorter_id
+        self.trash_type = trash_type
+        self.trash_class = trash_class
+        self.confidence = confidence
+        self.image_base64 = image_base64
+        self.is_maintenance = is_maintenance
+
+class SortingRecorderThread:
+    """Background thread for posting sorting records to server (async, non-blocking)"""
+    def __init__(self, base_path):
+        self.base_path = base_path
+        self.queue = Queue()
+        self.running = True
+        self.thread = Thread(target=self._process_queue, daemon=True)
+        self.thread.start()
+    
+    def queue_record(self, record):
+        """Queue a sorting record for async posting"""
+        self.queue.put(record)
+    
+    def _process_queue(self):
+        """Background worker that posts records to server"""
+        while self.running:
+            try:
+                if not self.queue.empty():
+                    record = self.queue.get(timeout=0.1)
+                    try:
+                        url = f"{self.base_path}/record_sorting.php"
+                        response = requests.post(url, json={
+                            'device_identity': record.sorter_id,
+                            'trash_type': record.trash_type,
+                            'trash_class': record.trash_class,
+                            'confidence': float(record.confidence),
+                            'image_data': record.image_base64,
+                            'is_maintenance': record.is_maintenance
+                        }, timeout=5)
+                        
+                        if response.status_code == 200:
+                            print(f"📤 [BG] Sorting record posted: {record.trash_type}")
+                        else:
+                            print(f"⚠️ [BG] Failed to post sorting record: {response.status_code}")
+                    except Exception as e:
+                        print(f"⚠️ [BG] Error posting sorting record: {e}")
+                else:
+                    time.sleep(0.01)
+            except Exception as e:
+                print(f"Error in sorting recorder: {e}")
+                time.sleep(0.1)
+    
+    def stop(self):
+        self.running = False
+        if self.thread.is_alive():
+            self.thread.join()
+
 def is_maintenance_mode():
     return os.path.exists('python_maintenance_mode.txt')
 
@@ -44,119 +100,31 @@ def save_config(config):
     with open('gosort_config.json', 'w') as f:
         json.dump(config, f)
 
-def get_base_path(ip_address):
-    """Determine the correct base path based on whether it's a local IP or domain"""
-    # If it's a local IP (contains dots and no dots at end, or starts with 192., 10., etc.)
-    if ip_address.replace('.', '').isdigit() or ip_address.startswith(('192.', '10.', '172.')):
-        return f"http://{ip_address}/GoSort_Web"
-    else:
-        # It's a domain name
-        return f"http://{ip_address}"
+def get_base_path():
+    """Return the fixed server URL"""
+    return "https://gosortweb-production.up.railway.app/gs_DB"
 
 def scan_network():
-    print("\nScanning network for available devices...")
-    available_ips = []
-    gosort_ips = []
-    import socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(('10.255.255.255', 1))
-        local_ip = s.getsockname()[0]
-    except Exception:
-        local_ip = '127.0.0.1'
-    finally:
-        s.close()
-    ip_parts = local_ip.split('.')
-    network_prefix = '.'.join(ip_parts[:3])
-    network_ips = [f"{network_prefix}.{i}" for i in range(1, 255)]
-    total_ips = len(network_ips)
-    scanned_ips = 0
-    print_lock = threading.Lock()
-    def update_progress():
-        nonlocal scanned_ips
-        with print_lock:
-            scanned_ips += 1
-            progress = (scanned_ips / total_ips) * 100
-            print(f"\rScanning network... {progress:.1f}% complete", end="", flush=True)
-    def check_ip(ip):
-        try:
-            response = requests.get(f"http://{ip}/gs_DB/trash_detected.php", timeout=0.5)
-            if response.status_code == 200 or (
-                response.status_code == 400 and "No trash type provided" in response.text
-            ):
-                gosort_ips.append(str(ip))
-            else:
-                available_ips.append(str(ip))
-        except:
-            pass
-        update_progress()
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        executor.map(check_ip, network_ips)
-    print("\n\nScan complete!")
-    gosort_ips = sorted(list(set(gosort_ips)))
-    available_ips = sorted(list(set(available_ips) - set(gosort_ips)))
-    return gosort_ips, available_ips
+    # Network scanning no longer needed - using fixed server URL
+    return [], []
 
-def check_server(ip):
+def check_server():
     print("\rChecking server...", end="", flush=True)
     try:
-        base_path = get_base_path(ip)
-        response = requests.get(f"{base_path}/gs_DB/trash_detected.php", timeout=5)
+        base_path = get_base_path()
+        response = requests.get(f"{base_path}/trash_detected.php", timeout=5)
         if response.status_code == 200 or (response.status_code == 400 and "No trash type provided" in response.text):
             print("\r✅ Server connection successful!")
             return True
-        print("\r❌ GoSort does not exist in this server")
+        print("\r❌ GoSort server is not reachable")
         return False
     except requests.exceptions.RequestException:
-        print("\r❌ GoSort does not exist in this server")
+        print("\r❌ GoSort server is not reachable")
         return False
 
 def get_ip_address():
-    config = load_config()
-    ip = config.get('ip_address')
-    while True:
-        if not ip:
-            gosort_ips, available_ips = scan_network()
-            if not gosort_ips and not available_ips:
-                print("\nNo devices found in the network.")
-                ip = input("\nEnter GoSort IP address manually (e.g., 192.168.1.100): ")
-            else:
-                print("\nAvailable IP addresses:")
-                if gosort_ips:
-                    print("\n🟢 GoSort servers found:")
-                    for i, ip_addr in enumerate(gosort_ips):
-                        print(f"{i+1}. {ip_addr}")
-                if available_ips:
-                    print("\n⚪ Other devices found:")
-                    offset = len(gosort_ips)
-                    for i, ip_addr in enumerate(available_ips):
-                        print(f"{i+offset+1}. {ip_addr}")
-                print(f"{len(gosort_ips) + len(available_ips) + 1}. Enter IP manually")
-                while True:
-                    try:
-                        choice = int(input("\nChoose an IP address (enter the number): "))
-                        if 1 <= choice <= len(gosort_ips):
-                            ip = gosort_ips[choice-1]
-                            break
-                        elif len(gosort_ips) < choice <= len(gosort_ips) + len(available_ips):
-                            ip = available_ips[choice-len(gosort_ips)-1]
-                            break
-                        elif choice == len(gosort_ips) + len(available_ips) + 1:
-                            ip = input("\nEnter GoSort IP address manually: ")
-                            break
-                        else:
-                            print("Invalid choice. Please try again.")
-                    except ValueError:
-                        print("Invalid input. Please enter a number.")
-        if check_server(ip):
-            config['ip_address'] = ip
-            save_config(config)
-            return ip
-        else:
-            ip = None
-            config['ip_address'] = None
-            save_config(config)
+    # Fixed server URL - no configuration needed
+    return get_base_path()
 
 def list_available_cameras(max_cams=10):
     available = []
@@ -320,9 +288,10 @@ def map_category_to_command(waste_type, mapping):
     }
     return default_commands.get(waste_type, 'ndeg')
 
-def check_maintenance_mode(ip_address, device_identity):
+def check_maintenance_mode(device_identity):
     try:
-        url = f"http://{ip_address}/gs_DB/check_maintenance.php"
+        base_path = get_base_path()
+        url = f"{base_path}/check_maintenance.php"
         response = requests.post(
             url,
             json={'identity': device_identity},
@@ -343,9 +312,10 @@ def check_maintenance_mode(ip_address, device_identity):
             print(f"\n⚠️ Maintenance mode check failed: {type(e).__name__}")
         return False
 
-def send_heartbeat(ip_address, device_identity):
+def send_heartbeat(device_identity):
     try:
-        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
+        base_path = get_base_path()
+        url = f"{base_path}/verify_sorter.php"
         response = requests.post(url, json={'identity': device_identity}, timeout=5)
         return response.status_code == 200
     except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
@@ -357,9 +327,10 @@ def send_heartbeat(ip_address, device_identity):
             print(f"⚠️ Heartbeat error: {type(e).__name__}")
         return False
 
-def request_registration(ip_address, identity):
+def request_registration(identity):
     try:
-        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
+        base_path = get_base_path()
+        url = f"{base_path}/verify_sorter.php"
         response = requests.post(
             url,
             json={'identity': identity},
@@ -373,7 +344,7 @@ def request_registration(ip_address, identity):
                     return True, None
                 else:
                     response = requests.post(
-                        f"http://{ip_address}/gs_DB/add_waiting_device.php",
+                        f"{base_path}/add_waiting_device.php",
                         json={'identity': identity},
                         timeout=5
                     )
@@ -393,10 +364,8 @@ def request_registration(ip_address, identity):
 
 def main():
     config = load_config()
-    ip_address = get_ip_address()
-    config['ip_address'] = ip_address
-    save_config(config)
-    print(f"\nUsing GoSort server at: {ip_address}")
+    base_path = get_base_path()
+    print(f"\nUsing GoSort server at: {base_path}")
     sorting_history = []
     current_view = 'kiosk'
     a_key_pressed = False
@@ -410,7 +379,7 @@ def main():
     sorter_id = config.get('sorter_id')
     print(f"Using Sorter Identity: {sorter_id}")
     print("\nVerifying server connection...")
-    if not send_heartbeat(ip_address, sorter_id):
+    if not send_heartbeat(sorter_id):
         print("❌ Failed to connect to the server")
         return
     print("\nRequesting device registration with the server...")
@@ -419,12 +388,12 @@ def main():
     def print_waiting_menu():
         print("\n\nOptions while waiting:")
         print("r - Reconfigure Identity")
-        print("c - Clear All Configuration")
+        print("c - Clear Configuration")
         print("q - Quit")
         print("\nPress any other key to check registration status...")
     import msvcrt
     while not registered:
-        registered, status = request_registration(ip_address, sorter_id)
+        registered, status = request_registration(sorter_id)
         if registered:
             print("\n✅ Device registration confirmed!")
             break
@@ -521,7 +490,7 @@ def main():
     fps = 0
     fps_time = time.time()
     frame_count = 0
-    mapping_url = f"http://{ip_address}/gs_DB/save_sorter_mapping.php?device_identity={sorter_id}"
+    mapping_url = f"{base_path}/save_sorter_mapping.php?device_identity={sorter_id}"
     try:
         resp = requests.get(mapping_url, timeout=5)
         mapping = resp.json().get('mapping', {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'})
@@ -529,6 +498,9 @@ def main():
         print(f"Warning: Could not fetch mapping, using default. {e}")
         mapping = {'zdeg': 'bio', 'ndeg': 'nbio', 'odeg': 'hazardous'}
     trash_to_cmd = {v: k for k, v in mapping.items()}
+    
+    # Start the async sorting recorder thread
+    sorting_recorder = SortingRecorderThread(base_path)
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -541,7 +513,7 @@ def main():
                 last_heartbeat = current_time
             else:
                 print("\n Failed to send heartbeat")
-        current_maintenance = check_maintenance_mode(ip_address, sorter_id)
+        current_maintenance = check_maintenance_mode(sorter_id)
         if current_maintenance != last_maintenance_status:
             if current_maintenance:
                 print("\n Entering maintenance mode - Detection paused")
@@ -728,6 +700,7 @@ def main():
             print("\n👋 Exiting application...")
             break
     cap.release()
+    sorting_recorder.stop()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
