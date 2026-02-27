@@ -310,6 +310,93 @@ class MaintenanceChecker:
         if self.thread.is_alive():
             self.thread.join()
 
+class MaintenanceCommandChecker:
+    """Background thread for checking and executing maintenance commands"""
+    def __init__(self, base_path, sorter_id, command_handler):
+        self.base_path = base_path
+        self.sorter_id = sorter_id
+        self.command_handler = command_handler
+        self.running = True
+        self.thread = Thread(target=self._check_loop, daemon=True)
+        self.thread.start()
+    
+    def _check_loop(self):
+        """Background loop to check for maintenance commands"""
+        while self.running:
+            try:
+                response = requests.post(
+                    f"{self.base_path}/check_maintenance_commands.php",
+                    json={'device_identity': self.sorter_id},
+                    headers={'Content-Type': 'application/json'},
+                    timeout=5
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('success') and data.get('command'):
+                        command = data['command']
+                        self._execute_command(command)
+            except:
+                pass
+            time.sleep(1)  # Check every 1 second
+    
+    def _execute_command(self, command):
+        """Execute a maintenance command"""
+        print(f"\n📡 Received maintenance command: {command}")
+        
+        if command == 'shutdown':
+            print("⚠️ Shutdown command received. Shutting down computer...")
+            try:
+                requests.post(
+                    f"{self.base_path}/mark_command_executed.php",
+                    json={'device_identity': self.sorter_id, 'command': command},
+                    timeout=5
+                )
+            except:
+                pass
+            os.system('shutdown /s /t 1 /f')
+            time.sleep(5)
+            return
+        
+        # For other commands, queue to Arduino
+        if self.command_handler and command in ['ndeg', 'zdeg', 'odeg', 'mdeg', 'unclog', 'sweep1', 'sweep2']:
+            print(f"🔧 Sending maintenance command to Arduino: {command}")
+            
+            # Special handling for maintenance-specific commands
+            if command in ['unclog', 'sweep1', 'sweep2']:
+                # Enable maintenance mode first
+                maintenance_cmd = ArduinoCommand("maintmode\n")
+                self.command_handler.command_queue.put(maintenance_cmd)
+                maintenance_cmd.wait_for_completion(timeout=10)
+                time.sleep(0.5)
+            
+            # Send the actual command
+            cmd = ArduinoCommand(f"{command}\n")
+            self.command_handler.command_queue.put(cmd)
+            cmd.wait_for_completion(timeout=15)
+            
+            # Exit maintenance mode if needed
+            if command in ['unclog', 'sweep1', 'sweep2']:
+                time.sleep(0.5)
+                end_cmd = ArduinoCommand("maintend\n")
+                self.command_handler.command_queue.put(end_cmd)
+                end_cmd.wait_for_completion(timeout=10)
+        
+        # Mark command as executed on server
+        try:
+            requests.post(
+                f"{self.base_path}/mark_command_executed.php",
+                json={'device_identity': self.sorter_id, 'command': command},
+                timeout=5
+            )
+            print(f"✅ Command executed: {command}")
+        except Exception as e:
+            print(f"⚠️ Error marking command as executed: {e}")
+    
+    def stop(self):
+        self.running = False
+        if self.thread.is_alive():
+            self.thread.join()
+
 class HeartbeatSender:
     """Background thread for sending heartbeats"""
     def __init__(self, base_path, sorter_id):
@@ -830,6 +917,9 @@ def main():
 
     trash_to_cmd = {v: k for k, v in mapping.items()}
 
+    # Initialize maintenance command checker
+    maintenance_command_checker = MaintenanceCommandChecker(base_path, sorter_id, command_handler) if command_handler else None
+
     while True:
         frame = stream.read()
         frame_count += 1
@@ -1059,6 +1149,8 @@ def main():
     sorting_recorder.stop()
     bin_fullness_recorder.stop()
     maintenance_checker.stop()
+    if maintenance_command_checker:
+        maintenance_command_checker.stop()
     heartbeat_sender.stop()
     stream.stop()
     if command_handler:
