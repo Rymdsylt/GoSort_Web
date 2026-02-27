@@ -42,7 +42,7 @@ def load_config():
     if os.path.exists(config_file):
         with open(config_file, 'r') as f:
             return json.load(f)
-    return {'ip_address': None, 'sorter_id': None}
+    return {'sorter_id': None}
 
 def save_config(config):
     with open('gosort_config.json', 'w') as f:
@@ -246,12 +246,12 @@ def main():
     def print_waiting_menu():
         print("\n\nOptions while waiting:")
         print("r - Reconfigure Identity")
-        print("c - Clear Configuration")
+        print("a - Reconfigure All (IP and Identity)")
         print("q - Quit")
         print("\nPress any other key to check registration status...")
 
     while not registered:
-        registered, status = request_registration(config['sorter_id'])
+        registered, status = request_registration(ip_address, config['sorter_id'])
         
         if registered:
             print("\n✅ Device registration confirmed!")
@@ -274,19 +274,20 @@ def main():
                 print("\n⏳ Trying with new identity:", config['sorter_id'])
                 first_request = True  # Reset to show the waiting message again
                 continue
-            elif key == 'c':
-                print("\n⚙️ Clearing Configuration...")
+            elif key == 'a':
+                print("\n⚙️ Reconfiguring All Settings...")
                 # Remove from waiting devices before clearing config
-                remove_from_waiting_devices(config['sorter_id'])
-                # Clear identity
+                remove_from_waiting_devices(ip_address, config['sorter_id'])
+                # Clear IP and identity
+                config['ip_address'] = None
                 config['sorter_id'] = None
                 save_config(config)
-                print("\n✅ Configuration cleared. Please restart the application.")
+                print("\n✅ All configuration cleared. Please restart the application.")
                 return
             elif key == 'q':
                 print("\n❌ Registration cancelled. Exiting...")
                 # Remove from waiting devices before exiting
-                remove_from_waiting_devices(config['sorter_id'])
+                remove_from_waiting_devices(ip_address, config['sorter_id'])
                 return
             else:
                 print("\nChecking registration status...", end="", flush=True)
@@ -342,7 +343,7 @@ def main():
                     while simulated_responses:
                         response = simulated_responses.pop(0)
                         if response.startswith('bin_fullness:'):
-                            process_bin_fullness(response, config['sorter_id'])
+                            process_bin_fullness(response, ip_address, config['sorter_id'])
                         else:
                             print(f"\n🟢 Arduino (Simulated): {response}")
                     
@@ -406,7 +407,7 @@ def main():
                 
             try:
                 response = requests.post(
-                    f"{base_path}/gs_DB/check_maintenance_commands.php",
+                    f"{base_path}/check_maintenance_commands.php",
                     json={'device_identity': config['sorter_id']},
                     headers={'Content-Type': 'application/json'},
                     timeout=5
@@ -448,7 +449,7 @@ def main():
                             if trash_type:
                                 try:
                                     requests.post(
-                                        f"{base_path}/gs_DB/record_sorting.php",
+                                        f"{base_path}/record_sorting.php",
                                         json={
                                             'device_identity': config['sorter_id'],
                                             'trash_type': trash_type,
@@ -461,7 +462,7 @@ def main():
                         
                         # Mark command as executed
                         requests.post(
-                            f"{base_path}/gs_DB/mark_command_executed.php",
+                            f"{base_path}/mark_command_executed.php",
                             json={'device_identity': config['sorter_id'], 'command': command},
                             timeout=5
                         )
@@ -470,7 +471,7 @@ def main():
                             # Mark command as executed before shutdown
                             try:
                                 requests.post(
-                                    f"{base_path}/gs_DB/mark_command_executed.php",
+                                    f"{base_path}/mark_command_executed.php",
                                     json={'device_identity': config['sorter_id'], 'command': command},
                                     timeout=5
                                 )
@@ -521,7 +522,7 @@ def main():
                             
                             # Record the sorting action
                             try:
-                                sorting_url = f"{base_path}/gs_DB/record_sorting.php"
+                                sorting_url = f"{base_path}/record_sorting.php"
                                 response = requests.post(
                                     sorting_url,
                                     json={
