@@ -70,6 +70,16 @@ class ArduinoCommand:
     def __init__(self, command):
         self.command = command
         self.done = False
+        self.event = threading.Event()  # Event to signal completion
+    
+    def wait_for_completion(self, timeout=10):
+        """Wait for the command to complete (Arduino sends 'ready')"""
+        return self.event.wait(timeout=timeout)
+    
+    def mark_done(self):
+        """Mark the command as done and signal waiting threads"""
+        self.done = True
+        self.event.set()
 
 class SortingRecord:
     def __init__(self, sorter_id, trash_type, trash_class, confidence, image_base64, is_maintenance):
@@ -198,6 +208,7 @@ class CommandHandler:
                             print(f"🟢 Arduino: {response}")
                             if response == "ready":
                                 waiting_for_ready = False
+                                cmd.mark_done()  # Signal that command is complete
                                 print("✅ Arduino ready for next command")
                     cmd.done = True
                 time.sleep(0.01)
@@ -938,10 +949,16 @@ def main():
                             # Send command to Arduino if available (non-blocking queue)
                             if command_handler is not None:
                                 if command_handler.command_queue.empty():
-                                    print(f"⏱️ Queued sorting command: {command}")
+                                    print(f"⏱️ Sending sorting command: {command}")
                                     cmd = ArduinoCommand(f"{command}\n")
                                     command_handler.command_queue.put(cmd)
-                                    # Don't wait - continue detection immediately
+                                    
+                                    # **WAIT for servo to finish sorting**
+                                    print("⏸️  Detection paused - waiting for servo to finish...")
+                                    if cmd.wait_for_completion(timeout=15):
+                                        print("✅ Servo finished - resuming detection")
+                                    else:
+                                        print("⚠️ Servo timeout - resuming detection anyway")
                                 else:
                                     print("⏳ Arduino busy - skipping this detection")
                                     
