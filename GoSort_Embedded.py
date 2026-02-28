@@ -435,13 +435,15 @@ class MaintenanceChecker:
 
 class AsyncDisplayThread:
     """Background thread for displaying frames and handling keyboard/mouse input asynchronously"""
-    def __init__(self, frame_height=480, available_cams=None):
+    def __init__(self, frame_height=480, available_cams=None, mouse_callback=None):
         self.frame_height = frame_height
         self.available_cams = available_cams or []
         self.display_queue = Queue(maxsize=1)  # Keep only latest frame to avoid lag
         self.keyboard_queue = Queue()
         self.current_view = 'both'
         self.running = True
+        self.mouse_callback = mouse_callback
+        self.mouse_callback_set = False  # Track if we've set the callback
         self.thread = Thread(target=self._display_loop, daemon=True)
         self.thread.start()
     
@@ -464,6 +466,11 @@ class AsyncDisplayThread:
         """Update the view mode (both/camera/kiosk)"""
         self.current_view = view
     
+    def set_mouse_callback(self, mouse_callback):
+        """Set or update the mouse callback (can be called from main loop)"""
+        self.mouse_callback = mouse_callback
+        self.mouse_callback_set = False  # Reset flag to re-register callback next frame
+    
     def _display_loop(self):
         """Background loop for all display operations"""
         detection_window_exists = False
@@ -479,11 +486,16 @@ class AsyncDisplayThread:
                 # Show/hide detection window based on view mode
                 if self.current_view in ['both', 'camera']:
                     cv2.imshow("GoSort Detection", combined_frame)
+                    # Set mouse callback only once when window is first created
+                    if not self.mouse_callback_set and self.mouse_callback:
+                        cv2.setMouseCallback("GoSort Detection", self.mouse_callback)
+                        self.mouse_callback_set = True
                     detection_window_exists = True
                 else:
                     if detection_window_exists:
                         try:
                             cv2.destroyWindow("GoSort Detection")
+                            self.mouse_callback_set = False  # Reset flag when window is destroyed
                         except:
                             pass
                         detection_window_exists = False
@@ -1139,6 +1151,14 @@ def main():
     screen_width, screen_height = get_screen_resolution()
     print(f"Detected screen resolution: {screen_width}x{screen_height}")
     
+    # Detect available cameras for display renderer
+    print("Searching for available cameras...")
+    available_cams = list_available_cameras()
+    
+    if not available_cams:
+        print("No cameras found!")
+        return
+    
     # Initialize UI renderer thread for async kiosk display with detected screen dimensions
     ui_renderer = AsyncUIRenderThread(kiosk_width=screen_width, kiosk_height=screen_height)
     
@@ -1217,14 +1237,6 @@ def main():
         arduino_connected = False
         def check_arduino_connection():
             return False
-
-    print("Searching for available cameras...")
-
-    available_cams = list_available_cameras()
-    
-    if not available_cams:
-        print("No cameras found!")
-        return
 
     cam_index = available_cams[0]
     current_cam_idx = 0  # Index into available_cams list
@@ -1508,7 +1520,8 @@ def main():
                         display_renderer.stop()
                         exit()
 
-        cv2.setMouseCallback("GoSort Detection", mouse_callback)
+        # Update mouse callback with current callback (in case it changed)
+        display_renderer.set_mouse_callback(mouse_callback)
         
         # Handle keyboard input from async display thread (non-blocking)
         key = display_renderer.get_keyboard_input()
