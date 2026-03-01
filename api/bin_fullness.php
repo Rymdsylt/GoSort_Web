@@ -36,32 +36,14 @@ try {
         4 => 'hazardous'  // case 4 is odeg
     ];
     
-    // Default display names
-    $binNameMap = [
-        'bio' => 'Bio',
-        'nbio' => 'Non-Bio',
-        'hazardous' => 'Hazardous',
-        'mixed' => 'Mixed'
-    ];
-    
     if ($mappingResult && $mappingRow = $mappingResult->fetch_assoc()) {
-        // Map sensor cases to their configured trash types from sorter_mapping table
+        // Map sensor cases to their configured trash types from sorter_mapping
         $sensorMap = [
             1 => $mappingRow['ndeg'],  // case 1 is ndeg
             2 => $mappingRow['zdeg'],  // case 2 is zdeg
             3 => $mappingRow['mdeg'],  // case 3 is mdeg
             4 => $mappingRow['odeg']   // case 4 is odeg
         ];
-        
-        // Build binNameMap dynamically from the configured values
-        // This creates display names based on what's configured in the database
-        $configuredTypes = array_unique($sensorMap);
-        foreach ($configuredTypes as $trashType) {
-            if (!isset($binNameMap[$trashType])) {
-                // Capitalize the trash type for display
-                $binNameMap[$trashType] = ucwords(str_replace(['_', '-'], ' ', $trashType));
-            }
-        }
     }
     
     // Query to get the last 20 entries for the given device
@@ -84,25 +66,9 @@ try {
 
     $bins = [];
     while ($row = $result->fetch_assoc()) {
-        // Translate bin_name from Arduino's hardcoded names to configured trash types
-        $ardunoBinName = $row['bin_name'];
-        $trashType = strtolower(str_replace(' ', '', $ardunoBinName));
-        $trashType = str_replace('-', '', $trashType);
-        
-        // Map Arduino names to internal codes
-        $nameMap = [
-            'nonbio' => 'nbio',
-            'non-bio' => 'nbio',
-            'bio' => 'bio',
-            'hazardous' => 'hazardous',
-            'mixed' => 'mixed'
-        ];
-        
-        $internalType = $nameMap[$trashType] ?? 'mixed';
-        
         // Find which sensor case sent this reading based on the Arduino name
         $sensorCase = 0;
-        switch($ardunoBinName) {
+        switch($row['bin_name']) {
             case 'Non-Bio':
                 $sensorCase = 1;
                 break;
@@ -117,13 +83,12 @@ try {
                 break;
         }
         
-        // Get the configured trash type for this sensor case
-        $configuredType = $sensorMap[$sensorCase] ?? $internalType;
-        $displayName = $binNameMap[$configuredType] ?? $configuredType;
+        // Get the configured trash type for this sensor case from sorter_mapping
+        $configuredType = $sensorMap[$sensorCase] ?? 'mixed';
         
         $bins[] = [
             'device_identity' => $row['device_identity'],
-            'bin_name' => $displayName,
+            'bin_name' => $configuredType,
             'distance' => (int)$row['distance'],
             'fullness_percentage' => (int)$row['fullness_percentage'],
             'timestamp' => $row['timestamp']
