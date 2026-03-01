@@ -36,7 +36,7 @@ try {
         4 => 'hazardous'  // case 4 is odeg
     ];
     
-    // If mapping exists, use it to determine actual bin names
+    // Default display names
     $binNameMap = [
         'bio' => 'Bio',
         'nbio' => 'Non-Bio',
@@ -45,13 +45,23 @@ try {
     ];
     
     if ($mappingResult && $mappingRow = $mappingResult->fetch_assoc()) {
-        // Map sensor cases to their configured trash types
+        // Map sensor cases to their configured trash types from sorter_mapping table
         $sensorMap = [
             1 => $mappingRow['ndeg'],  // case 1 is ndeg
             2 => $mappingRow['zdeg'],  // case 2 is zdeg
             3 => $mappingRow['mdeg'],  // case 3 is mdeg
             4 => $mappingRow['odeg']   // case 4 is odeg
         ];
+        
+        // Build binNameMap dynamically from the configured values
+        // This creates display names based on what's configured in the database
+        $configuredTypes = array_unique($sensorMap);
+        foreach ($configuredTypes as $trashType) {
+            if (!isset($binNameMap[$trashType])) {
+                // Capitalize the trash type for display
+                $binNameMap[$trashType] = ucwords(str_replace(['_', '-'], ' ', $trashType));
+            }
+        }
     }
     
     // Query to get the last 20 entries for the given device
