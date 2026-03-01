@@ -21,31 +21,6 @@ if (!$device_identity) {
 }
 
 try {
-    // Get the sorter mapping for this device to translate bin names dynamically
-    $mappingQuery = "SELECT zdeg, ndeg, odeg, mdeg FROM sorter_mapping WHERE device_identity = ?";
-    $mappingStmt = $conn->prepare($mappingQuery);
-    $mappingStmt->bind_param("s", $device_identity);
-    $mappingStmt->execute();
-    $mappingResult = $mappingStmt->get_result();
-    
-    // Default mapping if not found
-    $sensorMap = [
-        1 => 'nbio',      // case 1 is ndeg
-        2 => 'bio',       // case 2 is zdeg
-        3 => 'mixed',     // case 3 is mdeg
-        4 => 'hazardous'  // case 4 is odeg
-    ];
-    
-    if ($mappingResult && $mappingRow = $mappingResult->fetch_assoc()) {
-        // Map sensor cases to their configured trash types from sorter_mapping
-        $sensorMap = [
-            1 => $mappingRow['ndeg'],  // case 1 is ndeg
-            2 => $mappingRow['zdeg'],  // case 2 is zdeg
-            3 => $mappingRow['mdeg'],  // case 3 is mdeg
-            4 => $mappingRow['odeg']   // case 4 is odeg
-        ];
-    }
-    
     // Query to get the last 20 entries for the given device
     $query = "
         SELECT bf.*,
@@ -66,29 +41,9 @@ try {
 
     $bins = [];
     while ($row = $result->fetch_assoc()) {
-        // Find which sensor case sent this reading based on the Arduino name
-        $sensorCase = 0;
-        switch($row['bin_name']) {
-            case 'Non-Bio':
-                $sensorCase = 1;
-                break;
-            case 'Bio':
-                $sensorCase = 2;
-                break;
-            case 'Hazardous':
-                $sensorCase = 3;
-                break;
-            case 'Mixed':
-                $sensorCase = 4;
-                break;
-        }
-        
-        // Get the configured trash type for this sensor case from sorter_mapping
-        $configuredType = $sensorMap[$sensorCase] ?? 'mixed';
-        
         $bins[] = [
             'device_identity' => $row['device_identity'],
-            'bin_name' => $configuredType,
+            'bin_name' => $row['bin_name'],
             'distance' => (int)$row['distance'],
             'fullness_percentage' => (int)$row['fullness_percentage'],
             'timestamp' => $row['timestamp']
