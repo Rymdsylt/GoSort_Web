@@ -21,46 +21,37 @@ if (!$device_identity) {
 }
 
 try {
-    // Get the sorter mapping for this device
-    // Sensor mapping (from Arduino):
-    // TRIG_PIN_1 / ECHO_PIN_1 = Front - Left (zdeg)
-    // TRIG_PIN_2 / ECHO_PIN_2 = Back - Left (ndeg)
-    // TRIG_PIN_3 / ECHO_PIN_3 = Back - Right (odeg)
-    // TRIG_PIN_4 / ECHO_PIN_4 = Front - Right (mdeg)
+    // Define sensor mapping (physical hardware pins)
+    // trig/echo_1 = front left (zdeg)
+    // trig/echo_2 = back left (ndeg)
+    // trig/echo_3 = back right (odeg)
+    // trig/echo_4 = front right (mdeg)
+    $sensor_to_position = [
+        'trig/echo_1' => 'zdeg',
+        'trig/echo_2' => 'ndeg',
+        'trig/echo_3' => 'odeg',
+        'trig/echo_4' => 'mdeg'
+    ];
+
+    // Fetch sorter mapping for this device
+    $mapping_query = "SELECT zdeg, ndeg, odeg, mdeg FROM sorter_mapping WHERE device_identity = ?";
+    $mapping_stmt = $conn->prepare($mapping_query);
+    $mapping_stmt->bind_param("s", $device_identity);
+    $mapping_stmt->execute();
+    $mapping_result = $mapping_stmt->get_result();
     
-    $mapping = [];
-    $mapStmt = $conn->prepare("SELECT zdeg, ndeg, odeg, mdeg FROM sorter_mapping WHERE device_identity = ?");
-    $mapStmt->bind_param("s", $device_identity);
-    $mapStmt->execute();
-    $mapResult = $mapStmt->get_result();
-    
-    if ($mapResult && $mapResult->num_rows > 0) {
-        $mapRow = $mapResult->fetch_assoc();
-        // Map sensor number to trash type based on servo position
-        $mapping = [
-            1 => $mapRow['zdeg'],    // Sensor 1 -> zdeg (Front - Left)
-            2 => $mapRow['ndeg'],    // Sensor 2 -> ndeg (Back - Left)
-            3 => $mapRow['odeg'],    // Sensor 3 -> odeg (Back - Right)
-            4 => $mapRow['mdeg']     // Sensor 4 -> mdeg (Front - Right)
-        ];
-    } else {
-        // Default mapping if not found
-        $mapping = [
-            1 => 'bio',
-            2 => 'nbio',
-            3 => 'hazardous',
-            4 => 'mixed'
-        ];
-    }
-    
-    // Map internal values to display names
-    $trashTypeLabels = [
-        'bio' => 'Bio',
-        'nbio' => 'Non-Bio',
-        'hazardous' => 'Hazardous',
-        'mixed' => 'Mixed'
+    // Use default mapping if not found
+    $sorter_mapping = [
+        'zdeg' => 'bio',
+        'ndeg' => 'nbio',
+        'odeg' => 'hazardous',
+        'mdeg' => 'mixed'
     ];
     
+    if ($mapping_row = $mapping_result->fetch_assoc()) {
+        $sorter_mapping = $mapping_row;
+    }
+
     // Query to get the last 20 entries for the given device
     $query = "
         SELECT bf.*,
@@ -81,22 +72,34 @@ try {
 
     $bins = [];
     while ($row = $result->fetch_assoc()) {
-        // Determine which sensor this bin_name came from and get the dynamic bin type
-        $dynamicBinName = $row['bin_name'];
+        // Map the bin_name from database (which is stored as trash type) to the correct servo position
+        $trash_type = strtolower($row['bin_name']);
+        $mapped_position = null;
         
-        // Try to match the bin name to determine its sensor position
-        foreach ($mapping as $sensorNum => $trashType) {
-            // The bin_name in the database should match our dynamically mapped type
-            // If bin_name doesn't match current mapping, use as-is for backward compatibility
-            if (isset($trashTypeLabels[$trashType])) {
-                // Store the dynamically mapped name
-                $dynamicBinName = $trashTypeLabels[$trashType];
+        // Find which servo position maps to this trash type
+        foreach ($sorter_mapping as $position => $type) {
+            if (strtolower($type) === $trash_type) {
+                $mapped_position = $position;
+                break;
+            }
+        }
+        
+        // Determine sensor number from mapped position
+        $sensor_name = $trash_type;
+        if ($mapped_position) {
+            foreach ($sensor_to_position as $sensor => $position) {
+                if ($position === $mapped_position) {
+                    $sensor_name = $sensor;
+                    break;
+                }
             }
         }
         
         $bins[] = [
             'device_identity' => $row['device_identity'],
-            'bin_name' => $dynamicBinName,
+            'bin_name' => $row['bin_name'],
+            'sensor' => $sensor_name,
+            'servo_position' => $mapped_position,
             'distance' => (int)$row['distance'],
             'fullness_percentage' => (int)$row['fullness_percentage'],
             'timestamp' => $row['timestamp']
