@@ -21,37 +21,30 @@ if (!$device_identity) {
 }
 
 try {
-    // Define sensor mapping (physical hardware pins)
-    // trig/echo_1 = front left (zdeg)
-    // trig/echo_2 = back left (ndeg)
-    // trig/echo_3 = back right (odeg)
-    // trig/echo_4 = front right (mdeg)
-    $sensor_to_position = [
-        'trig/echo_1' => 'zdeg',
-        'trig/echo_2' => 'ndeg',
-        'trig/echo_3' => 'odeg',
-        'trig/echo_4' => 'mdeg'
-    ];
-
-    // Fetch sorter mapping for this device
-    $mapping_query = "SELECT zdeg, ndeg, odeg, mdeg FROM sorter_mapping WHERE device_identity = ?";
-    $mapping_stmt = $conn->prepare($mapping_query);
-    $mapping_stmt->bind_param("s", $device_identity);
-    $mapping_stmt->execute();
-    $mapping_result = $mapping_stmt->get_result();
+    // Fetch the sorter mapping for this device
+    // Sensor mapping: TRIG_PIN_1/ECHO_PIN_1 = zdeg, TRIG_PIN_2/ECHO_PIN_2 = ndeg, TRIG_PIN_3/ECHO_PIN_3 = odeg, TRIG_PIN_4/ECHO_PIN_4 = mdeg
+    $mappingQuery = "SELECT zdeg, ndeg, odeg, mdeg FROM sorter_mapping WHERE device_identity = ?";
+    $mappingStmt = $conn->prepare($mappingQuery);
+    $mappingStmt->bind_param("s", $device_identity);
+    $mappingStmt->execute();
+    $mappingResult = $mappingStmt->get_result();
     
-    // Use default mapping if not found
-    $sorter_mapping = [
-        'zdeg' => 'bio',
-        'ndeg' => 'nbio',
-        'odeg' => 'hazardous',
-        'mdeg' => 'mixed'
-    ];
+    $mapping = ['zdeg' => 'bio', 'ndeg' => 'nbio', 'odeg' => 'hazardous', 'mdeg' => 'mixed'];
     
-    if ($mapping_row = $mapping_result->fetch_assoc()) {
-        $sorter_mapping = $mapping_row;
+    if ($mappingResult->num_rows > 0) {
+        $mapping = $mappingResult->fetch_assoc();
     }
-
+    
+    // Create a reverse map from stored bin_name to the correct mapped trash type
+    // bin_fullness.bin_name comes from Arduino in order: "Non-Bio" (sensor 1/zdeg), "Bio" (sensor 2/ndeg), "Hazardous" (sensor 3/odeg), "Mixed" (sensor 4/mdeg)
+    // We need to map these to the actual trash types from sorter_mapping
+    $sensorToBinType = [
+        'Non-Bio' => $mapping['zdeg'],      // Sensor 1 (TRIG_PIN_1/ECHO_PIN_1) = zdeg position
+        'Bio' => $mapping['ndeg'],          // Sensor 2 (TRIG_PIN_2/ECHO_PIN_2) = ndeg position
+        'Hazardous' => $mapping['odeg'],    // Sensor 3 (TRIG_PIN_3/ECHO_PIN_3) = odeg position
+        'Mixed Waste' => $mapping['mdeg']   // Sensor 4 (TRIG_PIN_4/ECHO_PIN_4) = mdeg position
+    ];
+    
     // Query to get the last 20 entries for the given device
     $query = "
         SELECT bf.*,
@@ -72,34 +65,12 @@ try {
 
     $bins = [];
     while ($row = $result->fetch_assoc()) {
-        // Map the bin_name from database (which is stored as trash type) to the correct servo position
-        $trash_type = strtolower($row['bin_name']);
-        $mapped_position = null;
-        
-        // Find which servo position maps to this trash type
-        foreach ($sorter_mapping as $position => $type) {
-            if (strtolower($type) === $trash_type) {
-                $mapped_position = $position;
-                break;
-            }
-        }
-        
-        // Determine sensor number from mapped position
-        $sensor_name = $trash_type;
-        if ($mapped_position) {
-            foreach ($sensor_to_position as $sensor => $position) {
-                if ($position === $mapped_position) {
-                    $sensor_name = $sensor;
-                    break;
-                }
-            }
-        }
+        // Map the Arduino sensor bin_name to the dynamically mapped trash type
+        $mappedBinName = $sensorToBinType[$row['bin_name']] ?? $row['bin_name'];
         
         $bins[] = [
             'device_identity' => $row['device_identity'],
-            'bin_name' => $row['bin_name'],
-            'sensor' => $sensor_name,
-            'servo_position' => $mapped_position,
+            'bin_name' => $mappedBinName,
             'distance' => (int)$row['distance'],
             'fullness_percentage' => (int)$row['fullness_percentage'],
             'timestamp' => $row['timestamp']
