@@ -36,6 +36,14 @@ try {
         4 => 'mixed'      // case 4 sends "Mixed" → maps to mdeg
     ];
     
+    // Map internal codes to display names
+    $displayNameMap = [
+        'nbio' => 'Non-Bio',
+        'bio' => 'Bio',
+        'hazardous' => 'Hazardous',
+        'mixed' => 'Mixed'
+    ];
+    
     if ($mappingResult && $mappingRow = $mappingResult->fetch_assoc()) {
         // Map Arduino sensor cases to their configured trash types from sorter_mapping
         $sensorMap = [
@@ -85,10 +93,11 @@ try {
         
         // Get the configured trash type for this sensor case from sorter_mapping
         $configuredType = $sensorMap[$sensorCase] ?? 'mixed';
+        $displayName = $displayNameMap[$configuredType] ?? $configuredType;
         
         $bins[] = [
             'device_identity' => $row['device_identity'],
-            'bin_name' => $configuredType,
+            'bin_name' => $displayName,
             'distance' => (int)$row['distance'],
             'fullness_percentage' => (int)$row['fullness_percentage'],
             'timestamp' => $row['timestamp']
