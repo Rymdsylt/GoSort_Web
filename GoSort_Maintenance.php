@@ -618,22 +618,22 @@ if (!$device_id || !$device_identity) {
                     <div class="servo-mapping-container" style="grid-template-columns: repeat(2, 1fr); max-width: 640px;">
                         <div class="servo-position servo-position-front servo-position-left">
                             <h6>Front - Left</h6>
-                            <button id="btn-zdeg" class="btn btn-outline-success quadrant-btn">Bio</button>
+                            <button id="btn-mdeg" class="btn btn-outline-secondary quadrant-btn">Mixed</button>
                         </div>
 
                         <div class="servo-position servo-position-front servo-position-right">
                             <h6>Front - Right</h6>
-                            <button id="btn-ndeg" class="btn btn-outline-danger quadrant-btn">Non-Bio</button>
+                            <button id="btn-zdeg" class="btn btn-outline-success quadrant-btn">Bio</button>
                         </div>
 
                         <div class="servo-position servo-position-back servo-position-left">
                             <h6>Back - Left</h6>
-                            <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Hazardous</button>
+                            <button id="btn-ndeg" class="btn btn-outline-danger quadrant-btn">Non-Bio</button>
                         </div>
 
                         <div class="servo-position servo-position-back servo-position-right">
                             <h6>Back - Right</h6>
-                            <button id="btn-mdeg" class="btn btn-outline-secondary quadrant-btn">Mixed</button>
+                            <button id="btn-odeg" class="btn btn-outline-warning quadrant-btn">Hazardous</button>
                         </div>
 
                     </div>
@@ -1227,16 +1227,16 @@ function updateQuadrantButtons() {
 
 function updateMappingPreview() {
     const mapToLabel = {bio: 'Bio', nbio: 'Non-Bio', hazardous: 'Hazardous', mixed: 'Mixed'};
-    // Map internal quadrant keys to UI positions according to GoSort.py default_mapping
-    // Front - Left  -> zdeg
-    // Front - Right -> ndeg
-    // Back - Left   -> odeg
-    // Back - Right  -> mdeg
+    // Map internal quadrant keys to UI positions
+    // Front - Left  -> mdeg
+    // Front - Right -> zdeg
+    // Back - Left   -> ndeg
+    // Back - Right  -> odeg
     const previewMap = {
-        zdeg: 'preview-front-left',   // Front - Left (Bio)
-        ndeg: 'preview-front-right',  // Front - Right (Non-Bio)
-        odeg: 'preview-back-left',    // Back - Left (Hazardous)
-        mdeg: 'preview-back-right'    // Back - Right (Mixed)
+        mdeg: 'preview-front-left',   // Front - Left (Mixed)
+        zdeg: 'preview-front-right',  // Front - Right (Bio)
+        ndeg: 'preview-back-left',    // Back - Left (Non-Bio)
+        odeg: 'preview-back-right'    // Back - Right (Hazardous)
     };
 
     Object.keys(previewMap).forEach(servoKey => {
