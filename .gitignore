@@ -13,3 +13,4 @@ node_modules/
 __pycache__/
 
 test_results.txt
+gosort_config.json
