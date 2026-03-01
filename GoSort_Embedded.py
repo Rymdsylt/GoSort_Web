@@ -18,8 +18,43 @@ import platform
 import cpuinfo
 from datetime import datetime
 
+try:
+    import tkinter as tk
+    TKINTER_AVAILABLE = True
+except ImportError:
+    TKINTER_AVAILABLE = False
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
+try:
+    import pygame
+    PYGAME_AVAILABLE = True
+    pygame.mixer.init()
+except ImportError:
+    PYGAME_AVAILABLE = False
+
 def is_maintenance_mode():
     return os.path.exists('python_maintenance_mode.txt')
+
+def get_screen_resolution():
+    """Detect screen resolution, default to 1920x1080 if detection fails"""
+    try:
+        if TKINTER_AVAILABLE:
+            root = tk.Tk()
+            root.withdraw()  # Hide the window
+            width = root.winfo_screenwidth()
+            height = root.winfo_screenheight()
+            root.destroy()
+            return (width, height)
+    except Exception:
+        pass
+    
+    # Fallback to common resolutions based on common aspect ratios
+    return (1920, 1080)
 
 def load_categories():
     categories_file = 'categories.json'
@@ -38,6 +73,94 @@ def load_config():
 def save_config(config):
     with open('gosort_config.json', 'w') as f:
         json.dump(config, f)
+
+def play_sorting_audio(waste_type):
+    """Play audio file based on waste type in a separate thread (non-blocking)"""
+    if not PYGAME_AVAILABLE:
+        return
+    
+    def play_audio_thread():
+        # Map waste types to audio files
+        audio_files = {
+            'bio': 'audio/biodegradable.mp3',
+            'nbio': 'audio/nonbiodegradable.mp3',
+            'hazardous': 'audio/hazardous.mp3',
+            'mixed': 'audio/mixed.mp3'
+        }
+        
+        audio_file = audio_files.get(waste_type)
+        if audio_file and os.path.exists(audio_file):
+            try:
+                pygame.mixer.music.load(audio_file)
+                pygame.mixer.music.play()
+                print(f"🔊 Playing audio for: {waste_type}")
+            except Exception as e:
+                print(f"\n⚠️ Error playing audio: {e}")
+    
+    # Start audio in a separate thread so it doesn't block UI updates
+    audio_thread = Thread(target=play_audio_thread, daemon=True)
+    audio_thread.start()
+
+def get_poppins_font(font_size):
+    """Try to load Poppins font, return None if not available"""
+    if not PIL_AVAILABLE:
+        return None
+    
+    font_paths = [
+        'fonts/Poppins-Regular.ttf',
+        'fonts/Poppins-SemiBold.ttf',
+        'C:/Windows/Fonts/poppins.ttf',
+        'C:/Windows/Fonts/Poppins-Regular.ttf',
+    ]
+    
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, font_size)
+            except:
+                continue
+    
+    # Try system default sans-serif
+    try:
+        return ImageFont.truetype("arial.ttf", font_size)
+    except:
+        return ImageFont.load_default()
+
+def get_text_size_pil(text, font):
+    """Get text size using PIL font"""
+    if font is None:
+        return (len(text) * 20, 30)  # Rough estimate
+    try:
+        bbox = font.getbbox(text)
+        return (bbox[2] - bbox[0], bbox[3] - bbox[1])
+    except:
+        return (len(text) * 20, 30)
+
+def draw_text_with_font(img, text, position, font_size, color, use_poppins=True):
+    """Draw text with Poppins font if available, otherwise use OpenCV default"""
+    if PIL_AVAILABLE and use_poppins:
+        try:
+            font = get_poppins_font(font_size)
+            
+            # Convert OpenCV image to PIL
+            img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(img_pil)
+            
+            # Draw text - convert BGR to RGB for PIL
+            color_rgb = (color[2], color[1], color[0])
+            draw.text(position, text, font=font, fill=color_rgb)
+            
+            # Convert back to OpenCV format
+            img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+            return img
+        except Exception as e:
+            # Fallback to OpenCV if PIL fails
+            pass
+    
+    # Fallback to OpenCV font
+    scale = font_size / 30.0
+    cv2.putText(img, text, position, cv2.FONT_HERSHEY_SIMPLEX, scale, color, 2)
+    return img
 
 def get_base_path():
     """Return the fixed server URL"""
@@ -304,6 +427,220 @@ class MaintenanceChecker:
     
     def is_maintenance(self):
         return self.maintenance_mode
+    
+    def stop(self):
+        self.running = False
+        if self.thread.is_alive():
+            self.thread.join()
+
+class AsyncDisplayThread:
+    """Background thread for displaying frames and handling keyboard/mouse input asynchronously"""
+    def __init__(self, frame_height=480, available_cams=None, mouse_callback=None):
+        self.frame_height = frame_height
+        self.available_cams = available_cams or []
+        self.display_queue = Queue(maxsize=1)  # Keep only latest frame to avoid lag
+        self.keyboard_queue = Queue()
+        self.current_view = 'both'
+        self.running = True
+        self.mouse_callback = mouse_callback
+        self.mouse_callback_set = False  # Track if we've set the callback
+        self.thread = Thread(target=self._display_loop, daemon=True)
+        self.thread.start()
+    
+    def queue_frame(self, frame, ui_panel, kiosk_ui):
+        """Queue a frame for display (non-blocking, drops old frames to avoid lag)"""
+        try:
+            self.display_queue.get_nowait()  # Remove old frame
+        except:
+            pass
+        self.display_queue.put((frame, ui_panel, kiosk_ui))
+    
+    def get_keyboard_input(self):
+        """Get keyboard input from display thread (non-blocking)"""
+        try:
+            return self.keyboard_queue.get_nowait()
+        except:
+            return None
+    
+    def set_view_mode(self, view):
+        """Update the view mode (both/camera/kiosk)"""
+        self.current_view = view
+    
+    def set_mouse_callback(self, mouse_callback):
+        """Set or update the mouse callback (can be called from main loop)"""
+        self.mouse_callback = mouse_callback
+        self.mouse_callback_set = False  # Reset flag to re-register callback next frame
+    
+    def _display_loop(self):
+        """Background loop for all display operations"""
+        detection_window_exists = False
+        kiosk_window_exists = False
+        
+        while self.running:
+            try:
+                frame, ui_panel, kiosk_ui = self.display_queue.get(timeout=0.01)
+                
+                # Combine detection frame with UI panel
+                combined_frame = np.vstack((frame, ui_panel))
+                
+                # Show/hide detection window based on view mode
+                if self.current_view in ['both', 'camera']:
+                    cv2.imshow("GoSort Detection", combined_frame)
+                    # Set mouse callback only once when window is first created
+                    if not self.mouse_callback_set and self.mouse_callback:
+                        cv2.setMouseCallback("GoSort Detection", self.mouse_callback)
+                        self.mouse_callback_set = True
+                    detection_window_exists = True
+                else:
+                    if detection_window_exists:
+                        try:
+                            cv2.destroyWindow("GoSort Detection")
+                            self.mouse_callback_set = False  # Reset flag when window is destroyed
+                        except:
+                            pass
+                        detection_window_exists = False
+                
+                # Show/hide kiosk window based on view mode
+                if self.current_view in ['both', 'kiosk']:
+                    cv2.imshow("GoSort Kiosk", kiosk_ui)
+                    cv2.setWindowProperty("GoSort Kiosk", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+                    kiosk_window_exists = True
+                else:
+                    if kiosk_window_exists:
+                        try:
+                            cv2.destroyWindow("GoSort Kiosk")
+                        except:
+                            pass
+                        kiosk_window_exists = False
+                
+                # Get keyboard input (non-blocking)
+                key = cv2.waitKey(1) & 0xFF
+                if key != 255:
+                    self.keyboard_queue.put(key)
+                    
+            except:
+                # Queue timeout/empty - just continue
+                pass
+    
+    def stop(self):
+        self.running = False
+        if self.thread.is_alive():
+            self.thread.join()
+
+class AsyncUIRenderThread:
+    """Background thread for rendering UI asynchronously (non-blocking)"""
+    def __init__(self, kiosk_width=640, kiosk_height=480):
+        self.kiosk_width = kiosk_width
+        self.kiosk_height = kiosk_height
+        self.sorting_history = []
+        self.history_lock = Lock()
+        self.running = True
+        self.thread = Thread(target=self._render_loop, daemon=True)
+        self.thread.start()
+    
+    def add_to_history(self, waste_type):
+        """Add a detected item to sorting history (thread-safe)"""
+        with self.history_lock:
+            self.sorting_history.insert(0, {'waste_type': waste_type, 'timestamp': datetime.now()})
+            # Keep only last 10 items
+            if len(self.sorting_history) > 10:
+                self.sorting_history.pop()
+    
+    def get_kiosk_ui(self):
+        """Get the current kiosk UI frame (non-blocking)"""
+        with self.history_lock:
+            return self._draw_kiosk_ui(list(self.sorting_history))
+    
+    def _draw_kiosk_ui(self, sorting_history):
+        """Create a simplified kiosk-style UI showing only the last sorted item"""
+        # Webapp color scheme (BGR format for OpenCV)
+        bg_color = (239, 243, 243)  # #F3F3EF - app background
+        primary_green = (23, 74, 39)  # #274a17 - primary green
+        dark_gray = (55, 47, 31)  # #1f2937 - dark gray text
+        medium_gray = (128, 114, 107)  # #6b7280 - medium gray
+        
+        # Waste type colors (BGR format)
+        waste_colors = {
+            'bio': (129, 185, 16),  # #10b981 - green
+            'nbio': (68, 68, 239),  # #ef4444 - red
+            'hazardous': (11, 158, 245),  # #f59e0b - orange/amber
+            'mixed': (128, 114, 107)  # #6b7280 - gray
+        }
+        
+        # Simplified waste names
+        waste_names = {
+            'bio': 'Biodegradable',
+            'nbio': 'Non-Biodegradable',
+            'hazardous': 'Hazardous',
+            'mixed': 'Mixed'
+        }
+        
+        # Create background with webapp color
+        kiosk_frame = np.full((self.kiosk_height, self.kiosk_width, 3), bg_color, dtype=np.uint8)
+        
+        # Simple header
+        header_height = 80
+        cv2.rectangle(kiosk_frame, (0, 0), (self.kiosk_width, header_height), primary_green, -1)
+        
+        # GoSort title
+        kiosk_frame = draw_text_with_font(kiosk_frame, "GoSort", 
+                                          (20, 30), 36, (255, 255, 255))
+        
+        # Display only the last sorted item
+        if not sorting_history:
+            # Show "No items sorted yet" message
+            center_x = self.kiosk_width // 2
+            center_y = self.kiosk_height // 2
+            no_items_text = "No items sorted yet"
+            text_size = cv2.getTextSize(no_items_text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)[0]
+            text_x = center_x - text_size[0] // 2
+            kiosk_frame = draw_text_with_font(kiosk_frame, no_items_text, 
+                                             (text_x, center_y), 28, medium_gray)
+        else:
+            # Get the most recent (first) item
+            last_item = sorting_history[0]
+            waste_type = last_item.get('waste_type', 'nbio')
+            waste_label = waste_names.get(waste_type, 'Unknown')
+            color = waste_colors.get(waste_type, medium_gray)
+            
+            # Center the content
+            center_x = self.kiosk_width // 2
+            center_y = self.kiosk_height // 2 - 30
+            
+            # "Sorted:" text
+            sorted_text = "Sorted:"
+            
+            # Calculate text widths (use OpenCV for simplicity in embedded)
+            sorted_size = cv2.getTextSize(sorted_text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 2)[0]
+            waste_size = cv2.getTextSize(waste_label, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 2)[0]
+            
+            # Calculate starting position to center both texts together
+            total_width = sorted_size[0] + waste_size[0] + 20  # 20px spacing
+            start_x = center_x - total_width // 2
+            
+            # Draw "Sorted:" text
+            kiosk_frame = draw_text_with_font(kiosk_frame, sorted_text, 
+                                             (start_x, center_y), 36, dark_gray)
+            
+            # Draw waste type text in color (next to "Sorted:")
+            waste_x = start_x + sorted_size[0] + 20
+            kiosk_frame = draw_text_with_font(kiosk_frame, waste_label, 
+                                             (waste_x, center_y), 36, color)
+            
+            # "Have a nice day" message below
+            nice_day_y = center_y + 70
+            nice_day_text = "Have a nice day"
+            nice_day_size = cv2.getTextSize(nice_day_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+            nice_day_x = center_x - nice_day_size[0] // 2
+            kiosk_frame = draw_text_with_font(kiosk_frame, nice_day_text, 
+                                             (nice_day_x, nice_day_y), 24, medium_gray)
+        
+        return kiosk_frame
+    
+    def _render_loop(self):
+        """Background loop for UI rendering"""
+        while self.running:
+            time.sleep(0.1)  # Light background task
     
     def stop(self):
         self.running = False
@@ -810,6 +1147,24 @@ def main():
     sorting_recorder = SortingRecorderThread(base_path)
     bin_fullness_recorder = BinFullnessRecorderThread(base_path)
     
+    # Get screen resolution for responsive UI
+    screen_width, screen_height = get_screen_resolution()
+    print(f"Detected screen resolution: {screen_width}x{screen_height}")
+    
+    # Detect available cameras for display renderer
+    print("Searching for available cameras...")
+    available_cams = list_available_cameras()
+    
+    if not available_cams:
+        print("No cameras found!")
+        return
+    
+    # Initialize UI renderer thread for async kiosk display with detected screen dimensions
+    ui_renderer = AsyncUIRenderThread(kiosk_width=screen_width, kiosk_height=screen_height)
+    
+    # Initialize async display thread for non-blocking UI rendering (improves FPS)
+    display_renderer = AsyncDisplayThread(frame_height=480, available_cams=available_cams)
+    
     # Initialize background threads for maintenance and heartbeat
     maintenance_checker = MaintenanceChecker(base_path, sorter_id)
     heartbeat_sender = HeartbeatSender(base_path, sorter_id)
@@ -883,14 +1238,6 @@ def main():
         def check_arduino_connection():
             return False
 
-    print("Searching for available cameras...")
-
-    available_cams = list_available_cameras()
-    
-    if not available_cams:
-        print("No cameras found!")
-        return
-
     cam_index = available_cams[0]
     current_cam_idx = 0  # Index into available_cams list
     print(f"Using camera index: {cam_index}")
@@ -919,6 +1266,11 @@ def main():
 
     # Initialize maintenance command checker
     maintenance_command_checker = MaintenanceCommandChecker(base_path, sorter_id, command_handler) if command_handler else None
+
+    # Initialize view toggle state: 'both', 'camera', or 'kiosk'
+    current_view = 'both'  # Start with both views visible
+    a_key_pressed = False
+    a_key_time = 0
 
     while True:
         frame = stream.read()
@@ -1035,6 +1387,12 @@ def main():
                             sorting_recorder.queue_record(record)
                             
                             print(f"✅ Detection: {detected_item} ({conf:.2f}) - Queued for posting")
+                            
+                            # Play audio feedback asynchronously (non-blocking)
+                            play_sorting_audio(trash_type)
+                            
+                            # Add to UI history for kiosk display (non-blocking)
+                            ui_renderer.add_to_history(trash_type)
 
                             # Send command to Arduino if available (non-blocking queue)
                             if command_handler is not None:
@@ -1057,34 +1415,52 @@ def main():
 
         ui_panel = np.zeros((100, frame.shape[1], 3), dtype=np.uint8)
         
-        # Server Status button (showing fixed server in use)
-        cv2.rectangle(ui_panel, (10, 10), (150, 40), (100, 200, 255), -1)
-        cv2.putText(ui_panel, "Server OK", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        # Maintenance Mode Indicator
+        if current_maintenance:
+            cv2.rectangle(ui_panel, (10, 10), (200, 40), (0, 0, 255), -1)
+            cv2.putText(ui_panel, "MAINTENANCE MODE", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            status_x = 210
+        else:
+            # Server Status button (showing fixed server in use)
+            cv2.rectangle(ui_panel, (10, 10), (150, 40), (100, 200, 255), -1)
+            cv2.putText(ui_panel, "Server OK", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+            status_x = 160
         
         # Change Identity button
-        cv2.rectangle(ui_panel, (170, 10), (310, 40), (0, 255, 0), -1)
-        cv2.putText(ui_panel, "Change ID", (190, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        cv2.rectangle(ui_panel, (status_x + 10, 10), (status_x + 150, 40), (0, 255, 0), -1)
+        cv2.putText(ui_panel, "Change ID", (status_x + 30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
         
         # Switch Camera button
-        cv2.rectangle(ui_panel, (330, 10), (490, 40), (100, 200, 255), -1)
+        cv2.rectangle(ui_panel, (status_x + 160, 10), (status_x + 320, 40), (100, 200, 255), -1)
         camera_label = f"Camera ({current_cam_idx + 1}/{len(available_cams)})"
-        cv2.putText(ui_panel, camera_label, (345, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        cv2.putText(ui_panel, camera_label, (status_x + 175, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
         
         # Reconfigure All button
-        cv2.rectangle(ui_panel, (510, 10), (650, 40), (0, 255, 0), -1)
-        cv2.putText(ui_panel, "Reconfig All", (520, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        cv2.rectangle(ui_panel, (status_x + 330, 10), (status_x + 470, 40), (0, 255, 0), -1)
+        cv2.putText(ui_panel, "Reconfig All", (status_x + 340, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
         
         # Exit button
-        cv2.rectangle(ui_panel, (670, 10), (810, 40), (0, 0, 255), -1)
-        cv2.putText(ui_panel, "Exit", (715, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.rectangle(ui_panel, (status_x + 480, 10), (status_x + 620, 40), (0, 0, 255), -1)
+        cv2.putText(ui_panel, "Exit", (status_x + 525, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
         cv2.putText(frame, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         device_text = f"GPU: {device_name}" if torch.cuda.is_available() else f"CPU: {device_name}"
         cv2.putText(frame, device_text, (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # Display current view mode
+        view_text = f"View: {current_view.upper()} (Press A+S to toggle)"
+        text_size = cv2.getTextSize(view_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)[0]
+        text_x = frame.shape[1] - text_size[0] - 10
+        cv2.putText(frame, view_text, (text_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         combined_frame = np.vstack((frame, ui_panel))
+        
+        # Get async kiosk UI (non-blocking)
+        kiosk_ui = ui_renderer.get_kiosk_ui()
 
-        cv2.imshow("GoSort Detection", combined_frame)
+        # Queue frame for async display (non-blocking - main loop doesn't wait)
+        display_renderer.current_view = current_view
+        display_renderer.queue_frame(frame, ui_panel, kiosk_ui)
         
         # Handle mouse events
         def mouse_callback(event, x, y, flags, param):
@@ -1093,9 +1469,12 @@ def main():
                 # Adjust y coordinate to account for the main frame
                 y = y - frame.shape[0]
                 if 10 <= y <= 40:  # Button row
+                    # Calculate status_x based on maintenance mode
+                    status_x_local = 210 if current_maintenance else 160
+                    
                     if 10 <= x <= 150:  # Change IP button
-                        print(f"\n✅ Using fixed GoSort server: {base_path}")
-                    elif 170 <= x <= 310:  # Change Identity button
+                        pass
+                    elif status_x_local + 10 <= x <= status_x_local + 150:  # Change Identity button
                         print("\nReconfiguring Sorter Identity")
                         sorter_id = input("Enter new Sorter Identity (e.g., Sorter1): ")
                         config = load_config()
@@ -1106,10 +1485,12 @@ def main():
                         stream.stop()
                         if command_handler:
                             command_handler.stop()
+                        ui_renderer.stop()
+                        display_renderer.stop()
                         exit()
-                    elif 330 <= x <= 490:  # Switch Camera button
+                    elif status_x_local + 160 <= x <= status_x_local + 320:  # Switch Camera button
                         if len(available_cams) > 1:
-                            print("\n🔄 Switching camera...")
+                            print("\n� Switching camera...")
                             stream.stop()
                             current_cam_idx = (current_cam_idx + 1) % len(available_cams)
                             cam_index = available_cams[current_cam_idx]
@@ -1118,7 +1499,7 @@ def main():
                             time.sleep(1.0)
                         else:
                             print("\n⚠️ Only one camera available")
-                    elif 510 <= x <= 650:  # Reconfigure All button
+                    elif status_x_local + 330 <= x <= status_x_local + 470:  # Reconfigure All button
                         print("\nReconfiguring All Settings")
                         config = {}
                         save_config(config)
@@ -1127,23 +1508,52 @@ def main():
                         stream.stop()
                         if command_handler:
                             command_handler.stop()
+                        ui_renderer.stop()
+                        display_renderer.stop()
                         exit()
-                    elif 670 <= x <= 810:  # Exit button
+                    elif status_x_local + 480 <= x <= status_x_local + 620:  # Exit button
                         cv2.destroyAllWindows()
                         stream.stop()
                         if command_handler:
                             command_handler.stop()
+                        ui_renderer.stop()
+                        display_renderer.stop()
                         exit()
 
-        cv2.setMouseCallback("GoSort Detection", mouse_callback)
+        # Update mouse callback with current callback (in case it changed)
+        display_renderer.set_mouse_callback(mouse_callback)
         
-        # Handle keyboard input
-        key = cv2.waitKey(1) & 0xFF
+        # Handle keyboard input from async display thread (non-blocking)
+        key = display_renderer.get_keyboard_input()
         
-        # Quit on 'q' or ESC key
-        if key == ord('q') or key == 27:  # 27 is ESC key
-            print("\n👋 Exiting application...")
-            break
+        if key:
+            # Check for 'a' or 'A' key
+            if key == ord('a') or key == ord('A'):
+                a_key_pressed = True
+                a_key_time = time.time()
+            
+            # Check for 's' or 'S' key (after 'a' was pressed)
+            if (key == ord('s') or key == ord('S')) and a_key_pressed:
+                # Toggle view mode
+                if current_view == 'both':
+                    current_view = 'camera'
+                    print("\n📺 View Mode: Camera Only")
+                elif current_view == 'camera':
+                    current_view = 'kiosk'
+                    print("\n📱 View Mode: Kiosk Only")
+                elif current_view == 'kiosk':
+                    current_view = 'both'
+                    print("\n👁️  View Mode: Both")
+                a_key_pressed = False
+            
+            # Quit on 'q' or ESC key
+            if key == ord('q') or key == 27:  # 27 is ESC key
+                print("\n👋 Exiting application...")
+                break
+        
+        # Reset 'a' key flag if too much time has passed
+        if a_key_pressed and time.time() - a_key_time > 0.5:
+            a_key_pressed = False
 
     # Release resources
     sorting_recorder.stop()
@@ -1152,6 +1562,8 @@ def main():
     if maintenance_command_checker:
         maintenance_command_checker.stop()
     heartbeat_sender.stop()
+    ui_renderer.stop()
+    display_renderer.stop()
     stream.stop()
     if command_handler:
         command_handler.stop()

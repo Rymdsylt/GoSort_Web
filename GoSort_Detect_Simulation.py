@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 import base64
 import torch
+from threading import Thread
+from queue import Queue
 from ultralytics import YOLO
 from datetime import datetime
 try:
@@ -483,6 +485,7 @@ def main():
         print("No cameras found!")
         return
     cam_index = available_cams[0]
+    current_cam_idx = 0
     print(f"Using camera index: {cam_index}")
     print("Starting video stream...")
     cap = cv2.VideoCapture(cam_index)
@@ -509,7 +512,7 @@ def main():
         frame_count += 1
         current_time = time.time()
         if current_time - last_heartbeat >= heartbeat_interval:
-            if send_heartbeat(ip_address, sorter_id):
+            if send_heartbeat(sorter_id):
                 last_heartbeat = current_time
             else:
                 print("\n Failed to send heartbeat")
@@ -566,40 +569,55 @@ def main():
                             image_base64 = base64.b64encode(buffer).decode('utf-8')
                             detected_classes = [detected_item]
                             trash_class_str = ', '.join(detected_classes)
-                            url = f"http://{ip_address}/gs_DB/record_sorting.php"
-                            response = requests.post(url, json={
-                                'device_identity': sorter_id,
-                                'trash_type': trash_type,
-                                'trash_class': trash_class_str,
-                                'confidence': float(conf),
-                                'image_data': image_base64,
-                                'is_maintenance': False
-                            }, timeout=5)
-                            if response.status_code == 200:
-                                print(f"✅ Sorting operation recorded")
-                                timestamp = datetime.now().strftime("%H:%M:%S")
-                                sorting_history.insert(0, {
-                                    'waste_type': trash_type,
-                                    'item_name': detected_item,
-                                    'timestamp': timestamp,
-                                    'confidence': float(conf)
-                                })
-                                if len(sorting_history) > 20:
-                                    sorting_history.pop()
-                                play_sorting_audio(trash_type)
-                            else:
-                                print(f"❌ Failed to record sorting operation")
+                            
+                            # Queue sorting operation to async thread (non-blocking)
+                            record = SortingRecord(
+                                sorter_id=sorter_id,
+                                trash_type=trash_type,
+                                trash_class=trash_class_str,
+                                confidence=float(conf),
+                                image_base64=image_base64,
+                                is_maintenance=False
+                            )
+                            sorting_recorder.queue_record(record)
+                            
+                            # Update sorting history immediately (optimistic UI update)
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            sorting_history.insert(0, {
+                                'waste_type': trash_type,
+                                'item_name': detected_item,
+                                'timestamp': timestamp,
+                                'confidence': float(conf)
+                            })
+                            if len(sorting_history) > 20:
+                                sorting_history.pop()
+                            
+                            # Play audio for the sorted waste type (non-blocking)
+                            play_sorting_audio(trash_type)
+                            print(f"✅ Detection: {detected_item} ({conf:.2f}) - Queued for posting")
                         except Exception as e:
                             print(f"❌ Error processing detection: {e}")
         ui_panel = np.zeros((100, frame.shape[1], 3), dtype=np.uint8)
-        cv2.rectangle(ui_panel, (10, 10), (150, 40), (0, 255, 0), -1)
-        cv2.putText(ui_panel, "Change IP", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        
+        # Server Status button (showing fixed server in use)
+        cv2.rectangle(ui_panel, (10, 10), (150, 40), (100, 200, 255), -1)
+        cv2.putText(ui_panel, "Server OK", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        
+        # Change Identity button
         cv2.rectangle(ui_panel, (170, 10), (310, 40), (0, 255, 0), -1)
         cv2.putText(ui_panel, "Change ID", (190, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-        cv2.rectangle(ui_panel, (330, 10), (470, 40), (0, 255, 0), -1)
-        cv2.putText(ui_panel, "Reconfig All", (340, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-        cv2.rectangle(ui_panel, (490, 10), (630, 40), (0, 0, 255), -1)
-        cv2.putText(ui_panel, "Exit", (535, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        # Switch Camera button
+        cv2.rectangle(ui_panel, (330, 10), (490, 40), (100, 200, 255), -1)  # Orange color
+        cv2.putText(ui_panel, "Switch Cam", (345, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        
+        # Reconfigure All button
+        cv2.rectangle(ui_panel, (510, 10), (650, 40), (0, 255, 0), -1)
+        cv2.putText(ui_panel, "Reconfig All", (520, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        
+        # Exit button
+        cv2.rectangle(ui_panel, (670, 10), (810, 40), (0, 0, 255), -1)
+        cv2.putText(ui_panel, "Exit", (715, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.putText(frame, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         device_text = f"GPU: {device_name}" if torch.cuda.is_available() else f"CPU: {device_name}"
         cv2.putText(frame, device_text, (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
@@ -645,12 +663,8 @@ def main():
                 y = y - frame.shape[0]
                 if 10 <= y <= 40:
                     if 10 <= x <= 150:
-                        config = load_config()
-                        config['ip_address'] = None
-                        save_config(config)
-                        nonlocal ip_address
-                        ip_address = get_ip_address()
-                        print(f"\nUpdated GoSort server address to: {ip_address}")
+                        # Using fixed server URL now - no IP configuration needed
+                        print(f"\n✅ Using fixed GoSort server: {base_path}")
                     elif 170 <= x <= 310:
                         print("\nReconfiguring Sorter Identity")
                         sorter_id = input("Enter new Sorter Identity (e.g., Sorter1): ")
@@ -661,7 +675,15 @@ def main():
                         cv2.destroyAllWindows()
                         cap.release()
                         exit()
-                    elif 330 <= x <= 470:
+                    elif 330 <= x <= 490:
+                        print("\n🔄 Switching camera...")
+                        current_cam_idx = (current_cam_idx + 1) % len(available_cams)
+                        cam_index = available_cams[current_cam_idx]
+                        print(f"Switched to camera {current_cam_idx + 1}/{len(available_cams)} (Index: {cam_index})")
+                        cap.release()
+                        cap = cv2.VideoCapture(cam_index)
+                        time.sleep(1.0)
+                    elif 510 <= x <= 650:
                         print("\nReconfiguring All Settings")
                         config = {}
                         save_config(config)
@@ -669,7 +691,7 @@ def main():
                         cv2.destroyAllWindows()
                         cap.release()
                         exit()
-                    elif 490 <= x <= 630:
+                    elif 670 <= x <= 810:
                         cv2.destroyAllWindows()
                         cap.release()
                         exit()
