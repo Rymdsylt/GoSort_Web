@@ -21,6 +21,31 @@ if (!$device_identity) {
 }
 
 try {
+    // Get the sorter mapping for this device to translate bin names dynamically
+    $mappingQuery = "SELECT zdeg, ndeg, odeg, mdeg FROM sorter_mapping WHERE device_identity = ?";
+    $mappingStmt = $conn->prepare($mappingQuery);
+    $mappingStmt->bind_param("s", $device_identity);
+    $mappingStmt->execute();
+    $mappingResult = $mappingStmt->get_result();
+    
+    // Default mapping if not found (default Arduino layout)
+    $sensorMap = [
+        1 => 'nbio',      // case 1 sends "Non-Bio" → maps to ndeg
+        2 => 'bio',       // case 2 sends "Bio" → maps to zdeg
+        3 => 'hazardous', // case 3 sends "Hazardous" → maps to odeg
+        4 => 'mixed'      // case 4 sends "Mixed" → maps to mdeg
+    ];
+    
+    if ($mappingResult && $mappingRow = $mappingResult->fetch_assoc()) {
+        // Map Arduino sensor cases to their configured trash types from sorter_mapping
+        $sensorMap = [
+            1 => $mappingRow['ndeg'],  // Arduino case 1 (Non-Bio) → configured ndeg
+            2 => $mappingRow['zdeg'],  // Arduino case 2 (Bio) → configured zdeg
+            3 => $mappingRow['odeg'],  // Arduino case 3 (Hazardous) → configured odeg
+            4 => $mappingRow['mdeg']   // Arduino case 4 (Mixed) → configured mdeg
+        ];
+    }
+    
     // Query to get the last 20 entries for the given device
     $query = "
         SELECT bf.*,
@@ -41,9 +66,29 @@ try {
 
     $bins = [];
     while ($row = $result->fetch_assoc()) {
+        // Map Arduino's hardcoded bin names to sensor cases
+        $sensorCase = 0;
+        switch($row['bin_name']) {
+            case 'Non-Bio':
+                $sensorCase = 1;
+                break;
+            case 'Bio':
+                $sensorCase = 2;
+                break;
+            case 'Hazardous':
+                $sensorCase = 3;
+                break;
+            case 'Mixed':
+                $sensorCase = 4;
+                break;
+        }
+        
+        // Get the configured trash type for this sensor case from sorter_mapping
+        $configuredType = $sensorMap[$sensorCase] ?? 'mixed';
+        
         $bins[] = [
             'device_identity' => $row['device_identity'],
-            'bin_name' => $row['bin_name'],
+            'bin_name' => $configuredType,
             'distance' => (int)$row['distance'],
             'fullness_percentage' => (int)$row['fullness_percentage'],
             'timestamp' => $row['timestamp']
