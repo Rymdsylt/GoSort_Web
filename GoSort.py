@@ -11,11 +11,11 @@ import ipaddress
 import msvcrt
 import sys
 
-def check_maintenance_mode(ip_address, device_identity, base_path=None):
+def check_maintenance_mode(device_identity, base_path=None):
     if base_path is None:
-        base_path = get_base_path(ip_address)
+        base_path = get_base_path()
     try:
-        url = f"{base_path}/gs_DB/check_maintenance.php"
+        url = f"{base_path}/check_maintenance.php"
         response = requests.post(
             url,
             json={'identity': device_identity},
@@ -30,14 +30,9 @@ def check_maintenance_mode(ip_address, device_identity, base_path=None):
         print(f"\n❌ Error checking maintenance mode: {e}")
         return False
 
-def get_base_path(ip_address):
-    """Determine the correct base path based on whether it's a local IP or domain"""
-    # If it's a local IP (contains dots and no dots at end, or starts with 192., 10., etc.)
-    if ip_address.replace('.', '').isdigit() or ip_address.startswith(('192.', '10.', '172.')):
-        return f"http://{ip_address}/GoSort_Web"
-    else:
-        # It's a domain name
-        return f"http://{ip_address}"
+def get_base_path():
+    """Return the fixed server URL"""
+    return "https://gosortweb-production.up.railway.app/gs_DB"
 
 def load_config():
     config_file = 'gosort_config.json'
@@ -51,122 +46,26 @@ def save_config(config):
         json.dump(config, f)
 
 def scan_network():
-    print("\nScanning network for available devices...")
-    available_ips = []
-    gosort_ips = []
-    
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(('10.255.255.255', 1))
-        local_ip = s.getsockname()[0]
-    except Exception:
-        local_ip = '127.0.0.1'
-    finally:
-        s.close()
-    ip_parts = local_ip.split('.')
-    network_prefix = '.'.join(ip_parts[:3])
-    
-    network_ips = [f"{network_prefix}.{i}" for i in range(1, 255)]
-    total_ips = len(network_ips)
-    scanned_ips = 0
-    print_lock = threading.Lock()
+    # Network scanning no longer needed - using fixed server URL
+    return [], []
 
-    def update_progress():
-        nonlocal scanned_ips
-        with print_lock:
-            scanned_ips += 1
-            progress = (scanned_ips / total_ips) * 100
-            print(f"\rScanning network... {progress:.1f}% complete", end="", flush=True)
-
-    def check_ip(ip):
-        try:
-            base_path = get_base_path(ip)
-            response = requests.get(f"{base_path}/gs_DB/trash_detected.php", 
-                                 timeout=0.5)
-            if response.status_code == 200 or (
-                response.status_code == 400 and 
-                "No trash type provided" in response.text
-            ):
-                gosort_ips.append(str(ip))
-            else:
-                available_ips.append(str(ip))
-        except:
-            pass
-        update_progress()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        executor.map(check_ip, network_ips)
-
-    print("\n\nScan complete!")
-    
-    gosort_ips = sorted(list(set(gosort_ips)))
-    available_ips = sorted(list(set(available_ips) - set(gosort_ips)))
-    
-    return gosort_ips, available_ips
-
-def check_server(ip):
+def check_server():
     print("\rChecking server...", end="", flush=True)
     try:
-        base_path = get_base_path(ip)
-        response = requests.get(f"{base_path}/gs_DB/trash_detected.php", timeout=5)
+        base_path = get_base_path()
+        response = requests.get(f"{base_path}/trash_detected.php", timeout=5)
         if response.status_code == 200 or (response.status_code == 400 and "No trash type provided" in response.text):
             print("\r✅ Server connection successful!")
             return True
-        print("\r❌ GoSort does not exist in this server")
+        print("\r❌ GoSort server is not reachable")
         return False
     except requests.exceptions.RequestException:
-        print("\r❌ GoSort does not exist in this server")
+        print("\r❌ GoSort server is not reachable")
         return False
 
 def get_ip_address():
-    config = load_config()
-    ip = config.get('ip_address')
-    
-    while True:
-        if not ip:
-            gosort_ips, available_ips = scan_network()
-            
-            if not gosort_ips and not available_ips:
-                print("\nNo devices found in the network.")
-                ip = input("\nEnter GoSort IP address manually (e.g., 192.168.1.100): ")
-            else:
-                print("\nAvailable IP addresses:")
-                if gosort_ips:
-                    print("\n🟢 GoSort servers found:")
-                    for i, ip_addr in enumerate(gosort_ips):
-                        print(f"{i+1}. {ip_addr}")
-                
-                if available_ips:
-                    print("\n⚪ Other devices found:")
-                    offset = len(gosort_ips)
-                    for i, ip_addr in enumerate(available_ips):
-                        print(f"{i+offset+1}. {ip_addr}")
-                print(f"{len(gosort_ips) + len(available_ips) + 1}. Enter IP manually")
-                
-                while True:
-                    try:
-                        choice = int(input("\nChoose an IP address (enter the number): "))
-                        if 1 <= choice <= len(gosort_ips):
-                            ip = gosort_ips[choice-1]
-                            break
-                        elif len(gosort_ips) < choice <= len(gosort_ips) + len(available_ips):
-                            ip = available_ips[choice-len(gosort_ips)-1]
-                            break
-                        elif choice == len(gosort_ips) + len(available_ips) + 1:
-                            ip = input("\nEnter GoSort IP address manually: ")
-                            break
-                        else:
-                            print("Invalid choice. Please try again.")
-                    except ValueError:
-                        print("Invalid input. Please enter a number.")
-        
-        if check_server(ip):
-            config['ip_address'] = ip
-            save_config(config)
-            return ip
-        else:
-            ip = None
-            config['ip_address'] = None
-            save_config(config)
+    # Fixed server URL - no configuration needed
+    return get_base_path()
 
 def list_arduino_ports():
     ports = serial.tools.list_ports.comports()
@@ -208,9 +107,10 @@ def connect_to_arduino(port):
         print(f"Unexpected error while connecting to {port}: {e}")
         return None
 
-def add_to_waiting_devices(ip_address, device_identity):
+def add_to_waiting_devices(device_identity):
     try:
-        url = f"http://{ip_address}/gs_DB/add_waiting_device.php"
+        base_path = get_base_path()
+        url = f"{base_path}/add_waiting_device.php"
         response = requests.post(url, json={
             'identity': device_identity
         })
@@ -224,10 +124,11 @@ def add_to_waiting_devices(ip_address, device_identity):
         print(f"\n❌ Error adding device to waiting list: {e}")
         return False
 
-def request_registration(ip_address, identity):
+def request_registration(identity):
     try:
         # First check if device is in sorters table
-        url = f"http://{ip_address}/gs_DB/verify_sorter.php"
+        base_path = get_base_path()
+        url = f"{base_path}/verify_sorter.php"
         response = requests.post(
             url,
             json={'identity': identity},
@@ -241,7 +142,7 @@ def request_registration(ip_address, identity):
                 else:
                     # Try to add to waiting devices
                     response = requests.post(
-                        f"http://{ip_address}/gs_DB/add_waiting_device.php",
+                        f"{base_path}/add_waiting_device.php",
                         json={'identity': identity}
                     )
                     if response.status_code == 200:
@@ -261,9 +162,10 @@ def restart_program():
     python = sys.executable
     os.execl(python, python, *sys.argv)
 
-def remove_from_waiting_devices(ip_address, device_identity):
+def remove_from_waiting_devices(device_identity):
     try:
-        url = f"http://{ip_address}/gs_DB/remove_waiting_device.php"
+        base_path = get_base_path()
+        url = f"{base_path}/remove_waiting_device.php"
         response = requests.post(url, json={'identity': device_identity}, headers={'Content-Type': 'application/json'})
         if response.status_code == 200:
             data = response.json()
@@ -275,7 +177,7 @@ def remove_from_waiting_devices(ip_address, device_identity):
         print(f"\n❌ Error removing from waiting devices: {e}")
         return False
 
-def process_bin_fullness(data, ip_address, device_identity):
+def process_bin_fullness(data, device_identity):
     # Format is "bin_fullness:BinName:Distance"
     try:
         parts = data.split(':')
@@ -285,8 +187,9 @@ def process_bin_fullness(data, ip_address, device_identity):
             
             # Send data to database using form data
             try:
+                base_path = get_base_path()
                 response = requests.post(
-                    f"http://{ip_address}/gs_DB/update_bin_fullness.php",
+                    f"{base_path}/update_bin_fullness.php",
                     data={
                         'device_identity': device_identity,
                         'bin_name': bin_name,
@@ -308,12 +211,9 @@ def process_bin_fullness(data, ip_address, device_identity):
 
 def main():
     config = load_config()
-    # First get IP address
-    ip_address = get_ip_address()
-    print(f"\nUsing GoSort server at: {ip_address}")
-    
-    # Get base path for this server
-    base_path = get_base_path(ip_address)
+    # Get fixed server URL
+    base_path = get_base_path()
+    print(f"\nUsing GoSort server at: {base_path}")
 
     # Then get or set identity
     config = load_config()
@@ -332,7 +232,7 @@ def main():
     }
     
     # Fetch mapping from backend
-    mapping_url = f"{base_path}/gs_DB/save_sorter_mapping.php?device_identity={config['sorter_id']}"
+    mapping_url = f"{base_path}/save_sorter_mapping.php?device_identity={config['sorter_id']}"
     try:
         resp = requests.get(mapping_url, timeout=5)
         server_mapping = resp.json().get('mapping', {})
@@ -375,12 +275,12 @@ def main():
     def print_waiting_menu():
         print("\n\nOptions while waiting:")
         print("r - Reconfigure Identity")
-        print("a - Reconfigure All (IP and Identity)")
+        print("c - Clear Configuration")
         print("q - Quit")
         print("\nPress any other key to check registration status...")
 
     while not registered:
-        registered, status = request_registration(ip_address, config['sorter_id'])
+        registered, status = request_registration(config['sorter_id'])
         
         if registered:
             print("\n✅ Device registration confirmed!")
@@ -403,20 +303,19 @@ def main():
                 print("\n⏳ Trying with new identity:", config['sorter_id'])
                 first_request = True  # Reset to show the waiting message again
                 continue
-            elif key == 'a':
-                print("\n⚙️ Reconfiguring All Settings...")
+            elif key == 'c':
+                print("\n⚙️ Clearing Configuration...")
                 # Remove from waiting devices before clearing config
-                remove_from_waiting_devices(ip_address, config['sorter_id'])
-                # Clear IP and identity
-                config['ip_address'] = None
+                remove_from_waiting_devices(config['sorter_id'])
+                # Clear identity
                 config['sorter_id'] = None
                 save_config(config)
-                print("\n✅ All configuration cleared. Please restart the application.")
+                print("\n✅ Configuration cleared. Please restart the application.")
                 return
             elif key == 'q':
                 print("\n❌ Registration cancelled. Exiting...")
                 # Remove from waiting devices before exiting
-                remove_from_waiting_devices(ip_address, config['sorter_id'])
+                remove_from_waiting_devices(config['sorter_id'])
                 return
             else:
                 print("\nChecking registration status...", end="", flush=True)
@@ -453,7 +352,7 @@ def main():
         response = ser.readline().decode().strip()
         if response:
             if response.startswith('bin_fullness:'):
-                process_bin_fullness(response, ip_address, config['sorter_id'])
+                process_bin_fullness(response, config['sorter_id'])
             else:
                 print(f"🟢 Arduino Response: {response}")
     
@@ -542,13 +441,13 @@ def main():
                         response = ser.readline().decode().strip()
                         if response:
                             if response.startswith('bin_fullness:'):
-                                process_bin_fullness(response, ip_address, config['sorter_id'])
+                                process_bin_fullness(response, config['sorter_id'])
                             else:
                                 print(f"\n🟢 Arduino: {response}")
                     
                     # Send heartbeat to update last_active
                     requests.post(
-                        f"http://{ip_address}/gs_DB/verify_sorter.php",
+                        f"{base_path}/verify_sorter.php",
                         json={'identity': config['sorter_id']},
                         headers={'Content-Type': 'application/json'}
                     )
@@ -556,16 +455,16 @@ def main():
                 except Exception as e:
                     print(f"\n⚠️ Heartbeat error: {e}")
                     # Remove from waiting devices if heartbeat fails
-                    remove_from_waiting_devices(ip_address, config['sorter_id'])
+                    remove_from_waiting_devices(config['sorter_id'])
             else:
                 # Arduino disconnected, stop sending heartbeats
                 print("\n⚠️ Arduino disconnected - stopping heartbeats")
                 # Remove from waiting devices since Arduino is disconnected
-                remove_from_waiting_devices(ip_address, config['sorter_id'])
+                remove_from_waiting_devices(config['sorter_id'])
                 break
 
         # Check maintenance mode periodically
-        current_maintenance = check_maintenance_mode(ip_address, config['sorter_id'], base_path)
+        current_maintenance = check_maintenance_mode(config['sorter_id'], base_path)
         
         # If maintenance status changed, notify user
         if current_maintenance != last_maintenance_status:
@@ -602,7 +501,7 @@ def main():
                 
             try:
                 response = requests.post(
-                    f"http://{ip_address}/gs_DB/check_maintenance_commands.php",
+                    f"{base_path}/check_maintenance_commands.php",
                     json={'device_identity': config['sorter_id']},
                     headers={'Content-Type': 'application/json'}
                 )
@@ -658,7 +557,7 @@ def main():
                             if trash_type:
                                 try:
                                     requests.post(
-                                        f"http://{ip_address}/gs_DB/record_sorting.php",
+                                        f"{base_path}/record_sorting.php",
                                         json={
                                             'device_identity': config['sorter_id'],
                                             'trash_type': trash_type,
@@ -670,7 +569,7 @@ def main():
                         
                         # Mark command as executed
                         requests.post(
-                            f"http://{ip_address}/gs_DB/mark_command_executed.php",
+                            f"{base_path}/mark_command_executed.php",
                             json={'device_identity': config['sorter_id'], 'command': command}
                         )
                         if command == 'shutdown':
@@ -732,7 +631,7 @@ def main():
                             
                             # Record the sorting action
                             try:
-                                sorting_url = f"http://{ip_address}/gs_DB/record_sorting.php"
+                                sorting_url = f"{base_path}/record_sorting.php"
                                 response = requests.post(
                                     sorting_url,
                                     json={
@@ -781,7 +680,7 @@ def main():
                 # Send first reading (9cm)
                 try:
                     response = requests.post(
-                        f"http://{ip_address}/gs_DB/update_bin_fullness.php",
+                        f"{base_path}/update_bin_fullness.php",
                         data={
                             'device_identity': config['sorter_id'],
                             'bin_name': bin_type,
@@ -806,7 +705,7 @@ def main():
                 # Send second reading (10cm)
                 try:
                     response = requests.post(
-                        f"http://{ip_address}/gs_DB/update_bin_fullness.php",
+                        f"{base_path}/update_bin_fullness.php",
                         data={
                             'device_identity': config['sorter_id'],
                             'bin_name': bin_type,
@@ -831,7 +730,7 @@ def main():
                     bin_label = trash_labels.get(bin_type, bin_type).title()
                     notification_message = f"{bin_label} bin is full"
                     requests.post(
-                        f"http://{ip_address}/api/add_bin_notification.php",
+                        f"{base_path}/../api/add_bin_notification.php",
                         json={
                             'message': notification_message,
                             'type': 'bin_full',

@@ -10,9 +10,10 @@ echo 1. GoSort (Run this if you have Arduino, will not run without it. MADE FOR 
 echo 2. GoSort_Detect (Run this if you have Arduino, will not run without it. FOR DETECTION)
 echo 3. GoSort_Simulation (Run this if you don't have Arduino. MADE FOR TESTING WITHOUT DETECTION)
 echo 4. GoSort_Detect_Simulation (Run this if you don't have Arduino. FOR DETECTION)
-echo 5. Exit
+echo 5. GoSort_Embedded (UI + Audio simulation. NO hardware, NO camera, NO database)
+echo 6. Exit
 echo.
-set /p choice="Enter your choice (1-5): "
+set /p choice="Enter your choice (1-6): "
 
 if "%choice%"=="1" (
     python GoSort.py
@@ -35,6 +36,11 @@ if "%choice%"=="4" (
     goto menu
 )
 if "%choice%"=="5" (
+    python GoSort_Embedded.py
+    pause
+    goto menu
+)
+if "%choice%"=="6" (
     exit
 ) else (
     echo Invalid choice. Please try again.
