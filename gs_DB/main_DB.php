@@ -238,6 +238,15 @@ try {
             INDEX idx_reviewed_at (reviewed_at)
         )
     ");
+    
+    // Seed default admin user (only if no users exist)
+    $userCheck = $conn->query("SELECT COUNT(*) as cnt FROM users");
+    $userRow = $userCheck->fetch_assoc();
+    if ($userRow['cnt'] == 0) {
+        $defaultPassword = password_hash('pcsadmin', PASSWORD_DEFAULT);
+        $conn->query("INSERT INTO users (userName, lastName, email, password, role) VALUES ('root', 'Admin', 'root@gosort.com', '$defaultPassword', 'admin')");
+    }
+
 
     // Mark schema as initialized so we skip all CREATE TABLE statements next time
     $conn->query("CREATE TABLE IF NOT EXISTS schema_initialized (id INT PRIMARY KEY DEFAULT 1)");
