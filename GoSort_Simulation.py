@@ -251,7 +251,7 @@ def main():
         print("\nPress any other key to check registration status...")
 
     while not registered:
-        registered, status = request_registration(ip_address, config['sorter_id'])
+        registered, status = request_registration(config['sorter_id'])
         
         if registered:
             print("\n✅ Device registration confirmed!")
