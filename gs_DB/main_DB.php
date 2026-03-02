@@ -7,7 +7,7 @@ try {
         throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
-    $conn->query("CREATE DATABASE IF NOT EXISTS `$db_name`");
+    $conn->query("CREATE DATABASE IF NOT EXISTS `$db_name`"); //test
     $conn->select_db($db_name);
 
     // Migration guard: skip schema creation if already initialized
