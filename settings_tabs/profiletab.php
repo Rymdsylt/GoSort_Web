@@ -168,11 +168,42 @@ if ($user_id) {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1.2rem;
+            padding: 0.5rem 0.6rem;
+            border-radius: 10px;
+            transition: background 0.25s ease;
+        }
+
+        .profile-info .info-row > div:first-child {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .profile-info .info-row.editing {
+            background: rgba(46, 125, 50, 0.04);
         }
 
         .profile-info .info-row span {
             color: var(--dark-gray);
             font-size: 1rem;
+        }
+
+        .profile-info .info-row .form-control {
+            border-radius: 10px;
+            border: 1.5px solid #d1d5db;
+            padding: 0.45rem 0.75rem;
+            font-size: 0.92rem;
+            transition: all 0.25s ease;
+            animation: fadeInInput 0.25s ease;
+        }
+
+        .profile-info .info-row .form-control:focus {
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+        }
+
+        @keyframes fadeInInput {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
         .edit-btn {
@@ -189,6 +220,23 @@ if ($user_id) {
             color: var(--light-green);
         }
 
+        .edit-actions {
+            display: flex;
+            gap: 0.4rem;
+            align-items: center;
+            animation: fadeInInput 0.25s ease;
+        }
+
+        .section-edit-actions {
+            display: none;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid #f0f0f0;
+            animation: fadeInInput 0.25s ease;
+        }
+
         .save-btn {
             background: var(--primary-green);
             color: #fff;
@@ -202,6 +250,124 @@ if ($user_id) {
 
         .save-btn:hover {
             background: #1f3a13;
+        }
+
+        .cancel-btn {
+            background: transparent;
+            border: 1.5px solid #d1d5db;
+            color: var(--medium-gray);
+            border-radius: 8px;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cancel-btn:hover {
+            border-color: #9ca3af;
+            color: var(--dark-gray);
+        }
+
+        .password-fields {
+            display: none;
+            animation: fadeInInput 0.25s ease;
+        }
+
+        .password-fields .info-row {
+            margin-bottom: 0.8rem;
+        }
+
+        .password-fields .input-group .form-control {
+            border-radius: 10px 0 0 10px;
+            border: 1.5px solid #d1d5db;
+            padding: 0.45rem 0.75rem;
+            font-size: 0.92rem;
+        }
+
+        .password-fields .input-group .form-control:focus {
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+        }
+
+        .password-fields .input-group .btn {
+            border-radius: 0 10px 10px 0;
+            border: 1.5px solid #d1d5db;
+            border-left: none;
+        }
+
+        /* ── Responsive / Adaptive ── */
+        @media (max-width: 768px) {
+            .profile-card {
+                padding: 1.2rem;
+            }
+
+            .profile-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 0.8rem;
+            }
+
+            .profile-pic-container {
+                width: 75px;
+                height: 75px;
+            }
+
+            .section-header {
+                font-size: 1rem;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .profile-info .info-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.4rem;
+                padding: 0.4rem 0.4rem;
+            }
+
+            .section-edit-actions {
+                flex-direction: column;
+                gap: 0.4rem;
+            }
+
+            .section-edit-actions .cancel-btn,
+            .section-edit-actions .save-btn {
+                width: 100%;
+                text-align: center;
+            }
+
+            .edit-btn {
+                font-size: 0.85rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .profile-card {
+                padding: 1rem;
+                border-radius: 12px;
+            }
+
+            .profile-pic-container {
+                width: 65px;
+                height: 65px;
+            }
+
+            .profile-header h4 {
+                font-size: 1.1rem;
+            }
+
+            .profile-info label {
+                font-size: 0.85rem;
+            }
+
+            .profile-info .info-row span {
+                font-size: 0.9rem;
+            }
+
+            .theme-switch-wrapper {
+                margin-top: 0.3rem;
+            }
         }
     </style>
 </head>
@@ -245,24 +411,7 @@ if ($user_id) {
                 </div>
             </div>
 
-            <!-- Password Modal -->
-            <div class="modal fade" id="passwordModal" tabindex="-1" aria-labelledby="passwordModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content" style="border-radius: 16px; border: none;">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Change Password</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>Password change form goes here (Current Password, New Password, Confirm New Password).</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                            <button type="button" class="btn btn-primary" onclick="handlePasswordChange()">Save Password</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             <!-- Logout Modal -->
             <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
@@ -308,33 +457,38 @@ if ($user_id) {
 
             <!-- Profile Information Section -->
             <div class="profile-info">
-                <h4 class="section-header">Personal Information</h4>
+                <h4 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    Personal Information
+                    <button class="edit-btn" id="profile-edit-btn" onclick="enterProfileEdit()">Edit</button>
+                </h4>
 
-                <div class="info-row">
+                <div class="section-edit-actions" id="profile-edit-actions">
+                    <button class="cancel-btn" onclick="cancelProfileEdit()">Cancel</button>
+                    <button class="save-btn" onclick="saveProfileEdit()">Save Changes</button>
+                </div>
+
+                <div class="info-row" id="name-row">
                     <div>
                         <label>Full Name</label>
                         <span id="name-display"><?= htmlspecialchars($name ?? 'Admin User'); ?></span>
-                        <input type="text" id="name-input" class="form-control form-control-sm d-none" value="<?= htmlspecialchars($name ?? ''); ?>">
+                        <input type="text" id="name-input" class="form-control d-none" value="<?= htmlspecialchars($name ?? ''); ?>" placeholder="Enter your full name">
                     </div>
-                    <button class="edit-btn" onclick="toggleEdit('name')">Edit</button>
                 </div>
 
-                <div class="info-row">
+                <div class="info-row" id="email-row">
                     <div>
                         <label>Email</label>
                         <span id="email-display"><?= htmlspecialchars($email ?? 'admin@example.com'); ?></span>
-                        <input type="email" id="email-input" class="form-control form-control-sm d-none" value="<?= htmlspecialchars($email ?? ''); ?>">
+                        <input type="email" id="email-input" class="form-control d-none" value="<?= htmlspecialchars($email ?? ''); ?>" placeholder="Enter your email">
                     </div>
-                    <button class="edit-btn" onclick="toggleEdit('email')">Edit</button>
                 </div>
 
-                <div class="info-row">
+                <div class="info-row" id="contact-row">
                     <div>
                         <label>Contact</label>
                         <span id="contact-display"><?= htmlspecialchars($contact ?? 'N/A'); ?></span>
-                        <input type="text" id="contact-input" class="form-control form-control-sm d-none" value="<?= htmlspecialchars($contact ?? ''); ?>">
+                        <input type="text" id="contact-input" class="form-control d-none" value="<?= htmlspecialchars($contact ?? ''); ?>" placeholder="Enter your contact number">
                     </div>
-                    <button class="edit-btn" onclick="toggleEdit('contact')">Edit</button>
                 </div>
 
                 <div class="info-row">
@@ -345,14 +499,56 @@ if ($user_id) {
                 </div>
 
                 <!-- Security Section -->
-                <h4 class="section-header">Security</h4>
+                <h4 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    Security
+                    <button class="edit-btn" id="password-edit-btn" onclick="enterPasswordEdit()">Change Password</button>
+                </h4>
 
-                <div class="info-row">
+                <div class="info-row" id="password-display-row">
                     <div>
                         <label>Password</label>
                         <span>******</span>
                     </div>
-                    <button class="edit-btn" data-bs-toggle="modal" data-bs-target="#passwordModal">Change Password</button>
+                </div>
+
+                <div class="password-fields" id="password-fields">
+                    <div class="info-row">
+                        <div style="width: 100%;">
+                            <label>Current Password</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="currentPassword" placeholder="Enter current password">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVis('currentPassword', this)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div style="width: 100%;">
+                            <label>New Password</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="newPassword" placeholder="Enter new password">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVis('newPassword', this)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div style="width: 100%;">
+                            <label>Confirm New Password</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="confirmPassword" placeholder="Confirm new password">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVis('confirmPassword', this)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section-edit-actions" style="display: flex;">
+                        <button class="cancel-btn" onclick="cancelPasswordEdit()">Cancel</button>
+                        <button class="save-btn" onclick="savePasswordEdit()">Save Password</button>
+                    </div>
                 </div>
 
                 <!-- Preferences & Actions Section -->
@@ -392,44 +588,126 @@ if ($user_id) {
 
     <script>
         const profileConfirmationModal = new bootstrap.Modal(document.getElementById('profileConfirmationModal'));
-        const passwordModalInstance = new bootstrap.Modal(document.getElementById('passwordModal'));
         const logoutModalInstance = new bootstrap.Modal(document.getElementById('logoutModal'));
         const deleteAccountModalInstance = new bootstrap.Modal(document.getElementById('deleteAccountModal'));
 
-        function toggleEdit(field) {
-            const displayEl = document.getElementById(`${field}-display`);
-            const inputEl = document.getElementById(`${field}-input`);
-            const editBtn = event.currentTarget;
+        // ── Personal Information Edit ──
+        let originalProfileValues = {};
+        const profileFields = ['name', 'email', 'contact'];
 
-            if (inputEl.classList.contains('d-none')) {
-                displayEl.classList.add('d-none');
-                inputEl.classList.remove('d-none');
-                editBtn.textContent = 'Save';
-                editBtn.classList.add('save-btn');
-                editBtn.classList.remove('edit-btn');
-                editBtn.dataset.mode = 'editing';
-            } else if (editBtn.dataset.mode === 'editing') {
-                window.currentField = field;
-                window.currentInput = inputEl;
-                window.currentDisplay = displayEl;
-                window.currentButton = editBtn;
-                profileConfirmationModal.show();
+        function enterProfileEdit() {
+            // Store originals and switch all fields to edit mode
+            profileFields.forEach(field => {
+                const display = document.getElementById(`${field}-display`);
+                const input = document.getElementById(`${field}-input`);
+                const row = document.getElementById(`${field}-row`);
+                originalProfileValues[field] = display.textContent;
+                input.value = display.textContent;
+                display.classList.add('d-none');
+                input.classList.remove('d-none');
+                row.classList.add('editing');
+            });
+            document.getElementById('profile-edit-btn').classList.add('d-none');
+            document.getElementById('profile-edit-actions').style.display = 'flex';
+            // Auto-close password edit if open
+            if (document.getElementById('password-fields').style.display === 'block') {
+                cancelPasswordEdit();
             }
+            setTimeout(() => document.getElementById('name-input').focus(), 50);
+        }
+
+        function cancelProfileEdit() {
+            profileFields.forEach(field => {
+                const display = document.getElementById(`${field}-display`);
+                const input = document.getElementById(`${field}-input`);
+                const row = document.getElementById(`${field}-row`);
+                input.value = originalProfileValues[field] || '';
+                display.classList.remove('d-none');
+                input.classList.add('d-none');
+                row.classList.remove('editing');
+            });
+            document.getElementById('profile-edit-btn').classList.remove('d-none');
+            document.getElementById('profile-edit-actions').style.display = 'none';
+
+        }
+
+        function saveProfileEdit() {
+            profileConfirmationModal.show();
         }
 
         function confirmSave() {
-            currentDisplay.textContent = currentInput.value;
-            currentDisplay.classList.remove('d-none');
-            currentInput.classList.add('d-none');
-            currentButton.textContent = 'Edit';
-            currentButton.classList.remove('save-btn');
-            currentButton.classList.add('edit-btn');
-            currentButton.dataset.mode = '';
+            profileFields.forEach(field => {
+                const display = document.getElementById(`${field}-display`);
+                const input = document.getElementById(`${field}-input`);
+                const row = document.getElementById(`${field}-row`);
+                display.textContent = input.value || (field === 'contact' ? 'N/A' : '');
+                display.classList.remove('d-none');
+                input.classList.add('d-none');
+                row.classList.remove('editing');
+            });
+            document.getElementById('profile-edit-btn').classList.remove('d-none');
+            document.getElementById('profile-edit-actions').style.display = 'none';
             profileConfirmationModal.hide();
-
-            console.log(`Confirmed save for ${currentField}: ${currentInput.value}`);
+            console.log('Profile saved:', {
+                name: document.getElementById('name-display').textContent,
+                email: document.getElementById('email-display').textContent,
+                contact: document.getElementById('contact-display').textContent
+            });
         }
 
+        // ── Password Edit ──
+        function enterPasswordEdit() {
+            document.getElementById('password-edit-btn').classList.add('d-none');
+            document.getElementById('password-display-row').classList.add('d-none');
+            document.getElementById('password-fields').style.display = 'block';
+            // Auto-close profile edit if open
+            if (document.getElementById('profile-edit-actions').style.display === 'flex') {
+                cancelProfileEdit();
+            }
+            setTimeout(() => document.getElementById('currentPassword').focus(), 50);
+        }
+
+        function cancelPasswordEdit() {
+            document.getElementById('password-edit-btn').classList.remove('d-none');
+            document.getElementById('password-display-row').classList.remove('d-none');
+            document.getElementById('password-fields').style.display = 'none';
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+
+        }
+
+        function savePasswordEdit() {
+            const current = document.getElementById('currentPassword').value;
+            const newPwd = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+
+            if (!current || !newPwd || !confirm) {
+                alert('Please fill in all password fields.');
+                return;
+            }
+            if (newPwd !== confirm) {
+                alert('New password and confirmation do not match.');
+                return;
+            }
+            // TODO: send to backend
+            console.log('Password change submitted.');
+            cancelPasswordEdit();
+        }
+
+        function togglePwdVis(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        }
+
+        // ── Image preview ──
         function previewImage(event) {
             const file = event.target.files[0];
             if (file) {
@@ -438,12 +716,11 @@ if ($user_id) {
                     document.getElementById('profile-pic').src = e.target.result;
                 };
                 reader.readAsDataURL(file);
-                console.log("Previewing new profile image:", file.name);
             }
         }
 
+        // ── Theme ──
         document.addEventListener('DOMContentLoaded', () => {
-            // If global theme manager exists, use it; otherwise use local storage
             if (window.themeManager) {
                 const currentTheme = window.themeManager.getCurrentTheme();
                 document.getElementById('theme-toggle').checked = currentTheme === 'dark';
@@ -458,11 +735,9 @@ if ($user_id) {
         });
 
         function toggleTheme() {
-            // Use global theme manager if available
             if (window.themeManager) {
                 window.themeManager.toggleTheme();
             } else {
-                // Fallback to local storage
                 if (document.getElementById('theme-toggle').checked) {
                     document.body.classList.add('dark-mode');
                     localStorage.setItem('gosort-theme', 'dark');
@@ -473,12 +748,6 @@ if ($user_id) {
                     localStorage.setItem('theme', 'light');
                 }
             }
-            console.log("Theme toggled.");
-        }
-
-        function handlePasswordChange() {
-            console.log("Password change initiated.");
-            passwordModalInstance.hide();
         }
 
         function handleLogout() {

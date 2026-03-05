@@ -39,13 +39,14 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             while ($row = $result->fetch_assoc()) {
                 $users[] = $row;
             }
-            
+
             echo json_encode([
                 'success' => true,
                 'users' => $users
             ]);
             exit();
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             echo json_encode([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -85,7 +86,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             $stmt = $conn->prepare("INSERT INTO users (userName, lastName, email, password, role, assigned_floor) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->bind_param("ssssss", $userName, $lastName, $email, $hashedPassword, $role, $assigned_floor);
             $stmt->execute();
-            
+
             $user_id = $conn->insert_id;
 
             // Insert assigned sorters if any
@@ -99,18 +100,19 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 
             // Commit transaction
             $conn->commit();
-            
+
             // Log user addition
             $fullName = $userName . ' ' . $lastName;
             log_user_added($_SESSION['user_id'], $fullName);
-            
+
             echo json_encode([
                 'success' => true,
                 'message' => 'User added successfully',
                 'user_id' => $user_id
             ]);
             exit();
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             if ($conn->connect_errno) {
                 $conn->rollback();
             }
@@ -180,7 +182,8 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 'message' => 'User deleted successfully'
             ]);
             exit();
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             if ($conn->connect_errno) {
                 $conn->rollback();
             }
@@ -244,7 +247,8 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 'message' => 'User updated successfully'
             ]);
             exit();
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             echo json_encode([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -696,7 +700,8 @@ if ($sorters_result) {
                                                     <option value="<?php echo htmlspecialchars($sorter['device_identity']); ?>">
                                                         <?php echo htmlspecialchars($sorter['device_name'] . ' (' . $sorter['location'] . ')'); ?>
                                                     </option>
-                                                <?php endforeach; ?>
+                                                <?php
+endforeach; ?>
                                             </select>
                                             <small class="text-muted">Hold Ctrl (Windows) or Command (Mac) to select multiple sorters</small>
                                         </div>
