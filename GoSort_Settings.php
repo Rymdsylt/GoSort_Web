@@ -674,15 +674,15 @@ if ($sorters_result) {
                                         <div class="row mb-3">
                                             <div class="col-md-6">
                                                 <label class="form-label fw-semibold">Role</label>
-                                                <select class="form-select" name="role" id="addRole" required>
+                                                <select class="form-select" name="role" id="addRole" required onchange="toggleAddFloorSorter()">
                                                     <option value="">Select Role</option>
                                                     <option value="admin">Administrator</option>
                                                     <option value="utility">Utility Member</option>
                                                 </select>
                                             </div>
-                                            <div class="col-md-6">
+                                            <div class="col-md-6" id="addFloorContainer">
                                                 <label class="form-label fw-semibold">Assigned Floor</label>
-                                                <select class="form-select" name="assigned_floor" id="addFloor" required>
+                                                <select class="form-select" name="assigned_floor" id="addFloor">
                                                     <option value="">Select Floor</option>
                                                     <option value="Floor 1">Floor 1</option>
                                                     <option value="Floor 2">Floor 2</option>
@@ -693,7 +693,7 @@ if ($sorters_result) {
                                             </div>
                                         </div>
 
-                                        <div class="mb-3">
+                                        <div class="mb-3" id="addSortersContainer">
                                             <label class="form-label fw-semibold">Assigned Sorters</label>
                                             <select class="form-select" name="assigned_sorters[]" id="addSorters" multiple size="4">
                                                 <?php foreach ($sorters as $sorter): ?>
@@ -731,12 +731,12 @@ endforeach; ?>
                                         </div>
                                         <div class="mb-3">
                                             <label class="form-label fw-semibold">Role</label>
-                                            <select class="form-select" id="editRole">
+                                            <select class="form-select" id="editRole" onchange="toggleEditFloorSorter()">
                                                 <option>Administrator</option>
                                                 <option>Utility Member</option>
                                             </select>
                                         </div>
-                                        <div class="mb-3">
+                                        <div class="mb-3" id="editFloorContainer">
                                             <label class="form-label fw-semibold">Assigned Floor</label>
                                             <select class="form-select" id="editFloor" required>
                                                 <option value="">Select Floor</option>
@@ -1198,6 +1198,40 @@ endforeach; ?>
             icon.classList.remove('bi-eye-slash');
             icon.classList.add('bi-eye');
         }
+    });
+
+    // Toggle floor/sorter visibility in Add User Modal
+    function toggleAddFloorSorter() {
+        const role = document.getElementById('addRole').value;
+        const floorContainer = document.getElementById('addFloorContainer');
+        const sortersContainer = document.getElementById('addSortersContainer');
+        
+        // Only show floor and sorter fields when Utility Member is selected
+        if (role === 'utility') {
+            floorContainer.style.display = '';
+            sortersContainer.style.display = '';
+        } else {
+            floorContainer.style.display = 'none';
+            sortersContainer.style.display = 'none';
+        }
+    }
+
+    // Toggle floor/sorter visibility in Edit User Modal
+    function toggleEditFloorSorter() {
+        const role = document.getElementById('editRole').value;
+        const floorContainer = document.getElementById('editFloorContainer');
+        
+        // Only show floor field when Utility Member is selected
+        if (role === 'Utility Member') {
+            floorContainer.style.display = '';
+        } else {
+            floorContainer.style.display = 'none';
+        }
+    }
+
+    // Initialize visibility when Add User modal opens
+    document.getElementById('addUserModal').addEventListener('show.bs.modal', function() {
+        toggleAddFloorSorter();
     });
 
     // SEARCH FILTER
