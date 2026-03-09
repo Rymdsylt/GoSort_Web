@@ -242,6 +242,16 @@ body.dark-mode .device-count {
     color: var(--dm-text-secondary);
 }
 
+body.dark-mode .status-online {
+    background-color: rgba(102, 187, 106, 0.2) !important;
+    color: #66bb6a !important;
+}
+
+body.dark-mode .status-offline {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    color: #ff8a8a !important;
+}
+
 body.dark-mode .section-title {
     color: var(--dm-text-primary);
 }
