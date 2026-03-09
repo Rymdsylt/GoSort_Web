@@ -7,7 +7,7 @@ try {
         throw new Exception("Connection failed: " . $conn->connect_error);
     }
 
-    $conn->query("CREATE DATABASE IF NOT EXISTS `$db_name`");
+    $conn->query("CREATE DATABASE IF NOT EXISTS `$db_name`"); //test
     $conn->select_db($db_name);
 
     // Migration guard: skip schema creation if already initialized
@@ -238,6 +238,15 @@ try {
             INDEX idx_reviewed_at (reviewed_at)
         )
     ");
+    
+    // Seed default admin user (only if no users exist)
+    $userCheck = $conn->query("SELECT COUNT(*) as cnt FROM users");
+    $userRow = $userCheck->fetch_assoc();
+    if ($userRow['cnt'] == 0) {
+        $defaultPassword = password_hash('pcsadmin', PASSWORD_DEFAULT);
+        $conn->query("INSERT INTO users (userName, lastName, email, password, role) VALUES ('root', 'Admin', 'root@gosort.com', '$defaultPassword', 'admin')");
+    }
+
 
     // Seed default admin user (only if no users exist)
     $userCheck = $conn->query("SELECT COUNT(*) as cnt FROM users");
