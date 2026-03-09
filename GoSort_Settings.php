@@ -33,20 +33,19 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 throw new Exception('Not authorized');
             }
 
-            $users_query = "SELECT id, userName, lastName, role, assigned_floor FROM users";
+            $users_query = "SELECT id, userName, lastName, email, role, assigned_floor FROM users";
             $result = $conn->query($users_query);
             $users = [];
             while ($row = $result->fetch_assoc()) {
                 $users[] = $row;
             }
-
+            
             echo json_encode([
                 'success' => true,
                 'users' => $users
             ]);
             exit();
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             echo json_encode([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -86,7 +85,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             $stmt = $conn->prepare("INSERT INTO users (userName, lastName, email, password, role, assigned_floor) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->bind_param("ssssss", $userName, $lastName, $email, $hashedPassword, $role, $assigned_floor);
             $stmt->execute();
-
+            
             $user_id = $conn->insert_id;
 
             // Insert assigned sorters if any
@@ -100,19 +99,18 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 
             // Commit transaction
             $conn->commit();
-
+            
             // Log user addition
             $fullName = $userName . ' ' . $lastName;
             log_user_added($_SESSION['user_id'], $fullName);
-
+            
             echo json_encode([
                 'success' => true,
                 'message' => 'User added successfully',
                 'user_id' => $user_id
             ]);
             exit();
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             if ($conn->connect_errno) {
                 $conn->rollback();
             }
@@ -182,8 +180,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 'message' => 'User deleted successfully'
             ]);
             exit();
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             if ($conn->connect_errno) {
                 $conn->rollback();
             }
@@ -207,6 +204,8 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             $user_id_to_update = $_PUT['user_id'] ?? null;
             $userName = $_PUT['userName'] ?? '';
             $lastName = $_PUT['lastName'] ?? '';
+            $email = $_PUT['email'] ?? '';
+            $password = $_PUT['password'] ?? '';
             $role = $_PUT['role'] ?? '';
             $assigned_floor = $_PUT['assigned_floor'] ?? '';
 
@@ -230,9 +229,34 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 throw new Exception('Full name is required');
             }
 
-            // Update user
-            $stmt = $conn->prepare("UPDATE users SET userName = ?, lastName = ?, role = ?, assigned_floor = ? WHERE id = ?");
-            $stmt->bind_param("ssssi", $userName, $lastName, $role, $assigned_floor, $user_id_to_update);
+            if (!$email) {
+                throw new Exception('Email is required');
+            }
+
+            // Validate email format
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new Exception('Invalid email format');
+            }
+
+            // Check if email is already used by another user
+            $check_email = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+            $check_email->bind_param("si", $email, $user_id_to_update);
+            $check_email->execute();
+            if ($check_email->get_result()->num_rows > 0) {
+                throw new Exception('Email is already in use');
+            }
+
+            // Build update query based on whether password is being changed
+            if (!empty($password)) {
+                // Password is being updated
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("UPDATE users SET userName = ?, lastName = ?, email = ?, password = ?, role = ?, assigned_floor = ? WHERE id = ?");
+                $stmt->bind_param("ssssssi", $userName, $lastName, $email, $hashedPassword, $role, $assigned_floor, $user_id_to_update);
+            } else {
+                // Password is not being updated
+                $stmt = $conn->prepare("UPDATE users SET userName = ?, lastName = ?, email = ?, role = ?, assigned_floor = ? WHERE id = ?");
+                $stmt->bind_param("sssssi", $userName, $lastName, $email, $role, $assigned_floor, $user_id_to_update);
+            }
             $stmt->execute();
 
             if ($stmt->affected_rows === 0) {
@@ -247,8 +271,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 'message' => 'User updated successfully'
             ]);
             exit();
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             echo json_encode([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -546,6 +569,302 @@ if ($sorters_result) {
         body:not(.modal-open) .modal-backdrop {
             display: none;
         }
+
+        /* ===== About Tab Styles ===== */
+        .about-card,
+        .team-card,
+        .dev-card,
+        .insight-card,
+        .stat-card,
+        .info-card {
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .about-card:hover,
+        .team-card:hover,
+        .dev-card:hover,
+        .insight-card:hover,
+        .stat-card:hover,
+        .info-card:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            border-color: var(--primary-green);
+        }
+
+        /* About Header */
+        .about-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .about-icon {
+            font-size: 2.5rem;
+            color: var(--primary-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .about-title {
+            margin: 0;
+            color: var(--dark-gray);
+            font-weight: 700;
+            font-size: 1.75rem;
+        }
+
+        .about-content p {
+            margin-bottom: 1rem;
+            line-height: 1.8;
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .about-content p strong {
+            color: var(--primary-green);
+            font-weight: 700;
+        }
+
+        /* Feature List */
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .feature-item {
+            text-align: center;
+            padding: 1.25rem;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #f8fdf6 0%, #f0f9eb 100%);
+            border: 1px solid #d4e8d4;
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
+            background: linear-gradient(135deg, #f0f9eb 0%, #e8f5e0 100%);
+            border-color: var(--primary-green);
+            transform: translateY(-4px);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--primary-green);
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .feature-text h6 {
+            font-weight: 700;
+            margin: 0.75rem 0 0.5rem;
+            color: var(--dark-gray);
+            font-size: 0.95rem;
+        }
+
+        .feature-text p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: #888;
+            line-height: 1.4;
+        }
+
+        /* Stat Card Header */
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--light-green);
+        }
+
+        .stat-card-title {
+            margin: 0;
+            font-weight: 700;
+            color: var(--dark-gray);
+            font-size: 1.1rem;
+        }
+
+        .stat-icon {
+            font-size: 1.75rem;
+            color: var(--primary-green);
+        }
+
+        /* Team List */
+        .team-list,
+        .dev-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .team-member,
+        .dev-member {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: linear-gradient(90deg, #f8fdf6 0%, #ffffff 100%);
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .team-member:hover,
+        .dev-member:hover {
+            background: #f0f9eb;
+            border-color: var(--primary-green);
+            transform: translateX(4px);
+        }
+
+        .team-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary-green);
+        }
+
+        .dev-icon {
+            font-size: 2.5rem;
+            color: var(--primary-green);
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .team-member h6,
+        .dev-member h6 {
+            margin: 0;
+            font-weight: 700;
+            color: var(--dark-gray);
+            font-size: 0.95rem;
+        }
+
+        .team-member p,
+        .dev-member p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        /* Insights List */
+        .insight-list {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        .insight-list li {
+            padding: 0.75rem 0 0.75rem 1.75rem;
+            position: relative;
+            color: #666;
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .insight-list li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary-green);
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .insight-list li b {
+            color: var(--primary-green);
+            font-weight: 700;
+        }
+
+        /* Statistics Items */
+        .stat-items {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1.25rem;
+            background: linear-gradient(135deg, #f8fdf6 0%, #f0f9eb 100%);
+            border-radius: 10px;
+            border: 1px solid #d4e8d4;
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary-green);
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary-green);
+        }
+
+        /* Info Content */
+        .info-content,
+        .release-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .info-content p,
+        .release-info p {
+            margin: 0;
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .info-content p i,
+        .release-info p i {
+            color: var(--primary-green);
+            font-size: 1.1rem;
+            min-width: 20px;
+        }
+
+        .info-content strong,
+        .release-info strong {
+            color: var(--dark-gray);
+            font-weight: 700;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .feature-list {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-items {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .about-title {
+                font-size: 1.4rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -572,6 +891,9 @@ if ($sorters_result) {
                 </button>
                 <button class="tab-btn" onclick="switchTab('history')">
                     <i class="bi bi-clock-history me-2"></i>Activity Logs
+                </button>
+                <button class="tab-btn" onclick="switchTab('about')">
+                    <i class="bi bi-info-circle me-2"></i>About GoSort
                 </button>
                 <button class="tab-btn" onclick="switchTab('support')">
                     <i class="bi bi-question-circle me-2"></i>Help/Support
@@ -674,15 +996,15 @@ if ($sorters_result) {
                                         <div class="row mb-3">
                                             <div class="col-md-6">
                                                 <label class="form-label fw-semibold">Role</label>
-                                                <select class="form-select" name="role" id="addRole" required onchange="toggleAddFloorSorter()">
+                                                <select class="form-select" name="role" id="addRole" required>
                                                     <option value="">Select Role</option>
                                                     <option value="admin">Administrator</option>
                                                     <option value="utility">Utility Member</option>
                                                 </select>
                                             </div>
-                                            <div class="col-md-6" id="addFloorContainer">
+                                            <div class="col-md-6">
                                                 <label class="form-label fw-semibold">Assigned Floor</label>
-                                                <select class="form-select" name="assigned_floor" id="addFloor">
+                                                <select class="form-select" name="assigned_floor" id="addFloor" required>
                                                     <option value="">Select Floor</option>
                                                     <option value="Floor 1">Floor 1</option>
                                                     <option value="Floor 2">Floor 2</option>
@@ -693,15 +1015,14 @@ if ($sorters_result) {
                                             </div>
                                         </div>
 
-                                        <div class="mb-3" id="addSortersContainer">
+                                        <div class="mb-3">
                                             <label class="form-label fw-semibold">Assigned Sorters</label>
                                             <select class="form-select" name="assigned_sorters[]" id="addSorters" multiple size="4">
                                                 <?php foreach ($sorters as $sorter): ?>
                                                     <option value="<?php echo htmlspecialchars($sorter['device_identity']); ?>">
                                                         <?php echo htmlspecialchars($sorter['device_name'] . ' (' . $sorter['location'] . ')'); ?>
                                                     </option>
-                                                <?php
-endforeach; ?>
+                                                <?php endforeach; ?>
                                             </select>
                                             <small class="text-muted">Hold Ctrl (Windows) or Command (Mac) to select multiple sorters</small>
                                         </div>
@@ -725,27 +1046,50 @@ endforeach; ?>
                                 </div>
                                 <div class="modal-body">
                                     <form id="editUserForm">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-semibold">Full Name</label>
-                                            <input type="text" class="form-control" id="editName">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">First Name</label>
+                                                <input type="text" class="form-control" id="editFirstName">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Last Name</label>
+                                                <input type="text" class="form-control" id="editLastName">
+                                            </div>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-semibold">Role</label>
-                                            <select class="form-select" id="editRole" onchange="toggleEditFloorSorter()">
-                                                <option>Administrator</option>
-                                                <option>Utility Member</option>
-                                            </select>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Email</label>
+                                                <input type="email" class="form-control" id="editEmail">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Password</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" id="editPassword" placeholder="Leave empty to keep current">
+                                                    <button class="btn btn-outline-secondary" type="button" id="toggleEditPassword">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="mb-3" id="editFloorContainer">
-                                            <label class="form-label fw-semibold">Assigned Floor</label>
-                                            <select class="form-select" id="editFloor" required>
-                                                <option value="">Select Floor</option>
-                                                <option value="Floor 1">Floor 1</option>
-                                                <option value="Floor 2">Floor 2</option>
-                                                <option value="Floor 3">Floor 3</option>
-                                                <option value="Floor 4">Floor 4</option>
-                                                <option value="Floor 5">Floor 5</option>
-                                            </select>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Role</label>
+                                                <select class="form-select" id="editRole">
+                                                    <option>Administrator</option>
+                                                    <option>Utility Member</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Assigned Floor</label>
+                                                <select class="form-select" id="editFloor" required>
+                                                    <option value="">Select Floor</option>
+                                                    <option value="Floor 1">Floor 1</option>
+                                                    <option value="Floor 2">Floor 2</option>
+                                                    <option value="Floor 3">Floor 3</option>
+                                                    <option value="Floor 4">Floor 4</option>
+                                                    <option value="Floor 5">Floor 5</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </form>
                                 </div>
@@ -781,8 +1125,15 @@ endforeach; ?>
                 <div id="history" class="tab-content">
                     <?php include 'settings_tabs/historytab.php'; ?>
                 </div>
+                
+                <!-- Tab 4: About -->
+                <div id="about" class="tab-content">
+                    <div class="content-area">
+                        <?php include 'settings_tabs/abouttab.php'; ?>
+                    </div>
+                </div>
 
-                <!-- Tab 4: Help/Support -->
+                <!-- Tab 5: Help/Support -->
                 <div id="support" class="tab-content">
                     <?php include 'settings_tabs/supporttab.php'; ?>
                 </div>
@@ -834,7 +1185,7 @@ endforeach; ?>
                             <td>${role}</td>
                             <td>${floor}</td>
                             <td>
-                                <button class="action-btn edit" onclick="openEditModal('${fullName.replace(/'/g, "\\'")}', '${user.role}', '${floor.replace(/'/g, "\\'")}', ${user.id})">
+                                <button class="action-btn edit" onclick="openEditModal('${user.userName.replace(/'/g, "\\'")}', '${user.lastName.replace(/'/g, "\\'")}', '${(user.email || '').replace(/'/g, "\\'")}', '${user.role}', '${floor.replace(/'/g, "\\'")}', ${user.id})">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
                                 <button class="action-btn delete" onclick="openDeleteModal('${fullName.replace(/'/g, "\\'")}', ${user.id})">
@@ -859,11 +1210,14 @@ endforeach; ?>
         accountsButton.addEventListener('click', loadUsers);
     }
 
-    function openEditModal(name, role, floor, userId) {
-        document.getElementById('editName').value = name;
+    function openEditModal(firstName, lastName, email, role, floor, userId) {
+        document.getElementById('editFirstName').value = firstName;
+        document.getElementById('editLastName').value = lastName;
+        document.getElementById('editEmail').value = email;
+        document.getElementById('editPassword').value = '';
         document.getElementById('editRole').value = role === 'admin' ? 'Administrator' : 'Utility Member';
         document.getElementById('editFloor').value = floor;
-        currentUser = { name, role, floor, userId };
+        currentUser = { firstName, lastName, email, role, floor, userId };
         editUserModal.show();
     }
 
@@ -874,13 +1228,33 @@ endforeach; ?>
         }
 
         const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
-        const fullName = document.getElementById('editName').value.trim();
+        const userName = document.getElementById('editFirstName').value.trim();
+        const lastName = document.getElementById('editLastName').value.trim();
+        const email = document.getElementById('editEmail').value.trim();
+        const password = document.getElementById('editPassword').value;
         const editedRole = document.getElementById('editRole').value === 'Administrator' ? 'admin' : 'utility';
         const editedFloor = document.getElementById('editFloor').value;
 
-        // Validate full name
-        if (!fullName) {
-            alert('Please enter a full name');
+        // Validate required fields
+        if (!userName) {
+            alert('Please enter a first name');
+            return;
+        }
+
+        if (!lastName) {
+            alert('Please enter a last name');
+            return;
+        }
+
+        if (!email) {
+            alert('Please enter an email');
+            return;
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            alert('Please enter a valid email address');
             return;
         }
 
@@ -890,14 +1264,12 @@ endforeach; ?>
             return;
         }
 
-        // Split full name into firstName and lastName
-        const nameParts = fullName.split(' ');
-        const userName = nameParts[0];
-        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-
-        if (!lastName) {
-            alert('Please enter both first and last name (e.g., "John Doe")');
-            return;
+        // Build request body
+        let body = `user_id=${currentUser.userId}&userName=${encodeURIComponent(userName)}&lastName=${encodeURIComponent(lastName)}&email=${encodeURIComponent(email)}&role=${editedRole}&assigned_floor=${encodeURIComponent(editedFloor)}`;
+        
+        // Only include password if it's not empty
+        if (password) {
+            body += `&password=${encodeURIComponent(password)}`;
         }
 
         // Send PUT request
@@ -908,7 +1280,7 @@ endforeach; ?>
                 'Accept': 'application/json',
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: `user_id=${currentUser.userId}&userName=${encodeURIComponent(userName)}&lastName=${encodeURIComponent(lastName)}&role=${editedRole}&assigned_floor=${encodeURIComponent(editedFloor)}`
+            body: body
         })
         .then(response => response.json())
         .then(data => {
@@ -1184,7 +1556,7 @@ endforeach; ?>
         });
     }
 
-    // Add password toggle functionality
+    // Add password toggle functionality for add user modal
     document.getElementById('togglePassword').addEventListener('click', function() {
         const passwordInput = document.getElementById('addPassword');
         const icon = this.querySelector('i');
@@ -1200,38 +1572,20 @@ endforeach; ?>
         }
     });
 
-    // Toggle floor/sorter visibility in Add User Modal
-    function toggleAddFloorSorter() {
-        const role = document.getElementById('addRole').value;
-        const floorContainer = document.getElementById('addFloorContainer');
-        const sortersContainer = document.getElementById('addSortersContainer');
+    // Add password toggle functionality for edit user modal
+    document.getElementById('toggleEditPassword').addEventListener('click', function() {
+        const passwordInput = document.getElementById('editPassword');
+        const icon = this.querySelector('i');
         
-        // Only show floor and sorter fields when Utility Member is selected
-        if (role === 'utility') {
-            floorContainer.style.display = '';
-            sortersContainer.style.display = '';
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
         } else {
-            floorContainer.style.display = 'none';
-            sortersContainer.style.display = 'none';
+            passwordInput.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
         }
-    }
-
-    // Toggle floor/sorter visibility in Edit User Modal
-    function toggleEditFloorSorter() {
-        const role = document.getElementById('editRole').value;
-        const floorContainer = document.getElementById('editFloorContainer');
-        
-        // Only show floor field when Utility Member is selected
-        if (role === 'Utility Member') {
-            floorContainer.style.display = '';
-        } else {
-            floorContainer.style.display = 'none';
-        }
-    }
-
-    // Initialize visibility when Add User modal opens
-    document.getElementById('addUserModal').addEventListener('show.bs.modal', function() {
-        toggleAddFloorSorter();
     });
 
     // SEARCH FILTER
