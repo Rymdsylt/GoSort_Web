@@ -15,21 +15,28 @@ $i = 0;
  */
 $i++;
 
+/* Read Railway MariaDB credentials from environment variables, fall back to XAMPP defaults */
+$db_host = getenv('MARIADB_HOST') ?: '127.0.0.1';
+$db_user = getenv('MARIADB_USER') ?: 'root';
+$db_pass = getenv('MARIADB_PASSWORD') ?: '';
+$db_port = (int)(getenv('MARIADB_PORT') ?: 3306);
+
 /* Authentication type and info */
 $cfg['Servers'][$i]['auth_type'] = 'config';
-$cfg['Servers'][$i]['user'] = 'root';
-$cfg['Servers'][$i]['password'] = '';
+$cfg['Servers'][$i]['user'] = $db_user;
+$cfg['Servers'][$i]['password'] = $db_pass;
 $cfg['Servers'][$i]['extension'] = 'mysqli';
 $cfg['Servers'][$i]['AllowNoPassword'] = true;
 $cfg['Lang'] = '';
 
-/* Bind to the localhost ipv4 address and tcp */
-$cfg['Servers'][$i]['host'] = '127.0.0.1';
+/* Connect to Railway MariaDB (or localhost for local dev) */
+$cfg['Servers'][$i]['host'] = $db_host;
+$cfg['Servers'][$i]['port'] = $db_port;
 $cfg['Servers'][$i]['connect_type'] = 'tcp';
 
 /* User for advanced features */
-$cfg['Servers'][$i]['controluser'] = 'pma';
-$cfg['Servers'][$i]['controlpass'] = '';
+$cfg['Servers'][$i]['controluser'] = $db_user;
+$cfg['Servers'][$i]['controlpass'] = $db_pass;
 
 /* Advanced phpMyAdmin features */
 $cfg['Servers'][$i]['pmadb'] = 'phpmyadmin';
