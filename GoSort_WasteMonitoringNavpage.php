@@ -6,10 +6,7 @@ require_once 'gs_DB/connection.php';
 require_once 'gs_DB/activity_logs.php';
 
 if (isset($_GET['logout'])) {
-    // Log logout before destroying session
-    if (isset($_SESSION['user_id'])) {
-        log_logout($_SESSION['user_id']);
-    }
+    if (isset($_SESSION['user_id'])) { log_logout($_SESSION['user_id']); }
     session_destroy();
     setcookie('user_logged_in', '', time() - 3600, '/');
     header("Location: GoSort_Login.php");
@@ -21,447 +18,344 @@ if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
     exit();
 }
 
-// Check if current time is within operating hours (6 AM - 6 PM)
-$currentHour = (int)date('G'); // 24-hour format
-$isOperatingHours = ($currentHour >= 6 && $currentHour < 18);
-
-// Fetch all devices
 $sort = $_GET['sort'] ?? 'recent';
-
 $orderBy = match($sort) {
-    'name' => 'device_name ASC',
+    'name'   => 'device_name ASC',
     'active' => 'last_active DESC',
-    'recent' => 'created_at DESC',
-    default => 'created_at DESC'
+    default  => 'created_at DESC'
 };
 
-$query = "
-    SELECT 
-        s.id,
-        s.device_name,
-        s.device_identity,
-        s.status,
-        s.last_active,
-        s.location,
-        s.created_at
-    FROM sorters s
-    ORDER BY {$orderBy}
-";
-
-$stmt = $pdo->query($query);
+$stmt = $pdo->query("SELECT id, device_name, device_identity, status, last_active, location, created_at FROM sorters ORDER BY {$orderBy}");
 $allDevices = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Sort devices based on selected criteria
-$sortDevices = function($devices) use ($sort) {
-    $sortedDevices = $devices;
-    
-    switch ($sort) {
-        case 'name':
-            usort($sortedDevices, function($a, $b) {
-                return strcasecmp($a['device_name'], $b['device_name']);
-            });
-            break;
-        case 'active':
-            usort($sortedDevices, function($a, $b) {
-                return strcmp($b['last_active'], $a['last_active']);
-            });
-            break;
-        case 'recent':
-        default:
-            usort($sortedDevices, function($a, $b) {
-                return strcmp($b['created_at'], $a['created_at']);
-            });
-            break;
-    }
-    
-    return $sortedDevices;
-};
+$onlineDevices  = array_values(array_filter($allDevices, fn($d) => $d['status'] === 'online'));
+$offlineDevices = array_values(array_filter($allDevices, fn($d) => $d['status'] !== 'online'));
 
-$allDevices = $sortDevices($allDevices);
-
-// Separate devices by status
-$onlineDevices = array_filter($allDevices, function($device) {
-    return $device['status'] === 'online';
-});
-
-$offlineDevices = array_filter($allDevices, function($device) {
-    return $device['status'] !== 'online';
-});
-
-$onlineDevices = array_values($onlineDevices);
-$offlineDevices = array_values($offlineDevices);
+function getSortUrl($sortValue) {
+    $p = $_GET;
+    $p['sort'] = $sortValue;
+    return '?' . http_build_query($p);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoSort - Bin Monitoring</title>
+    <title>GoSort - Waste Monitoring</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/dark-mode-global.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="js/theme-manager.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Root Variables */
         :root {
-            --primary-green: #274a17ff;
-            --light-green: #7AF146;
-            --dark-gray: #1f2937;
-            --medium-gray: #6b7280;
-            --light-gray: #f3f4f6;
-            --border-color: #368137;
+            --primary-green: #274a17;
+            --light-green:   #7AF146;
+            --mid-green:     #368137;
+            --dark-gray:     #1f2937;
+            --medium-gray:   #6b7280;
+            --border-color:  #e5e7eb;
+            --card-shadow:   0 1px 3px rgba(0,0,0,0.07);
         }
 
-        /* General Styles */
         body {
-            background-color: #F3F3EF !important;
-            font-family: 'Inter', sans-serif !important;
+            background-color: #e8f1e6;
+            font-family: 'Poppins', sans-serif !important;
             color: var(--dark-gray);
         }
 
-        /* Layout */
         #main-content-wrapper {
-            margin-left: 260px;
-            transition: margin-left 0.3s ease;
-            padding: 20px;
+            margin-left: 240px;
+            padding: 100px 0 20px 0;
+            height: 100vh;
+            overflow-y: auto;
         }
 
-        #main-content-wrapper.collapsed {
-            margin-left: 80px;
-        }
-
-        /* Device Cards */
-        .device-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 15px;
+        .section-container {
+            background: #fff;
+            border-radius: 16px;
             padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #eeeeee;
         }
 
-        .device-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background: linear-gradient(to bottom, var(--light-green), var(--primary-green));
+        .section-block {
+            background: linear-gradient(135deg, rgb(236,251,234) 0%, #d5f5dc 100%);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .section-block:last-child { margin-bottom: 0; }
+
+        .section-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #000000b1;
+            margin-bottom: 1rem;
         }
 
-        /* Card Header and Status */
-        .device-header {
+        .inner-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: var(--card-shadow);
+        }
+
+        /* ── page header ── */
+        .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .sort-btn {
+            background: #fff;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.45rem 0.85rem;
+            font-size: 0.82rem;
+            font-family: 'Poppins', sans-serif;
+            color: var(--dark-gray);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: border-color 0.2s;
+        }
+        .sort-btn:hover { border-color: var(--mid-green); }
+
+        .custom-drive-dropdown {
+            border-radius: 12px !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            border: 1px solid #efefef !important;
+            padding: 6px !important;
+            min-width: 170px !important;
+        }
+        .custom-drive-dropdown .dropdown-item {
+            border-radius: 7px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-family: 'Poppins', sans-serif;
+        }
+        .custom-drive-dropdown .dropdown-item:hover { background: #f1f3f4; }
+        .custom-drive-dropdown .dropdown-item.active-sort {
+            background: #e8f5e1 !important;
+            color: var(--primary-green) !important;
+            font-weight: 600;
+        }
+
+        /* ── device card ── */
+        .device-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.1rem 1.2rem;
+            box-shadow: var(--card-shadow);
+            transition: all 0.2s;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .device-card:hover {
+            box-shadow: 0 4px 14px rgba(0,0,0,0.09);
+            transform: translateY(-2px);
+        }
+        .device-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 16px; bottom: 16px;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
+        }
+        .device-card.status-online::before     { background: #15803d; }
+        .device-card.status-offline::before    { background: #dc2626; }
+        .device-card.status-maintenance::before { background: #1d4ed8; }
+
+        .device-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.85rem;
+        }
+
+        .device-icon-wrap {
+            width: 38px; height: 38px;
+            background: #e8f5e1;
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--primary-green);
+            font-size: 1.1rem;
+            flex-shrink: 0;
         }
 
         .device-name {
-            font-size: 1.25rem;
+            font-size: 0.88rem;
             font-weight: 700;
             color: var(--dark-gray);
-            margin: 0;
+            margin: 0 0 0.25rem 0;
         }
 
-        .status-badge {
+        .status-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            gap: 0.3rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 0.18rem 0.55rem;
             border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            background-color: var(--light-green);
-            color: var(--primary-green);
         }
+        .status-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+        .status-pill.online      { background: #dcfce7; color: #15803d; }
+        .status-pill.offline     { background: #fee2e2; color: #dc2626; }
+        .status-pill.maintenance { background: #dbeafe; color: #1d4ed8; }
 
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            background-color: var(--primary-green);
-            box-shadow: 0 0 8px rgba(39, 74, 23, 0.6);
-        }
-
-        .status-badge.offline {
-            background-color: #fee2e2;
-            color: #dc2626;
-        }
-
-        .status-badge.offline .status-indicator {
-            background-color: #dc2626;
-            box-shadow: 0 0 8px rgba(220, 38, 38, 0.6);
-        }
-
-        .device-info {
-            margin-top: 1rem;
-            font-size: 0.875rem;
+        .device-meta {
+            font-size: 0.74rem;
             color: var(--medium-gray);
-        }
-
-        .info-item {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
+            flex-direction: column;
+            gap: 0.22rem;
+            margin-top: 0.5rem;
         }
+        .device-meta-row { display: flex; align-items: center; gap: 0.3rem; }
+        .device-meta-row i { font-size: 0.72rem; color: #9ca3af; }
 
-        /* Action Buttons */
-        .action-buttons {
+        /* ── action buttons ── */
+        .device-footer {
             display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid #e5e7eb;
+            gap: 0.6rem;
+            margin-top: 0.85rem;
+            padding-top: 0.7rem;
+            border-top: 1px solid #f3f4f6;
         }
 
-        .action-btn {
+        .btn-monitor {
             flex: 1;
-            border: 2px solid;
+            background: linear-gradient(135deg, var(--mid-green) 0%, var(--primary-green) 100%);
+            color: #fff;
+            border: none;
             border-radius: 8px;
-            padding: 0.75rem 1rem;
+            padding: 0.45rem 0.6rem;
+            font-size: 0.76rem;
             font-weight: 600;
-            font-size: 0.875rem;
-            display: flex;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
-            transition: all 0.3s ease;
+            gap: 0.35rem;
+            transition: all 0.2s;
             text-decoration: none;
-            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(39,74,23,0.15);
         }
-
-        .action-btn.monitor-live {
-            background: var(--primary-green);
-            border-color: var(--primary-green);
-            color: white;
-        }
-
-        .action-btn.monitor-live:hover {
-            background: #1e3a11;
-            border-color: #1e3a11;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(39, 74, 23, 0.3);
-        }
-
-        .action-btn.review-logs {
-            background: white;
-            border-color: var(--border-color);
-            color: var(--primary-green);
-        }
-
-        .action-btn.review-logs:hover:not(.disabled) {
-            background: #efffe8ff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(54, 129, 55, 0.2);
-        }
-
-        .action-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            position: relative;
-        }
-
-        .action-btn.disabled::after {
-            position: absolute;
-            bottom: -1.5rem;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.75rem;
-            color: var(--medium-gray);
-            white-space: nowrap;
-        }
-
-        .sort-dropdown-wrapper {
-            background: #fff;
-            border: 1px solid #368137;
-            border-radius: 6px;
-            padding: 0.1rem 0.7rem;
-            display: flex;
-            align-items: center;
+        .btn-monitor:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(39,74,23,0.25); color: #fff; }
+        .btn-monitor.disabled {
+            background: #d1d5db;
             box-shadow: none;
-            margin: 0rem 1rem 0rem 0.2rem;
-            max-height: 2.5rem;
+            cursor: not-allowed;
+            pointer-events: none;
+            color: #9ca3af;
         }
 
-        .sort-dropdown-wrapper .btn-link,
-        .sort-dropdown-wrapper .btn-link:focus {
-            text-decoration: none !important;
+        .btn-logs {
+            flex: 1;
+            background: #fff;
+            color: var(--primary-green);
+            border: 1.5px solid var(--mid-green);
+            border-radius: 8px;
+            padding: 0.45rem 0.6rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            transition: all 0.2s;
+        }
+        .btn-logs:hover { background: #f0fdf4; transform: translateY(-1px); }
+
+        /* ── empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--medium-gray);
+        }
+        .empty-state i { font-size: 2rem; display: block; margin-bottom: 0.5rem; color: #9ca3af; }
+        .empty-state p { font-size: 0.85rem; margin: 0; }
+
+        /* ── date picker modal ── */
+        .modal-content {
+            border-radius: 16px;
+            border: none;
+            font-family: 'Poppins', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+        }
+        .modal-header {
+            border-bottom: 1px solid #f3f4f6;
+            padding: 1.1rem 1.25rem;
+        }
+        .modal-title { font-size: 0.92rem; font-weight: 700; }
+        .modal-body  { padding: 1.25rem; }
+        .modal-footer { border-top: 1px solid #f3f4f6; padding: 0.9rem 1.25rem; }
+
+        .date-device-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--medium-gray);
+            margin-bottom: 0.75rem;
         }
 
-        .sort-dropdown-wrapper:hover {
-            background: #efffe8ff !important;
-        }
-
-        .section-title {
-            font-size: 1.5rem;
+        .date-input-wrap label {
+            font-size: 0.78rem;
             font-weight: 600;
             color: var(--dark-gray);
-            margin: 2rem 0 1rem;
-            padding-left: 1rem;
-            padding: 0.5rem 0;
+            margin-bottom: 0.3rem;
+            display: block;
         }
 
-        #searchDevice {
-            max-width: 300px;
-            border-color: var(--border-color);
-        }
-
-        #searchDevice:focus {
-            box-shadow: 0 0 0 0.25rem rgba(54, 129, 55, 0.25);
-        }
-
-        .device-count {
-            font-size: 0.875rem;
-            color: var(--medium-gray);
-            margin-left: 0.5rem;
-        }
-
-        .device-card.archive {
-            border-color: #0d6efd;
-        }
-
-        .device-card.archive::before {
-            background: linear-gradient(to bottom, #0d6efd, #084298);
-        }
-
-        .device-card.archive .action-btn {
-            border-color: #0d6efd;
-            color: #0d6efd;
-        }
-
-        .device-card.archive .action-btn:hover {
-            background: #f0f6ff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
-        }
-
-        .info-banner {
-            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-            border: 2px solid #0ea5e9;
-            border-radius: 12px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: start;
-            gap: 1rem;
-        }
-
-        .info-banner i {
-            font-size: 1.5rem;
-            color: #0284c7;
-            margin-top: 0.2rem;
-        }
-
-        .info-banner .banner-text {
-            flex: 1;
-        }
-
-        .info-banner h5 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1rem;
-            font-weight: 600;
-            color: #075985;
-        }
-
-        .info-banner ul {
-            margin: 0;
-            padding-left: 1.25rem;
-            font-size: 0.875rem;
-            color: #0c4a6e;
-        }
-
-        .info-banner li {
-            margin-bottom: 0.25rem;
-        }
-
-        .no-devices-message {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 2rem;
-            text-align: center;
-            margin: 1.5rem 0;
-        }
-
-        .no-devices-message i {
-            font-size: 2rem;
-            color: var(--medium-gray);
-            margin-bottom: 1rem;
-        }
-
-        .no-devices-message p {
-            color: var(--medium-gray);
-            font-size: 1rem;
-            margin-bottom: 0;
-        }
-
-        /* Sorting Statistics Styles */
-        .stats-card {
-            border: 2px solid var(--border-color);
-            border-radius: 15px;
-            overflow: hidden;
-        }
-
-        .stat-item {
-            background: white;
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .stat-count {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary-green);
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
-            color: var(--medium-gray);
-        }
-
-        .confidence-badge {
-            background: var(--light-green);
-            color: var(--primary-green);
-            padding: 0.25rem 0.5rem;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .latest-sort-preview {
-            background: white;
-            padding: 1rem;
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-        }
-
-        .latest-sort-preview img {
-            max-width: 100%;
-            height: auto;
+        input[type="date"] {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.82rem;
+            border: 1.5px solid var(--border-color);
             border-radius: 8px;
-            margin-bottom: 1rem;
+            padding: 0.45rem 0.75rem;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="date"]:focus {
+            border-color: var(--mid-green);
+            box-shadow: 0 0 0 3px rgba(54,129,55,0.1);
         }
 
-        @media (max-width: 768px) {
-            .action-buttons {
-                flex-direction: column;
-            }
-            
-            .action-btn.disabled::after {
-                position: static;
-                transform: none;
-                display: block;
-                margin-top: 0.5rem;
-            }
+        .btn-green {
+            background: linear-gradient(135deg, var(--mid-green) 0%, var(--primary-green) 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.4rem 0.9rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(39,74,23,0.15);
+        }
+        .btn-green:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(39,74,23,0.25); color: #fff; }
+
+        @media (max-width: 992px) {
+            #main-content-wrapper { margin-left: 0; padding: 12px; }
         }
     </style>
 </head>
@@ -470,417 +364,186 @@ $offlineDevices = array_values($offlineDevices);
 
     <div id="main-content-wrapper">
         <div class="container-fluid">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="fw-bold mb-0 mt-3">Waste Monitoring</h2>
-                <!-- Search bar -->
-                <div class="input-group mt-3" style="max-width: 300px;">
-                    <input type="text" id="searchDevice" class="form-control" placeholder="Search Device">
-                    <button class="btn btn-outline-secondary" type="button">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-            </div>
 
-            <hr style="height: 1.5px; background-color: #000; opacity: 1; margin-left:6.5px;" class="mb-4">
+            <?php include 'topbar.php'; ?>
 
-            <!-- Today's Sorting Statistics -->
-            <div class="stats-card mb-4">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center p-3">
-                    <h5 class="mb-0">Today's Sorting Statistics</h5>
-                    <div class="d-flex align-items-center">
-                        <small class="me-2">Auto-updates every 2 seconds</small>
-                        <div class="spinner-border spinner-border-sm text-light" role="status" id="updateSpinner" style="display: none;">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-4">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="row" id="sortingStats">
-                                <!-- Stats will be populated by JavaScript -->
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="latest-sort-preview">
-                                <h6 class="text-center mb-3">Latest Sorted Item</h6>
-                                <div id="latestImageContainer" class="text-center">
-                                    <!-- Latest image will be displayed here -->
-                                </div>
-                                <div id="latestSortInfo" class="text-center mt-2">
-                                    <!-- Latest sort info will be displayed here -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div class="section-container">
 
-            <!-- Info Banner -->
-            <div class="info-banner">
-                <i class="bi bi-info-circle-fill"></i>
-                <div class="banner-text">
-                    <h5>Monitoring Options</h5>
-                    <ul>
-                        <li><strong>Monitor Live Sorting:</strong> Watch real-time waste sorting on online devices</li>
-                        <li><strong>Review Daily Logs:</strong> Check and verify all sorting history (available after 6:00 PM for all devices)</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="d-flex mb-2">
-                <div class="sort-dropdown-wrapper">
+                <!-- Page header -->
+                <div class="page-header">
+                    <div></div>
                     <div class="dropdown">
-                        <button class="btn btn-link text-dark dropdown-toggle px-0" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            Sort by
+                        <button class="sort-btn dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-arrow-down-up" style="font-size:0.78rem;"></i>
+                            <?php echo match($sort) { 'name' => 'Name (A–Z)', 'active' => 'Last Active', default => 'Most Recent' }; ?>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown" aria-labelledby="sortDropdown">
-                            <?php
-                            // Get current query parameters
-                            $params = $_GET;
-                            
-                            // Function to generate sort URL
-                            function getSortUrl($sortValue) {
-                                global $params;
-                                $urlParams = $params;
-                                $urlParams['sort'] = $sortValue;
-                                return '?' . http_build_query($urlParams);
-                            }
-                            ?>
-                            <li><a class="dropdown-item<?= $sort === 'recent' ? ' active-sort' : '' ?>" href="<?= getSortUrl('recent') ?>">Recently Added</a></li>
-                            <li><a class="dropdown-item<?= $sort === 'name' ? ' active-sort' : '' ?>" href="<?= getSortUrl('name') ?>">Name (A-Z)</a></li>
+                        <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown">
+                            <li><a class="dropdown-item<?= $sort === 'recent' ? ' active-sort' : '' ?>" href="<?= getSortUrl('recent') ?>">Most Recent</a></li>
+                            <li><a class="dropdown-item<?= $sort === 'name'   ? ' active-sort' : '' ?>" href="<?= getSortUrl('name') ?>">Name (A–Z)</a></li>
                             <li><a class="dropdown-item<?= $sort === 'active' ? ' active-sort' : '' ?>" href="<?= getSortUrl('active') ?>">Last Active</a></li>
                         </ul>
                     </div>
                 </div>
-            </div>
 
-            <!-- Online Devices Section -->
-            <div class="section-title mt-4">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-circle-fill text-success me-2" style="font-size: 0.75rem;"></i>
-                    <h3 class="mb-0" style="font-size: 1.25rem;">Online Devices</h3>
-                    <span class="device-count">(<?php echo count($onlineDevices); ?>)</span>
-                </div>
-            </div>
-            <div class="row">
-                <?php if (empty($onlineDevices)): ?>
-                    <div class="col-12">
-                        <div class="no-devices-message">
-                            <i class="bi bi-info-circle-fill d-block"></i>
-                            <p>No online devices available for live monitoring.</p>
-                        </div>
+                <?php $hasAny = !empty($onlineDevices) || !empty($offlineDevices); ?>
+
+                <?php if (!$hasAny): ?>
+
+                    <div class="empty-state">
+                        <i class="bi bi-cpu"></i>
+                        <p>No devices registered yet.</p>
                     </div>
+
                 <?php else: ?>
-                    <?php foreach ($onlineDevices as $device): ?>
-                        <div class="col-lg-4 col-md-6">
-                            <div class="device-card" data-device="<?php echo htmlspecialchars($device['device_name']); ?>">
-                                <div class="device-header">
-                                    <h3 class="device-name">
-                                        <?php echo htmlspecialchars($device['device_name']); ?>
-                                    </h3>
-                                    <div class="status-badge">
-                                        <span class="status-indicator"></span>
-                                        Online
-                                    </div>
-                                </div>
-                                <div class="device-info">
-                                    <div class="info-item">
-                                        <i class="bi bi-geo-alt"></i>
-                                        <?php echo htmlspecialchars($device['location']); ?>
-                                    </div>
-                                    <div class="info-item">
-                                        <i class="bi bi-clock"></i>
-                                        Last active: <?php echo date('M j, Y g:i A', strtotime($device['last_active'])); ?>
-                                    </div>
-                                </div>
-                                
-                                <div class="action-buttons">
-                                    <a href="GoSort_LiveMonitor.php?device=<?php echo $device['id']; ?>&name=<?php echo urlencode($device['device_name']); ?>&identity=<?php echo urlencode($device['device_identity']); ?>" 
-                                       class="action-btn monitor-live">
-                                        <i class="bi bi-broadcast"></i>
-                                        Monitor Live
-                                    </a>
-                                    
-                                    <a href="GoSort_ReviewLogs.php?device=<?php echo $device['id']; ?>&name=<?php echo urlencode($device['device_name']); ?>&identity=<?php echo urlencode($device['device_identity']); ?>" 
-                                       class="action-btn review-logs">
-                                        <i class="bi bi-clock-history"></i>
-                                        Review Logs
-                                    </a>
-                                </div>
-                            </div>
+
+                    <!-- ── Online Devices ── -->
+                    <?php if (!empty($onlineDevices)): ?>
+                    <div class="section-block">
+                        <div class="section-label">
+                            <i class="bi bi-circle-fill text-success me-1" style="font-size:0.55rem;vertical-align:middle;"></i>
+                            Online Devices (<?= count($onlineDevices) ?>)
                         </div>
-                    <?php endforeach; ?>
+                        <div class="row g-3">
+                            <?php foreach ($onlineDevices as $device): ?>
+                                <div class="col-lg-4 col-md-6">
+                                    <div class="device-card status-online">
+                                        <div class="device-card-header">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="device-icon-wrap"><i class="bi bi-cpu-fill"></i></div>
+                                                <div style="margin-left:0.6rem;">
+                                                    <div class="device-name"><?= htmlspecialchars($device['device_name']) ?></div>
+                                                    <span class="status-pill online"><span class="dot"></span>Online</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="device-meta">
+                                            <div class="device-meta-row"><i class="bi bi-geo-alt-fill"></i><?= htmlspecialchars($device['location']) ?></div>
+                                            <div class="device-meta-row"><i class="bi bi-clock"></i>Last active: <?= date('M j, Y g:i A', strtotime($device['last_active'])) ?></div>
+                                        </div>
+                                        <div class="device-footer">
+                                            <a href="GoSort_LiveMonitor.php?device=<?= $device['id'] ?>&name=<?= urlencode($device['device_name']) ?>&identity=<?= urlencode($device['device_identity']) ?>"
+                                               class="btn-monitor">
+                                                <i class="bi bi-broadcast"></i> Monitor Live
+                                            </a>
+                                            <button class="btn-logs"
+                                                onclick="openDatePicker('<?= $device['id'] ?>','<?= htmlspecialchars(addslashes($device['device_name'])) ?>','<?= urlencode($device['device_identity']) ?>')">
+                                                <i class="bi bi-clock-history"></i> Review Logs
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- ── Offline Devices ── -->
+                    <?php if (!empty($offlineDevices)): ?>
+                    <div class="section-block">
+                        <div class="section-label">
+                            <i class="bi bi-circle-fill text-danger me-1" style="font-size:0.55rem;vertical-align:middle;"></i>
+                            Offline Devices (<?= count($offlineDevices) ?>)
+                        </div>
+                        <div class="row g-3">
+                            <?php foreach ($offlineDevices as $device): ?>
+                                <div class="col-lg-4 col-md-6">
+                                    <div class="device-card status-offline">
+                                        <div class="device-card-header">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="device-icon-wrap" style="background:#fee2e2;color:#dc2626;"><i class="bi bi-cpu-fill"></i></div>
+                                                <div style="margin-left:0.6rem;">
+                                                    <div class="device-name"><?= htmlspecialchars($device['device_name']) ?></div>
+                                                    <span class="status-pill offline"><span class="dot"></span>Offline</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="device-meta">
+                                            <div class="device-meta-row"><i class="bi bi-geo-alt-fill"></i><?= htmlspecialchars($device['location']) ?></div>
+                                            <div class="device-meta-row"><i class="bi bi-clock"></i>Last active: <?= date('M j, Y g:i A', strtotime($device['last_active'])) ?></div>
+                                        </div>
+                                        <div class="device-footer">
+                                            <div class="btn-monitor disabled">
+                                                <i class="bi bi-broadcast"></i> Monitor Live
+                                            </div>
+                                            <button class="btn-logs"
+                                                onclick="openDatePicker('<?= $device['id'] ?>','<?= htmlspecialchars(addslashes($device['device_name'])) ?>','<?= urlencode($device['device_identity']) ?>')">
+                                                <i class="bi bi-clock-history"></i> Review Logs
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                 <?php endif; ?>
-            </div>
 
-            <!-- Offline Devices Section -->
-            <div class="section-title mt-5">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-circle-fill text-danger me-2" style="font-size: 0.75rem;"></i>
-                    <h3 class="mb-0" style="font-size: 1.25rem;">Offline Devices</h3>
-                    <span class="device-count">(<?php echo count($offlineDevices); ?>)</span>
+            </div><!-- /section-container -->
+        </div>
+    </div>
+
+    <!-- ── Date Picker Modal ── -->
+    <div class="modal fade" id="datePickerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:360px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-calendar3 me-2" style="color:var(--primary-green);"></i>Select Date to Review
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-            </div>
-            <div class="row">
-                <?php if (empty($offlineDevices)): ?>
-                    <div class="col-12">
-                        <div class="no-devices-message">
-                            <i class="bi bi-info-circle-fill d-block"></i>
-                            <p>All devices are online!</p>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <?php foreach ($offlineDevices as $device): ?>
-                        <div class="col-lg-4 col-md-6">
-                            <div class="device-card offline" data-device="<?php echo htmlspecialchars($device['device_name']); ?>">
-                                <div class="device-header">
-                                    <h3 class="device-name">
-                                        <?php echo htmlspecialchars($device['device_name']); ?>
-                                    </h3>
-                                    <div class="status-badge offline">
-                                        <span class="status-indicator"></span>
-                                        Offline
-                                    </div>
-                                </div>
-                                <div class="device-info">
-                                    <div class="info-item">
-                                        <i class="bi bi-geo-alt"></i>
-                                        <?php echo htmlspecialchars($device['location']); ?>
-                                    </div>
-                                    <div class="info-item">
-                                        <i class="bi bi-clock"></i>
-                                        Last active: <?php echo date('M j, Y g:i A', strtotime($device['last_active'])); ?>
-                                    </div>
-                                </div>
-                                
-                                <div class="action-buttons">
-                                    <div class="action-btn monitor-live disabled" style="opacity: 0.4; cursor: not-allowed;">
-                                        <i class="bi bi-broadcast"></i>
-                                        Monitor Live
-                                    </div>
-                                    
-                                    <a href="GoSort_ReviewLogs.php?device=<?php echo $device['id']; ?>&name=<?php echo urlencode($device['device_name']); ?>&identity=<?php echo urlencode($device['device_identity']); ?>" 
-                                       class="action-btn review-logs">
-                                        <i class="bi bi-clock-history"></i>
-                                        Review Logs
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Archive Section -->
-        <div class="section-title mt-5">
-            <div class="d-flex align-items-center">
-                <i class="bi bi-archive-fill text-primary me-2" style="font-size: 0.75rem;"></i>
-                <h3 class="mb-0" style="font-size: 1.25rem;">Archive</h3>
-            </div>
-        </div>
-        <div class="row">
-            <?php
-            // Get archived sorting data grouped by device and date, with review counts
-            $archiveQuery = "
-                SELECT 
-                    s.id as device_id,
-                    s.device_identity,
-                    s.device_name,
-                    DATE(sh.sorted_at) as sort_date,
-                    COUNT(*) as total_sorted,
-                    SUM(CASE WHEN sr.id IS NOT NULL THEN 1 ELSE 0 END) as reviewed_count,
-                    SUM(CASE WHEN sr.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
-                    SUM(CASE WHEN sr.is_correct = 0 THEN 1 ELSE 0 END) as wrong_count
-                FROM sorting_history sh
-                JOIN sorters s ON s.device_identity = sh.device_identity
-                LEFT JOIN sorting_reviews sr ON sh.id = sr.sorting_history_id
-                WHERE sh.is_maintenance = 0
-                GROUP BY s.device_identity, DATE(sh.sorted_at)
-                ORDER BY sort_date DESC
-                LIMIT 6";
-            
-            $archiveStmt = $pdo->query($archiveQuery);
-            $archiveData = $archiveStmt->fetchAll(PDO::FETCH_ASSOC);
-
-            if (empty($archiveData)): ?>
-                <div class="col-12">
-                    <div class="no-devices-message">
-                        <i class="bi bi-archive-fill d-block"></i>
-                        <p>No sorting history available.</p>
+                <div class="modal-body">
+                    <div class="date-device-name" id="modalDeviceName"></div>
+                    <div class="date-input-wrap">
+                        <label for="reviewDate">Date</label>
+                        <input type="date" id="reviewDate" max="<?= date('Y-m-d') ?>">
                     </div>
                 </div>
-            <?php else: 
-                foreach ($archiveData as $archive): 
-                    $pendingCount = $archive['total_sorted'] - $archive['reviewed_count'];
-                    ?>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="device-card archive">
-                            <div class="device-header">
-                                <h3 class="device-name">
-                                    <?php echo htmlspecialchars($archive['device_name']); ?>
-                                </h3>
-                                <div class="badge bg-primary">
-                                    <?php echo date('M j, Y', strtotime($archive['sort_date'])); ?>
-                                </div>
-                            </div>
-                            <div class="device-info">
-                                <div class="info-item">
-                                    <i class="bi bi-fingerprint"></i>
-                                    ID: <?php echo htmlspecialchars($archive['device_identity']); ?>
-                                </div>
-                                <div class="info-item">
-                                    <i class="bi bi-trash"></i>
-                                    Total Sorted: <?php echo number_format($archive['total_sorted']); ?> items
-                                </div>
-                                <div class="info-item">
-                                    <i class="bi bi-check-circle text-success"></i>
-                                    <span class="text-success"><?php echo $archive['correct_count']; ?></span> |
-                                    <i class="bi bi-x-circle text-danger"></i>
-                                    <span class="text-danger"><?php echo $archive['wrong_count']; ?></span> |
-                                    <i class="bi bi-clock text-warning"></i>
-                                    <span class="text-warning"><?php echo $pendingCount; ?> pending</span>
-                                </div>
-                            </div>
-                            
-                            <div class="action-buttons">
-                                <a href="GoSort_ReviewLogs.php?device=<?php echo $archive['device_id']; ?>&name=<?php echo urlencode($archive['device_name']); ?>&identity=<?php echo urlencode($archive['device_identity']); ?>&date=<?php echo urlencode($archive['sort_date']); ?>" 
-                                   class="action-btn review-logs w-100">
-                                    <i class="bi bi-clipboard-check"></i>
-                                    Review Detections
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach;
-            endif; ?>
-        </div>
-
-        <!-- Corrected Waste Section -->
-        <div class="section-title mt-5">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <i class="bi bi-image text-warning me-2" style="font-size: 0.75rem;"></i>
-                    <h3 class="d-inline" style="font-size: 1.25rem;">Corrected Waste Images</h3>
+                <div class="modal-footer">
+                    <button class="btn btn-light" data-bs-dismiss="modal" style="font-family:'Poppins',sans-serif;font-size:0.82rem;border-radius:8px;">Cancel</button>
+                    <button class="btn-green" onclick="goToReviewLogs()">
+                        <i class="bi bi-arrow-right"></i> View Logs
+                    </button>
                 </div>
-                <a href="GoSort_CorrectedWaste.php" class="btn btn-warning">
-                    <i class="bi bi-table me-2"></i>
-                    View Corrections Table
-                </a>
             </div>
-
         </div>
     </div>
 
     <script src="js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Function to update sorting statistics
-            function updateSortingStats() {
-                const spinner = document.getElementById('updateSpinner');
-                spinner.style.display = 'inline-block';
+        let _reviewDeviceId       = '';
+        let _reviewDeviceIdentity = '';
 
-                fetch('api/get_daily_sorting.php')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            const statsContainer = document.getElementById('sortingStats');
-                            const imageContainer = document.getElementById('latestImageContainer');
-                            const sortInfoContainer = document.getElementById('latestSortInfo');
-                            
-                            // Clear existing stats
-                            statsContainer.innerHTML = '';
-                            
-                            // Group data by trash type
-                            const statsByType = {};
-                            let latestImage = null;
-                            let latestInfo = null;
-                            let latestTimestamp = 0;
-                            
-                            data.data.forEach(item => {
-                                if (!statsByType[item.trash_type]) {
-                                    statsByType[item.trash_type] = {
-                                        count: 0,
-                                        confidence: []
-                                    };
-                                }
-                                statsByType[item.trash_type].count += parseInt(item.count);
-                                statsByType[item.trash_type].confidence.push(parseFloat(item.avg_confidence));
-                                
-                                // Check if this is the latest image by comparing timestamps
-                                if (item.latest_image && item.timestamp) {
-                                    const itemTimestamp = new Date(item.timestamp).getTime();
-                                    if (itemTimestamp > latestTimestamp) {
-                                        latestTimestamp = itemTimestamp;
-                                        latestImage = item.latest_image;
-                                        latestInfo = {
-                                            type: item.trash_type,
-                                            confidence: item.avg_confidence,
-                                            timestamp: item.timestamp
-                                        };
-                                    }
-                                }
-                            });
-                            
-                            // Create stat cards for each type
-                            Object.entries(statsByType).forEach(([type, stats]) => {
-                                const avgConfidence = stats.confidence.reduce((a, b) => a + b, 0) / stats.confidence.length;
-                                const html = `
-                                    <div class="col-md-6 col-lg-4 mb-3">
-                                        <div class="stat-item">
-                                            <div class="stat-count">${stats.count}</div>
-                                            <div class="stat-label">${type.toUpperCase()} Items</div>
-                                            <div class="confidence-badge mt-2">
-                                                Avg. Confidence: ${avgConfidence.toFixed(2)}%
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                                statsContainer.innerHTML += html;
-                            });
-                            
-                            // Update latest image if available
-                            if (latestImage && latestInfo) {
-                                imageContainer.innerHTML = `<img src="data:image/jpeg;base64,${latestImage}" class="img-fluid rounded" alt="Latest sorted item">`;
-                                sortInfoContainer.innerHTML = `
-                                    <div class="mt-2">
-                                        <strong>Type:</strong> ${latestInfo.type.toUpperCase()}<br>
-                                        <strong>Confidence:</strong> ${parseFloat(latestInfo.confidence).toFixed(2)}%<br>
-                                        <small class="text-muted">Time: ${new Date(latestInfo.timestamp).toLocaleTimeString()}</small>
-                                    </div>
-                                `;
-                            }
-                        }
-                        spinner.style.display = 'none';
-                    })
-                    .catch(error => {
-                        console.error('Error fetching sorting data:', error);
-                        spinner.style.display = 'none';
+        function openDatePicker(deviceId, deviceName, deviceIdentity) {
+            _reviewDeviceId       = deviceId;
+            _reviewDeviceIdentity = deviceIdentity;
+            document.getElementById('modalDeviceName').textContent = 'Device: ' + deviceName;
+            document.getElementById('reviewDate').value = new Date().toISOString().split('T')[0];
+            new bootstrap.Modal(document.getElementById('datePickerModal')).show();
+        }
+
+        function goToReviewLogs() {
+            const date = document.getElementById('reviewDate').value;
+            if (!date) { alert('Please select a date.'); return; }
+            const url = `GoSort_ReviewLogs.php?device=${_reviewDeviceId}&identity=${_reviewDeviceIdentity}&date=${encodeURIComponent(date)}`;
+            window.location.href = url;
+        }
+
+        // Live status polling every 5s
+        setInterval(() => {
+            fetch('gs_DB/connection_status.php')
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data?.devices) return;
+                    data.devices.forEach(dev => {
+                        document.querySelectorAll('[data-device-id]').forEach(card => {
+                            // optional: wire up if you add data-device-id attrs
+                        });
                     });
-            }
-
-            // Initial update
-            updateSortingStats();
-
-            // Update every 2 seconds
-            setInterval(updateSortingStats, 2000);
-
-            // Search functionality
-            document.getElementById('searchDevice').addEventListener('keyup', function() {
-                const searchValue = this.value.toLowerCase().trim();
-                document.querySelectorAll('[data-device]').forEach(card => {
-                    const deviceName = card.getAttribute('data-device').toLowerCase();
-                    
-                    if (deviceName.includes(searchValue)) {
-                        card.closest('.col-lg-4').style.display = '';
-                    } else {
-                        card.closest('.col-lg-4').style.display = 'none';
-                    }
-                });
-            });
-        });
+                })
+                .catch(() => {});
+        }, 5000);
     </script>
-    <script src="js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

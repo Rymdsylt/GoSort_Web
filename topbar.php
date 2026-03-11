@@ -14,6 +14,11 @@ if ($topbar_userId) {
     $topbar_email = $tb_user['email']    ?? '';
 }
 
+// Unread notification count
+$notif_stmt = $pdo->prepare("SELECT COUNT(*) FROM bin_notifications WHERE is_read = 0");
+$notif_stmt->execute();
+$unread_count = $notif_stmt->fetchColumn();
+
 $pageTitles = [
     'GoSort_Dashboard.php'              => 'Dashboard',
     'GoSort_Sorters.php'                => 'Devices',
@@ -23,6 +28,7 @@ $pageTitles = [
     'GoSort_Maintenance.php'            => 'Maintenance',
     'GoSort_WasteMonitoringNavpage.php' => 'Waste Monitoring',
     'GoSort_LiveMonitor.php'            => 'Waste Monitoring',
+    'GoSort_ReviewLogs.php'             => 'Waste Monitoring',
     'GoSort_Notifications.php'          => 'Notifications',
     'GoSort_Settings.php'               => 'Settings',
 ];
@@ -177,8 +183,10 @@ $topbar_pageTitle = $pageTitles[basename($_SERVER['PHP_SELF'])] ?? 'GoSort';
     <div class="topbar-right">
 
         <a href="GoSort_Notifications.php" class="topbar-notif">
-            <i class="bi bi-bell"></i>
-            <span class="topbar-notif-badge"></span>
+            <i class="bi bi-bell<?= $unread_count > 0 ? '-fill' : '' ?>"></i>
+            <?php if ($unread_count > 0): ?>
+                <span class="topbar-notif-badge"></span>
+            <?php endif; ?>
         </a>
 
         <div class="topbar-divider"></div>

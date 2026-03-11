@@ -314,17 +314,6 @@ $p_role_label = $role_labels[$p_role] ?? ucfirst($p_role);
 
         <div class="profile-info-row">
             <div>
-                <div class="pir-label">Dark Mode</div>
-                <div class="pir-value">Toggle light / dark theme</div>
-            </div>
-            <label class="theme-switch">
-                <input type="checkbox" id="theme-toggle" onchange="profileToggleTheme()">
-                <span class="ts-slider"></span>
-            </label>
-        </div>
-
-        <div class="profile-info-row">
-            <div>
                 <div class="pir-label">Session</div>
                 <div class="pir-value">Securely log out of your account</div>
             </div>

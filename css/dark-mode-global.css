@@ -1697,10 +1697,12 @@ body.dark-mode .tab-btn {
 
 body.dark-mode .tab-btn:hover {
     color: var(--dm-text-primary);
+    background: rgba(255,255,255,0.05) !important;
 }
 
 body.dark-mode .tab-btn.active {
-    color: #66bb6a;
+    color: #7AF146 !important;
+    background: transparent !important;
 }
 
 body.dark-mode .search-input {
@@ -1802,4 +1804,270 @@ body.dark-mode [style*="background:#fff"],
 body.dark-mode [style*="background-color: #fff"],
 body.dark-mode [style*="background-color:#fff"] {
     background: var(--dm-bg-secondary) !important;
+}
+
+/* =====================================================================
+   SETTINGS PAGE — section-container, section-block, inner-card
+   ===================================================================== */
+body.dark-mode .section-container {
+    background: var(--dm-bg-secondary) !important;
+    border-color: var(--dm-border) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+body.dark-mode .section-block {
+    background: linear-gradient(135deg, #1a2e1a 0%, #1e3520 100%) !important;
+}
+
+body.dark-mode .inner-card {
+    background: var(--dm-bg-tertiary) !important;
+    border-color: var(--dm-border) !important;
+}
+
+body.dark-mode .inner-card-header {
+    border-bottom-color: var(--dm-border) !important;
+}
+
+body.dark-mode .inner-card-title {
+    color: var(--dm-text-primary) !important;
+}
+
+body.dark-mode .section-label {
+    color: rgba(232,232,232,0.6) !important;
+}
+
+/* Search input inside settings */
+body.dark-mode .search-wrap input {
+    background: var(--dm-bg-secondary) !important;
+    border-color: var(--dm-border) !important;
+    color: var(--dm-text-primary) !important;
+}
+body.dark-mode .search-wrap input::placeholder { color: #666; }
+body.dark-mode .search-wrap .search-icon { color: #666; }
+
+/* btn-outline-green in dark mode */
+body.dark-mode .btn-outline-green {
+    background: var(--dm-bg-tertiary) !important;
+    border-color: #368137 !important;
+    color: #7AF146 !important;
+}
+body.dark-mode .btn-outline-green:hover {
+    background: rgba(122,241,70,0.1) !important;
+}
+
+/* User table */
+body.dark-mode #userTable thead th {
+    background: var(--dm-bg-tertiary) !important;
+    color: var(--dm-text-secondary) !important;
+    border-bottom-color: var(--dm-border) !important;
+}
+body.dark-mode #userTable tbody td {
+    border-bottom-color: var(--dm-border) !important;
+    color: var(--dm-text-primary) !important;
+}
+body.dark-mode #userTable tbody tr:hover td {
+    background: rgba(122,241,70,0.05) !important;
+}
+
+/* Role badges in dark mode */
+body.dark-mode .role-badge.admin      { background: rgba(122,241,70,0.12);  color: #7AF146; }
+body.dark-mode .role-badge.utility    { background: rgba(59,130,246,0.15);  color: #93c5fd; }
+body.dark-mode .role-badge.superadmin { background: rgba(251,191,36,0.15);  color: #fcd34d; }
+
+/* Device chips */
+body.dark-mode .device-chip {
+    background: rgba(122,241,70,0.08) !important;
+    border-color: rgba(122,241,70,0.2) !important;
+    color: #7AF146 !important;
+}
+body.dark-mode .device-chip .device-loc { color: var(--dm-text-secondary) !important; }
+
+/* Sorter cards in modals */
+body.dark-mode .sorter-card-inner {
+    background: var(--dm-bg-tertiary) !important;
+    border-color: var(--dm-border) !important;
+}
+body.dark-mode .sorter-card:hover .sorter-card-inner {
+    border-color: #368137 !important;
+    background: rgba(122,241,70,0.07) !important;
+}
+body.dark-mode .sorter-checkbox:checked + .sorter-card-inner {
+    background: rgba(122,241,70,0.12) !important;
+    border-color: #368137 !important;
+}
+body.dark-mode .sorter-icon-wrap {
+    background: rgba(122,241,70,0.1) !important;
+    color: #7AF146 !important;
+}
+body.dark-mode .sorter-checkbox:checked + .sorter-card-inner .sorter-icon-wrap {
+    background: #2e7d32 !important;
+    color: #fff !important;
+}
+body.dark-mode .sorter-name  { color: var(--dm-text-primary) !important; }
+body.dark-mode .sorter-location { color: var(--dm-text-secondary) !important; }
+body.dark-mode .sorter-card-grid::-webkit-scrollbar-track { background: var(--dm-bg-tertiary); }
+body.dark-mode .sorter-card-grid::-webkit-scrollbar-thumb { background: #444; }
+
+/* =====================================================================
+   PROFILE TAB — profile-inner-card, profile-hero, info rows
+   ===================================================================== */
+body.dark-mode .profile-section-block {
+    background: linear-gradient(135deg, #1a2e1a 0%, #1e3520 100%) !important;
+}
+
+body.dark-mode .profile-inner-card {
+    background: var(--dm-bg-tertiary) !important;
+    border-color: var(--dm-border) !important;
+}
+
+body.dark-mode .profile-hero {
+    border-bottom-color: var(--dm-border) !important;
+}
+
+body.dark-mode .profile-hero-name {
+    color: var(--dm-text-primary) !important;
+}
+
+body.dark-mode .profile-section-label {
+    color: rgba(232,232,232,0.55) !important;
+}
+
+body.dark-mode .profile-info-row {
+    border-bottom-color: var(--dm-border) !important;
+}
+
+body.dark-mode .pir-label {
+    color: var(--dm-text-secondary) !important;
+}
+
+body.dark-mode .pir-value {
+    color: var(--dm-text-primary) !important;
+}
+
+/* Inline edit inputs */
+body.dark-mode .pir-field-input {
+    background: var(--dm-bg-secondary) !important;
+    border-color: var(--dm-border) !important;
+    color: var(--dm-text-primary) !important;
+}
+body.dark-mode .pir-field-input::placeholder { color: #666; }
+body.dark-mode .pir-field-input:focus {
+    border-color: #368137 !important;
+    box-shadow: 0 0 0 3px rgba(54,129,55,0.2) !important;
+}
+
+/* Edit buttons */
+body.dark-mode .pir-edit-btn {
+    border-color: #368137 !important;
+    color: #7AF146 !important;
+    background: transparent !important;
+}
+body.dark-mode .pir-edit-btn:hover {
+    background: rgba(122,241,70,0.08) !important;
+}
+body.dark-mode .pir-edit-btn.active {
+    background: linear-gradient(135deg, #368137 0%, #274a17 100%) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+body.dark-mode .pir-edit-btn.danger {
+    border-color: #ff6b6b !important;
+    color: #ff6b6b !important;
+}
+body.dark-mode .pir-edit-btn.danger:hover {
+    background: rgba(255,107,107,0.1) !important;
+}
+
+/* Unsaved bar */
+body.dark-mode .profile-save-bar {
+    background: rgba(251,191,36,0.08) !important;
+    border-color: rgba(251,191,36,0.3) !important;
+    color: #fcd34d !important;
+}
+
+/* Theme switch ts-slider */
+body.dark-mode .ts-slider {
+    background: #444 !important;
+}
+body.dark-mode input:checked + .ts-slider {
+    background: #368137 !important;
+}
+
+/* Password hint text */
+body.dark-mode .pw-hint {
+    color: var(--dm-text-secondary) !important;
+}
+
+/* Profile hero role badge dark overrides */
+body.dark-mode .profile-hero-role.admin      { background: rgba(122,241,70,0.12); color: #7AF146; }
+body.dark-mode .profile-hero-role.utility    { background: rgba(59,130,246,0.15); color: #93c5fd; }
+body.dark-mode .profile-hero-role.superadmin { background: rgba(251,191,36,0.15); color: #fcd34d; }
+
+/* =====================================================================
+   DASHBOARD — dark mode for new components
+   ===================================================================== */
+body.dark-mode .device-status-card {
+    background: var(--dm-bg-tertiary) !important;
+    border-color: var(--dm-border) !important;
+}
+body.dark-mode .device-status-name   { color: var(--dm-text-primary) !important; }
+body.dark-mode .device-status-location { color: var(--dm-text-secondary) !important; }
+
+body.dark-mode .activity-row { border-bottom-color: var(--dm-border) !important; }
+body.dark-mode .activity-row:hover { background: rgba(255,255,255,0.04) !important; }
+body.dark-mode .activity-avatar { background: rgba(122,241,70,0.1) !important; }
+body.dark-mode .activity-action { color: var(--dm-text-primary) !important; }
+body.dark-mode .activity-user   { color: var(--dm-text-secondary) !important; }
+body.dark-mode .activity-details { color: var(--dm-text-secondary) !important; }
+body.dark-mode .activity-time   { color: #666 !important; }
+body.dark-mode .activity-device {
+    background: rgba(122,241,70,0.1) !important;
+    color: #7AF146 !important;
+}
+
+body.dark-mode .welcome-stat-icon {
+    background: rgba(255,255,255,0.1) !important;
+}
+
+/* =====================================================================
+   SORTERS PAGE — dark mode for sort button & device footer
+   ===================================================================== */
+body.dark-mode .sort-btn {
+    background: var(--dm-bg-tertiary) !important;
+    border-color: var(--dm-border) !important;
+    color: var(--dm-text-primary) !important;
+}
+body.dark-mode .sort-btn:hover {
+    border-color: #368137 !important;
+}
+
+body.dark-mode .device-footer {
+    border-top-color: var(--dm-border) !important;
+}
+body.dark-mode .analytics-link {
+    color: #7AF146 !important;
+}
+body.dark-mode .device-id-label {
+    color: #555 !important;
+}
+body.dark-mode .device-meta-row {
+    color: var(--dm-text-secondary) !important;
+}
+body.dark-mode .device-meta-row i {
+    color: #555 !important;
+}
+body.dark-mode .kebab-btn {
+    color: var(--dm-text-secondary) !important;
+}
+body.dark-mode .kebab-btn:hover {
+    background: var(--dm-bg-hover) !important;
+    color: var(--dm-text-primary) !important;
+}
+body.dark-mode .btn-add-device {
+    background: linear-gradient(135deg, #1a3a1a 0%, #2a5a2a 100%) !important;
+    color: #7AF146 !important;
+}
+body.dark-mode .btn-add-device:hover {
+    background: linear-gradient(135deg, #2a5a2a 0%, #368137 100%) !important;
+    color: #fff !important;
 }

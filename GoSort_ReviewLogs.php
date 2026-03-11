@@ -9,15 +9,12 @@ if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
     exit();
 }
 
-// Get device ID and other parameters from URL
-$deviceId = $_GET['device'] ?? null;
-$deviceName = $_GET['name'] ?? 'Unknown Device';
+$deviceId       = $_GET['device']   ?? null;
+$deviceName     = $_GET['name']     ?? '';
 $deviceIdentity = $_GET['identity'] ?? '';
-$selectedDate = $_GET['date'] ?? date('Y-m-d'); // Support date parameter from archive
+$selectedDate   = $_GET['date']     ?? date('Y-m-d');
 
-// If deviceIdentity is not provided but deviceId is (for archive links)
 if (!$deviceIdentity && $deviceId) {
-    // Try to get device identity from device ID or use deviceId as identity
     $deviceIdentity = $deviceId;
 }
 
@@ -26,57 +23,35 @@ if (!$deviceId && !$deviceIdentity) {
     exit();
 }
 
-// Validate date format
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selectedDate)) {
     $selectedDate = date('Y-m-d');
 }
 
-// Fetch sorting history for this device and date, including review status
-$query = "
-    SELECT 
-        sh.id,
-        sh.trash_type,
-        sh.trash_class,
-        sh.confidence,
-        sh.image_data,
-        sh.sorted_at,
-        sr.is_correct as review_status,
-        sr.reviewed_at
+// If device name not in URL, look it up
+if (empty($deviceName)) {
+    $dq = $pdo->prepare("SELECT device_name FROM sorters WHERE id = ? OR device_identity = ? LIMIT 1");
+    $dq->execute([$deviceId, $deviceIdentity]);
+    $dr = $dq->fetch(PDO::FETCH_ASSOC);
+    if ($dr) $deviceName = $dr['device_name'];
+}
+
+$stmt = $pdo->prepare("
+    SELECT sh.id, sh.trash_type, sh.trash_class, sh.confidence, sh.image_data, sh.sorted_at,
+           sr.is_correct as review_status, sr.reviewed_at
     FROM sorting_history sh
     LEFT JOIN sorting_reviews sr ON sh.id = sr.sorting_history_id
-    WHERE 
-        sh.device_identity = ? 
-        AND DATE(sh.sorted_at) = ?
-        AND sh.is_maintenance = 0
-    ORDER BY sh.sorted_at DESC";
-
-$stmt = $pdo->prepare($query);
+    WHERE sh.device_identity = ? AND DATE(sh.sorted_at) = ? AND sh.is_maintenance = 0
+    ORDER BY sh.sorted_at DESC
+");
 $stmt->execute([$deviceIdentity, $selectedDate]);
 $sortingHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get device name if not provided
-if ($deviceName === 'Unknown Device' || empty($deviceName)) {
-    $deviceQuery = $pdo->prepare("SELECT device_name FROM sorters WHERE device_identity = ?");
-    $deviceQuery->execute([$deviceIdentity]);
-    $deviceRow = $deviceQuery->fetch(PDO::FETCH_ASSOC);
-    if ($deviceRow) {
-        $deviceName = $deviceRow['device_name'];
-    }
-}
-
-// Calculate review statistics
 $totalDetections = count($sortingHistory);
-$reviewedCount = 0;
-$correctCount = 0;
-$wrongCount = 0;
-foreach ($sortingHistory as $detection) {
-    if ($detection['review_status'] !== null) {
+$reviewedCount = $correctCount = $wrongCount = 0;
+foreach ($sortingHistory as $d) {
+    if ($d['review_status'] !== null) {
         $reviewedCount++;
-        if ($detection['review_status'] == 1) {
-            $correctCount++;
-        } else {
-            $wrongCount++;
-        }
+        if ($d['review_status'] == 1) $correctCount++; else $wrongCount++;
     }
 }
 $pendingCount = $totalDetections - $reviewedCount;
@@ -87,1061 +62,877 @@ $pendingCount = $totalDetections - $reviewedCount;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GoSort - Review Logs</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/dark-mode-global.css" rel="stylesheet">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <script src="js/theme-manager.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Root Variables */
         :root {
-            --primary-green: #274a17ff;
-            --light-green: #7AF146;
-            --dark-gray: #1f2937;
-            --medium-gray: #6b7280;
-            --light-gray: #f3f4f6;
-            --border-color: #368137;
+            --primary-green: #274a17;
+            --light-green:   #7AF146;
+            --mid-green:     #368137;
+            --dark-gray:     #1f2937;
+            --medium-gray:   #6b7280;
+            --border-color:  #e5e7eb;
+            --card-shadow:   0 1px 3px rgba(0,0,0,0.07);
         }
 
-        /* General Styles */
         body {
-            background-color: #F3F3EF !important;
-            font-family: 'Inter', sans-serif !important;
+            background-color: #e8f1e6;
+            font-family: 'Poppins', sans-serif !important;
             color: var(--dark-gray);
-            padding: 20px;
         }
 
-        /* Header Section */
-        .monitor-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
+        #main-content-wrapper {
+            margin-left: 240px;
+            padding: 100px 0 40px 0;
+            min-height: 100vh;
+            overflow-y: auto;
         }
 
-        .back-button {
+        /* ── shared containers ── */
+        .section-container {
+            background: #fff;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #eeeeee;
+        }
+
+        .section-block {
+            background: linear-gradient(135deg, rgb(236,251,234) 0%, #d5f5dc 100%);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .section-block:last-child { margin-bottom: 0; }
+
+        .section-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #000000b1;
+            margin-bottom: 1rem;
+        }
+
+        .inner-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: var(--card-shadow);
+        }
+
+        /* ── back link ── */
+        .back-link {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            background: transparent;
-            border: none;
-            color: var(--dark-gray);
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--medium-gray);
             text-decoration: none;
-            font-size: 1.5rem;
-            margin-right: 1rem;
-            transition: all 0.2s ease;
+            margin-bottom: 1rem;
+            transition: color 0.2s;
         }
+        .back-link:hover { color: var(--primary-green); }
 
-        .back-button:hover {
-            color: var(--primary-green);
-        }
-
-        /* Time Display */
-        .time-display {
+        /* ── device/date strip ── */
+        .context-strip {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            background: white;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            border: 2px solid var(--border-color);
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
         }
 
-        .time-display .time {
-            font-size: 1rem;
-            font-weight: 700;
-            color: var(--primary-green);
-            margin: 0;
-        }
-
-        .time-display .date {
-            font-size: 0.875rem;
-            color: var(--medium-gray);
-            margin-top: 0.25rem;
-        }
-
-        /* Review Card */
-        .review-card {
-            background: white;
-            border: 2px solid var(--border-color);
+        .ctx-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #e8f5e1;
+            border: 1px solid #c8e6c9;
             border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            position: relative;
-            overflow: hidden;
-            max-width: 900px;
-            margin: 0 auto;
+            padding: 0.3rem 0.8rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--primary-green);
         }
 
-        .review-card::before {
+        .date-change-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #fff;
+            border: 1.5px solid var(--mid-green);
+            border-radius: 20px;
+            padding: 0.3rem 0.8rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--primary-green);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .date-change-btn:hover { background: #f0fdf4; }
+
+        /* ── stats pills ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        @media (max-width: 576px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .stat-pill {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+        }
+
+        .stat-pill-num {
+            font-size: 1.6rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.2rem;
+        }
+
+        .stat-pill-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--medium-gray);
+        }
+
+        .stat-pill.total   .stat-pill-num { color: var(--dark-gray); }
+        .stat-pill.pending .stat-pill-num { color: #d97706; }
+        .stat-pill.correct .stat-pill-num { color: #059669; }
+        .stat-pill.wrong   .stat-pill-num { color: #dc2626; }
+
+        /* ── review card ── */
+        .review-outer {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            max-width: 860px;
+            margin: 0 auto 1.5rem auto;
+            position: relative;
+        }
+
+        .review-outer::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 6px;
-            height: 100%;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
             background: linear-gradient(to bottom, var(--light-green), var(--primary-green));
         }
 
-        /* Counter */
-        .counter-display {
-            text-align: center;
-            font-size: 0.875rem;
-            color: var(--medium-gray);
-            margin-bottom: 1rem;
-            font-weight: 500;
-        }
+        .review-body { padding: 1.5rem 1.5rem 1.5rem 1.75rem; }
 
-        /* Category Title */
-        .category-title {
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: var(--dark-gray);
-            margin: 0 0 0.5rem 0;
-            letter-spacing: -0.02em;
+        .counter-label {
             text-align: center;
-        }
-
-        .detection-subtitle {
-            font-size: 1rem;
-            color: var(--medium-gray);
-            margin-bottom: 2rem;
-            font-weight: 500;
-            text-align: center;
-        }
-
-        .detected-item {
-            display: inline-block;
-            font-size: 1rem;
+            font-size: 0.78rem;
             font-weight: 600;
+            color: var(--medium-gray);
+            margin-bottom: 0.6rem;
+        }
+
+        .waste-category {
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--dark-gray);
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+        }
+
+        .waste-subtitle {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--medium-gray);
+            margin-bottom: 1.25rem;
+        }
+
+        .detected-chip {
+            display: inline-block;
+            background: #e8f5e1;
             color: var(--primary-green);
-            background: #efffe8ff;
-            padding: 0.5rem 1rem;
+            border: 1px solid #c8e6c9;
+            padding: 0.2rem 0.7rem;
             border-radius: 8px;
-            margin-left: 0.5rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-left: 0.25rem;
         }
 
-        /* Image Display */
-        .image-container {
+        /* ── image area ── */
+        .image-wrapper {
             position: relative;
             display: flex;
-            justify-content: center;
             align-items: center;
-            min-height: 400px;
-            margin-bottom: 2rem;
+            justify-content: center;
+            margin-bottom: 1.25rem;
         }
 
-        .image-display {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 400px;
-            background: #f9fafb;
-            border-radius: 16px;
-            border: 2px dashed #d1d5db;
-            position: relative;
-            overflow: visible;
+        .image-box {
             width: 100%;
-        }
-
-        .image-display img {
-            max-width: 100%;
-            max-height: 450px;
-            object-fit: contain;
+            min-height: 340px;
+            background: #f9fafb;
+            border: 1.5px dashed #d1d5db;
             border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        .placeholder-image {
+        .image-box img {
+            max-width: 100%;
+            max-height: 420px;
+            object-fit: contain;
+            border-radius: 10px;
+        }
+
+        .image-placeholder {
             text-align: center;
             color: var(--medium-gray);
         }
+        .image-placeholder i { font-size: 3rem; display: block; margin-bottom: 0.5rem; opacity: 0.3; }
+        .image-placeholder p { font-size: 0.82rem; margin: 0; }
 
-        .placeholder-image i {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.3;
+        /* review status overlay */
+        .review-badge-overlay {
+            position: absolute;
+            top: 10px; right: 10px;
+            padding: 0.22rem 0.65rem;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            z-index: 5;
         }
+        .review-badge-overlay.pending  { background: #fef3c7; color: #d97706; }
+        .review-badge-overlay.correct  { background: #d1fae5; color: #059669; }
+        .review-badge-overlay.wrong    { background: #fee2e2; color: #dc2626; }
 
-        .placeholder-image p {
-            font-size: 1rem;
-            margin: 0;
-        }
-
-        /* Navigation Arrows */
+        /* ── nav arrows ── */
         .nav-arrow {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            width: 50px;
-            height: 50px;
-            background: white;
-            border: 2px solid var(--border-color);
+            width: 42px; height: 42px;
+            background: #fff;
+            border: 1.5px solid var(--border-color);
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            z-index: 10;
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             color: var(--dark-gray);
+            transition: all 0.2s;
+            z-index: 10;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }
+        .nav-arrow:hover { background: var(--primary-green); color: #fff; border-color: var(--primary-green); transform: translateY(-50%) scale(1.06); }
+        .nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+        .nav-arrow-left  { left: -21px; }
+        .nav-arrow-right { right: -21px; }
 
-        .nav-arrow:hover {
-            background: var(--primary-green);
-            color: white;
-            transform: translateY(-50%) scale(1.1);
-        }
-
-        .nav-arrow:active {
-            transform: translateY(-50%) scale(0.95);
-        }
-
-        .nav-arrow.disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-
-        .nav-arrow-left {
-            left: -25px;
-        }
-
-        .nav-arrow-right {
-            right: -25px;
-        }
-
-        /* Action Buttons */
-        .action-buttons {
+        /* ── action buttons ── */
+        .review-actions {
             display: flex;
             justify-content: center;
-            gap: 4rem;
-            margin-top: 2rem;
+            gap: 3.5rem;
+            margin-top: 1.25rem;
         }
 
-        .action-btn {
+        .rev-btn {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.6rem;
             background: transparent;
             border: none;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: transform 0.2s;
         }
+        .rev-btn:hover { transform: translateY(-2px); }
 
-        .action-btn:hover .btn-icon {
-            transform: scale(1.1);
-        }
-
-        .btn-icon {
-            width: 80px;
-            height: 80px;
+        .rev-btn-icon {
+            width: 70px; height: 70px;
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            transition: all 0.3s ease;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem;
+            transition: all 0.2s;
         }
 
-        .btn-icon.wrong {
-            background: #fee;
-            color: #dc2626;
-        }
+        .rev-btn-icon.wrong   { background: #fee2e2; color: #dc2626; }
+        .rev-btn-icon.correct { background: #d1fae5; color: #059669; }
 
-        .btn-icon.correct {
-            background: #eff;
-            color: #16a34a;
-        }
+        .rev-btn:hover .rev-btn-icon.wrong   { background: #dc2626; color: #fff; }
+        .rev-btn:hover .rev-btn-icon.correct { background: #059669; color: #fff; }
 
-        .action-btn:hover .btn-icon.wrong {
-            background: #dc2626;
-            color: white;
-        }
-
-        .action-btn:hover .btn-icon.correct {
-            background: #16a34a;
-            color: white;
-        }
-
-        .btn-label {
-            font-size: 1.125rem;
+        .rev-btn-label {
+            font-size: 0.85rem;
             font-weight: 700;
             color: var(--dark-gray);
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .category-title {
-                font-size: 2rem;
-            }
-
-            .image-display {
-                min-height: 300px;
-            }
-
-            .nav-arrow {
-                width: 40px;
-                height: 40px;
-                font-size: 1.25rem;
-            }
-
-            .nav-arrow-left {
-                left: -20px;
-            }
-
-            .nav-arrow-right {
-                right: -20px;
-            }
-
-            .btn-icon {
-                width: 60px;
-                height: 60px;
-                font-size: 2rem;
-            }
-
-            .action-buttons {
-                gap: 2rem;
-            }
-        }
-
-        /* Review Stats Banner */
-        .review-stats-banner {
-            background: white;
-            border: 2px solid var(--border-color);
+        /* ── reviewed table ── */
+        .table-outer {
+            background: #fff;
+            border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1rem;
-            max-width: 900px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            max-width: 860px;
             margin: 0 auto;
         }
 
-        .stat-box {
-            padding: 0.75rem;
-            border-radius: 8px;
-            background: #f9fafb;
+        .table-outer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.9rem 1.1rem;
+            border-bottom: 1px solid #f3f4f6;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
-        .stat-box.pending {
-            background: #fef3c7;
-        }
-
-        .stat-box.correct {
-            background: #d1fae5;
-        }
-
-        .stat-box.wrong {
-            background: #fee2e2;
-        }
-
-        .stat-number {
-            font-size: 1.5rem;
+        .table-outer-title {
+            font-size: 0.85rem;
             font-weight: 700;
             color: var(--dark-gray);
         }
 
-        .stat-box.pending .stat-number {
-            color: #d97706;
-        }
-
-        .stat-box.correct .stat-number {
-            color: #059669;
-        }
-
-        .stat-box.wrong .stat-number {
-            color: #dc2626;
-        }
-
-        .review-status-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            z-index: 5;
-        }
-
-        .review-status-badge.reviewed-correct {
-            background: #d1fae5;
-            color: #059669;
-        }
-
-        .review-status-badge.reviewed-wrong {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-
-        .review-status-badge.pending {
-            background: #fef3c7;
-            color: #d97706;
-        }
-
-        /* Reviewed Table Styles */
-        .reviewed-table-section {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 20px;
-            padding: 1.5rem;
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        .reviewed-table {
-            margin-bottom: 0;
-        }
+        .reviewed-table { font-size: 0.79rem; font-family: 'Poppins', sans-serif; margin: 0; }
 
         .reviewed-table thead th {
-            background: #f8f9fa;
-            border-bottom: 2px solid var(--border-color);
-            font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.7rem;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
             color: var(--medium-gray);
-            padding: 0.75rem;
+            background: #fafafa;
+            border-bottom: 1px solid #f3f4f6;
+            padding: 0.6rem 0.75rem;
         }
 
         .reviewed-table tbody td {
+            padding: 0.65rem 0.75rem;
+            border-bottom: 1px solid #f9fafb;
             vertical-align: middle;
-            padding: 0.75rem;
-            border-bottom: 1px solid #e5e7eb;
         }
+
+        .reviewed-table tbody tr:last-child td { border-bottom: none; }
+        .reviewed-table tbody tr:hover td { background: #f9fafb; }
 
         .table-thumbnail {
-            width: 60px;
-            height: 60px;
+            width: 52px; height: 52px;
             object-fit: cover;
-            border-radius: 8px;
+            border-radius: 7px;
             cursor: pointer;
-            transition: transform 0.2s;
-            border: 2px solid #e5e7eb;
+            border: 1.5px solid #e5e7eb;
+            transition: transform 0.15s, border-color 0.15s;
         }
-
-        .table-thumbnail:hover {
-            transform: scale(1.1);
-            border-color: var(--primary-green);
-        }
+        .table-thumbnail:hover { transform: scale(1.08); border-color: var(--mid-green); }
 
         .category-badge {
             display: inline-block;
-            padding: 0.25rem 0.75rem;
+            padding: 0.18rem 0.6rem;
             border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
+            font-size: 0.68rem;
+            font-weight: 700;
         }
+        .category-badge.category-bio       { background: #dcfce7; color: #166534; }
+        .category-badge.category-nbio      { background: #fef3c7; color: #92400e; }
+        .category-badge.category-hazardous { background: #fee2e2; color: #991b1b; }
+        .category-badge.category-mixed     { background: #e0e7ff; color: #3730a3; }
 
-        .category-badge.category-bio {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .category-badge.category-nbio {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .category-badge.category-hazardous {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .category-badge.category-mixed {
-            background: #e0e7ff;
-            color: #3730a3;
-        }
-
-        .status-pill {
+        .status-pill-sm {
             display: inline-flex;
             align-items: center;
-            padding: 0.25rem 0.75rem;
+            gap: 0.25rem;
+            padding: 0.18rem 0.55rem;
             border-radius: 20px;
-            font-size: 0.75rem;
+            font-size: 0.68rem;
+            font-weight: 700;
+        }
+        .status-pill-sm.correct { background: #dcfce7; color: #166534; }
+        .status-pill-sm.wrong   { background: #fee2e2; color: #991b1b; }
+
+        /* ── buttons ── */
+        .btn-green {
+            background: linear-gradient(135deg, var(--mid-green) 0%, var(--primary-green) 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.35rem 0.8rem;
+            font-size: 0.76rem;
             font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(39,74,23,0.15);
         }
+        .btn-green:hover { transform: translateY(-1px); color: #fff; }
+        .btn-green:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
-        .status-pill.correct {
-            background: #dcfce7;
-            color: #166534;
+        .btn-filter {
+            background: #fff;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            color: var(--dark-gray);
+            cursor: pointer;
+            transition: border-color 0.2s;
         }
+        .btn-filter:hover { border-color: var(--mid-green); }
 
-        .status-pill.wrong {
-            background: #fee2e2;
-            color: #991b1b;
+        .form-select-sm {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.76rem;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
         }
+        .form-select-sm:focus { border-color: var(--mid-green); box-shadow: 0 0 0 3px rgba(54,129,55,0.1); }
 
-        #exportZipBtn {
-            background: var(--primary-green);
-            border-color: var(--primary-green);
+        /* ── empty state ── */
+        .empty-table {
+            text-align: center;
+            padding: 2rem;
+            color: var(--medium-gray);
         }
+        .empty-table i { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
+        .empty-table p { font-size: 0.82rem; margin: 0; }
 
-        #exportZipBtn:hover:not(:disabled) {
-            background: #1e3a12;
-            border-color: #1e3a12;
+        /* ── date modal ── */
+        .modal-content {
+            border-radius: 16px;
+            border: none;
+            font-family: 'Poppins', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.14);
         }
+        .modal-header { border-bottom: 1px solid #f3f4f6; padding: 1.1rem 1.25rem; }
+        .modal-title  { font-size: 0.92rem; font-weight: 700; }
+        .modal-body   { padding: 1.25rem; }
+        .modal-footer { border-top: 1px solid #f3f4f6; padding: 0.9rem 1.25rem; }
 
-        #exportZipBtn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        input[type="date"] {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.82rem;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.45rem 0.75rem;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="date"]:focus { border-color: var(--mid-green); box-shadow: 0 0 0 3px rgba(54,129,55,0.1); }
+
+        @media (max-width: 992px) {
+            #main-content-wrapper { margin-left: 0; padding: 12px; }
+            .review-outer { padding: 0; }
+            .nav-arrow-left  { left: -10px; }
+            .nav-arrow-right { right: -10px; }
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <!-- Header -->
-        <div class="d-flex align-items-center mb-2 mt-3">
-            <a href="GoSort_WasteMonitoringNavpage.php" class="back-button">
-                <i class="bi bi-arrow-left"></i>
-            </a>
-            <div>
-                <h2 class="fw-bold mb-0">Review Logs</h2>
-                <small class="text-muted"><?php echo htmlspecialchars($deviceName); ?> - <?php echo date('F j, Y', strtotime($selectedDate)); ?></small>
-            </div>
+    <?php include 'sidebar.php'; ?>
 
-            <!-- Time Display -->
-            <div class="time-display ms-auto">
-                <div class="time" id="currentTime">12:00 am</div>
-                <div class="date" id="currentDate">Tuesday, April 15</div>
-            </div>
-        </div>
+    <div id="main-content-wrapper">
+        <div class="container-fluid">
 
-        <hr style="height: 1.5px; background-color: #000; opacity: 1;" class="mb-4">
+            <?php include 'topbar.php'; ?>
 
-        <!-- Review Statistics Banner -->
-        <div class="review-stats-banner mb-4">
-            <div class="row text-center">
-                <div class="col-3">
-                    <div class="stat-box">
-                        <div class="stat-number"><?php echo $totalDetections; ?></div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="stat-box pending">
-                        <div class="stat-number"><?php echo $pendingCount; ?></div>
-                        <div class="stat-label">Pending</div>
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="stat-box correct">
-                        <div class="stat-number"><?php echo $correctCount; ?></div>
-                        <div class="stat-label">Correct</div>
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="stat-box wrong">
-                        <div class="stat-number"><?php echo $wrongCount; ?></div>
-                        <div class="stat-label">Wrong</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <div class="section-container">
 
-        <!-- Review Card -->
-        <div class="review-card">
-            <!-- Counter -->
-            <div class="counter-display">
-                <span id="currentCount">1</span> out of <span id="totalCount">500</span>
-            </div>
+                <!-- Back -->
+                <a href="GoSort_WasteMonitoringNavpage.php" class="back-link">
+                    <i class="bi bi-arrow-left"></i> Back to Devices
+                </a>
 
-            <!-- Category -->
-            <h1 class="category-title" id="wasteCategory">Biodegradable</h1>
-            <p class="detection-subtitle">
-                Detected: <span class="detected-item" id="detectedItem">Fruit Peel</span>
-            </p>
-
-            <!-- Image Container with Navigation -->
-            <div class="image-container">
-                <div class="nav-arrow nav-arrow-left" id="prevBtn">
-                    <i class="bi bi-chevron-left"></i>
-                </div>
-
-                <div class="image-display">
-                    <span class="review-status-badge pending" id="reviewStatusBadge">Pending Review</span>
-                    <div class="placeholder-image" id="placeholderImage">
-                        <i class="bi bi-camera-fill d-block"></i>
-                        <p>No detections found</p>
-                    </div>
-                    <img id="detectionImage" src="" alt="Detection" style="display: none;">
-                </div>
-
-                <div class="nav-arrow nav-arrow-right" id="nextBtn">
-                    <i class="bi bi-chevron-right"></i>
-                </div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="action-buttons">
-                <button class="action-btn" id="wrongBtn">
-                    <div class="btn-icon wrong">
-                        <i class="bi bi-x-lg"></i>
-                    </div>
-                    <span class="btn-label">Wrong</span>
-                </button>
-
-                <button class="action-btn" id="correctBtn">
-                    <div class="btn-icon correct">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <span class="btn-label">Correct</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Reviewed Items Table Section -->
-        <div class="reviewed-table-section mt-5">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-bold mb-0">
-                    <i class="bi bi-table me-2"></i>Reviewed Items
-                </h4>
-                <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm" id="tableFilter" style="width: auto;">
-                        <option value="all">All Reviewed</option>
-                        <option value="correct">Correct Only</option>
-                        <option value="wrong">Wrong Only</option>
-                    </select>
-                    <button class="btn btn-success btn-sm" id="exportZipBtn" <?php echo ($reviewedCount == 0) ? 'disabled' : ''; ?>>
-                        <i class="bi bi-download me-1"></i>Export ZIP
+                <!-- Context strip -->
+                <div class="context-strip">
+                    <span class="ctx-badge"><i class="bi bi-cpu-fill"></i><?= htmlspecialchars($deviceName) ?></span>
+                    <span class="ctx-badge"><i class="bi bi-calendar3"></i><?= date('F j, Y', strtotime($selectedDate)) ?></span>
+                    <button class="date-change-btn" data-bs-toggle="modal" data-bs-target="#changeDateModal">
+                        <i class="bi bi-pencil-fill"></i> Change Date
                     </button>
                 </div>
-            </div>
-            
-            <div class="table-responsive">
-                <table class="table table-hover reviewed-table" id="reviewedTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 80px;">Image</th>
-                            <th>Category</th>
-                            <th>Detected Item</th>
-                            <th>Confidence</th>
-                            <th>Sorted At</th>
-                            <th style="width: 100px;">Status</th>
-                            <th style="width: 100px;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reviewedTableBody">
-                        <?php 
-                        foreach ($sortingHistory as $index => $detection): 
-                            if ($detection['review_status'] === null) continue;
-                            $isCorrect = $detection['review_status'] == 1;
-                            $categoryMap = [
-                                'bio' => 'Biodegradable',
-                                'nbio' => 'Non-Biodegradable',
-                                'hazardous' => 'Hazardous',
-                                'mixed' => 'Mixed'
-                            ];
-                            $categoryDisplay = $categoryMap[$detection['trash_type']] ?? ucfirst($detection['trash_type']);
-                        ?>
-                        <tr data-id="<?php echo $detection['id']; ?>" data-status="<?php echo $isCorrect ? 'correct' : 'wrong'; ?>">
-                            <td>
-                                <img src="data:image/jpeg;base64,<?php echo $detection['image_data']; ?>" 
-                                     class="table-thumbnail" 
-                                     alt="Detection"
-                                     onclick="viewImage(<?php echo $index; ?>)">
-                            </td>
-                            <td>
-                                <span class="category-badge category-<?php echo $detection['trash_type']; ?>">
-                                    <?php echo $categoryDisplay; ?>
-                                </span>
-                            </td>
-                            <td><?php echo htmlspecialchars($detection['trash_class']); ?></td>
-                            <td><?php echo number_format($detection['confidence'] * 100, 1); ?>%</td>
-                            <td><?php echo date('g:i A', strtotime($detection['sorted_at'])); ?></td>
-                            <td>
-                                <?php if ($isCorrect): ?>
-                                    <span class="status-pill correct"><i class="bi bi-check-circle-fill me-1"></i>Correct</span>
-                                <?php else: ?>
-                                    <span class="status-pill wrong"><i class="bi bi-x-circle-fill me-1"></i>Wrong</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="viewImage(<?php echo $index; ?>)">
-                                    <i class="bi bi-eye"></i>
+
+                <!-- Stats -->
+                <div class="section-block">
+                    <div class="section-label">Review Summary</div>
+                    <div class="stats-row">
+                        <div class="stat-pill total">
+                            <div class="stat-pill-num" id="statTotal"><?= $totalDetections ?></div>
+                            <div class="stat-pill-label">Total</div>
+                        </div>
+                        <div class="stat-pill pending">
+                            <div class="stat-pill-num" id="statPending"><?= $pendingCount ?></div>
+                            <div class="stat-pill-label">Pending</div>
+                        </div>
+                        <div class="stat-pill correct">
+                            <div class="stat-pill-num" id="statCorrect"><?= $correctCount ?></div>
+                            <div class="stat-pill-label">Correct</div>
+                        </div>
+                        <div class="stat-pill wrong">
+                            <div class="stat-pill-num" id="statWrong"><?= $wrongCount ?></div>
+                            <div class="stat-pill-label">Wrong</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review card -->
+                <div class="review-outer">
+                    <div class="review-body">
+
+                        <div class="counter-label">
+                            <span id="currentCount">1</span> of <span id="totalCount"><?= $totalDetections ?></span>
+                        </div>
+
+                        <h2 class="waste-category" id="wasteCategory">—</h2>
+                        <p class="waste-subtitle">
+                            Detected: <span class="detected-chip" id="detectedItem">—</span>
+                        </p>
+
+                        <div class="image-wrapper">
+                            <div class="nav-arrow nav-arrow-left disabled" id="prevBtn">
+                                <i class="bi bi-chevron-left"></i>
+                            </div>
+
+                            <div class="image-box">
+                                <span class="review-badge-overlay pending" id="reviewBadge" style="display:none;">Pending</span>
+                                <div class="image-placeholder" id="imagePlaceholder">
+                                    <i class="bi bi-camera-fill"></i>
+                                    <p><?= $totalDetections === 0 ? 'No detections for this date' : 'Loading…' ?></p>
+                                </div>
+                                <img id="detectionImg" src="" alt="Detection" style="display:none;">
+                            </div>
+
+                            <div class="nav-arrow nav-arrow-right disabled" id="nextBtn">
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                        </div>
+
+                        <div class="review-actions">
+                            <button class="rev-btn" id="wrongBtn">
+                                <div class="rev-btn-icon wrong"><i class="bi bi-x-lg"></i></div>
+                                <span class="rev-btn-label">Wrong</span>
+                            </button>
+                            <button class="rev-btn" id="correctBtn">
+                                <div class="rev-btn-icon correct"><i class="bi bi-check-lg"></i></div>
+                                <span class="rev-btn-label">Correct</span>
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Reviewed table -->
+                <div class="section-block">
+                    <div class="section-label">Reviewed Items</div>
+                    <div class="inner-card" style="padding:0;overflow:hidden;">
+                        <div class="table-outer-header">
+                            <span class="table-outer-title"><i class="bi bi-table me-1"></i>Reviewed Items</span>
+                            <div class="d-flex gap-2 align-items-center">
+                                <select class="form-select form-select-sm btn-filter" id="tableFilter" style="width:auto;">
+                                    <option value="all">All Reviewed</option>
+                                    <option value="correct">Correct Only</option>
+                                    <option value="wrong">Wrong Only</option>
+                                </select>
+                                <button class="btn-green" id="exportZipBtn" <?= $reviewedCount == 0 ? 'disabled' : '' ?>>
+                                    <i class="bi bi-download"></i> Export ZIP
                                 </button>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            
-            <div id="noReviewedMessage" class="text-center py-4 text-muted" style="<?php echo ($reviewedCount > 0) ? 'display: none;' : ''; ?>">
-                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                <p>No reviewed items yet. Mark items as correct or wrong above.</p>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover reviewed-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:68px;">Image</th>
+                                        <th>Category</th>
+                                        <th>Detected Item</th>
+                                        <th>Confidence</th>
+                                        <th>Time</th>
+                                        <th style="width:100px;">Status</th>
+                                        <th style="width:70px;">View</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reviewedTableBody">
+                                    <?php foreach ($sortingHistory as $idx => $det):
+                                        if ($det['review_status'] === null) continue;
+                                        $isCorrect = $det['review_status'] == 1;
+                                        $catMap = ['bio'=>'Biodegradable','nbio'=>'Non-Biodegradable','hazardous'=>'Hazardous','mixed'=>'Mixed'];
+                                        $catLabel = $catMap[$det['trash_type']] ?? ucfirst($det['trash_type']);
+                                    ?>
+                                    <tr data-id="<?= $det['id'] ?>" data-status="<?= $isCorrect ? 'correct' : 'wrong' ?>">
+                                        <td>
+                                            <img src="data:image/jpeg;base64,<?= $det['image_data'] ?>"
+                                                 class="table-thumbnail"
+                                                 onclick="viewImage(<?= $idx ?>)"
+                                                 alt="img">
+                                        </td>
+                                        <td><span class="category-badge category-<?= $det['trash_type'] ?>"><?= $catLabel ?></span></td>
+                                        <td><?= htmlspecialchars($det['trash_class']) ?></td>
+                                        <td><?= number_format($det['confidence'] * 100, 1) ?>%</td>
+                                        <td><?= date('g:i A', strtotime($det['sorted_at'])) ?></td>
+                                        <td>
+                                            <?php if ($isCorrect): ?>
+                                                <span class="status-pill-sm correct"><i class="bi bi-check-circle-fill"></i> Correct</span>
+                                            <?php else: ?>
+                                                <span class="status-pill-sm wrong"><i class="bi bi-x-circle-fill"></i> Wrong</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="viewImage(<?= $idx ?>)" style="border-radius:7px;font-size:0.75rem;">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="noReviewedMsg" class="empty-table" style="<?= $reviewedCount > 0 ? 'display:none;' : '' ?>">
+                            <i class="bi bi-inbox"></i>
+                            <p>No reviewed items yet. Mark items above.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /section-container -->
+        </div>
+    </div>
+
+    <!-- ── Change Date Modal ── -->
+    <div class="modal fade" id="changeDateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:340px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calendar3 me-2" style="color:var(--primary-green);"></i>Change Date</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label style="font-size:0.78rem;font-weight:600;color:var(--dark-gray);display:block;margin-bottom:0.3rem;">Select Date</label>
+                    <input type="date" id="newDateInput" max="<?= date('Y-m-d') ?>" value="<?= $selectedDate ?>">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-light" data-bs-dismiss="modal" style="font-family:'Poppins',sans-serif;font-size:0.82rem;border-radius:8px;">Cancel</button>
+                    <button class="btn-green" onclick="changeDate()"><i class="bi bi-arrow-right"></i> Go</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
     <script>
-        // Get sorting history data from PHP
-        const detections = <?php echo json_encode($sortingHistory); ?> || [];
-        const deviceIdentity = '<?php echo addslashes($deviceIdentity); ?>';
-
+        const detections    = <?= json_encode($sortingHistory) ?>;
+        const deviceIdentity = '<?= addslashes($deviceIdentity) ?>';
         let currentIndex = 0;
 
-        // Review statistics
         let stats = {
-            total: <?php echo $totalDetections; ?>,
-            pending: <?php echo $pendingCount; ?>,
-            correct: <?php echo $correctCount; ?>,
-            wrong: <?php echo $wrongCount; ?>
+            total:   <?= $totalDetections ?>,
+            pending: <?= $pendingCount ?>,
+            correct: <?= $correctCount ?>,
+            wrong:   <?= $wrongCount ?>
         };
 
-        // Update time display
-        function updateTime() {
-            const now = new Date();
-            let hours = now.getHours();
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const ampm = hours >= 12 ? 'pm' : 'am';
-            hours = hours % 12;
-            hours = hours ? hours : 12;
-            
-            const timeString = `${hours}:${minutes} ${ampm}`;
-            const options = { weekday: 'long', month: 'long', day: 'numeric' };
-            const dateString = now.toLocaleDateString('en-US', options);
-            
-            document.getElementById('currentTime').textContent = timeString;
-            document.getElementById('currentDate').textContent = dateString;
+        // ── Date change ──
+        function changeDate() {
+            const d = document.getElementById('newDateInput').value;
+            if (!d) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('date', d);
+            window.location.href = url.toString();
         }
 
-        // Update statistics display
-        function updateStatsDisplay() {
-            document.querySelector('.stat-box:nth-child(1) .stat-number').textContent = stats.total;
-            document.querySelector('.stat-box.pending .stat-number').textContent = stats.pending;
-            document.querySelector('.stat-box.correct .stat-number').textContent = stats.correct;
-            document.querySelector('.stat-box.wrong .stat-number').textContent = stats.wrong;
-        }
-
-        // Update review status badge
-        function updateReviewStatusBadge(detection) {
-            const badge = document.getElementById('reviewStatusBadge');
-            if (!badge) return;
-
-            if (detection.review_status === null || detection.review_status === undefined) {
-                badge.className = 'review-status-badge pending';
-                badge.textContent = 'Pending Review';
-            } else if (detection.review_status == 1) {
-                badge.className = 'review-status-badge reviewed-correct';
-                badge.textContent = '✓ Marked Correct';
-            } else {
-                badge.className = 'review-status-badge reviewed-wrong';
-                badge.textContent = '✗ Marked Wrong';
-            }
-        }
-
-        // Update display with current detection
+        // ── Display ──
         function updateDisplay() {
             if (detections.length === 0) {
-                document.getElementById('placeholderImage').style.display = 'block';
-                document.getElementById('detectionImage').style.display = 'none';
-                document.getElementById('reviewStatusBadge').style.display = 'none';
                 document.getElementById('wasteCategory').textContent = 'No Detections';
-                document.getElementById('detectedItem').textContent = 'N/A';
-                document.getElementById('currentCount').textContent = '0';
-                document.getElementById('totalCount').textContent = '0';
+                document.getElementById('detectedItem').textContent  = '—';
+                document.getElementById('currentCount').textContent  = '0';
+                document.getElementById('totalCount').textContent    = '0';
+                document.getElementById('reviewBadge').style.display = 'none';
                 return;
             }
 
-            const detection = detections[currentIndex];
-            
-            // Update counter
-            document.getElementById('currentCount').textContent = currentIndex + 1;
-            document.getElementById('totalCount').textContent = detections.length;
-            
-            // Update category and item
-            document.getElementById('wasteCategory').textContent = detection.trash_type.toUpperCase();
-            // Split trash_class by comma and take first item if multiple items
-            const detectedItems = detection.trash_class.split(',').map(item => item.trim());
-            document.getElementById('detectedItem').textContent = detectedItems.join(', ');
-            
-            // Update image
-            const img = document.getElementById('detectionImage');
-            img.src = `data:image/jpeg;base64,${detection.image_data}`;
+            const d = detections[currentIndex];
+            document.getElementById('currentCount').textContent  = currentIndex + 1;
+            document.getElementById('wasteCategory').textContent = d.trash_type.toUpperCase();
+            document.getElementById('detectedItem').textContent  = d.trash_class || '—';
+
+            const img = document.getElementById('detectionImg');
+            img.src   = `data:image/jpeg;base64,${d.image_data}`;
             img.style.display = 'block';
-            document.getElementById('placeholderImage').style.display = 'none';
-            document.getElementById('reviewStatusBadge').style.display = 'block';
-            
-            // Update review status badge
-            updateReviewStatusBadge(detection);
-            
-            // Update arrow states
-            updateArrowStates();
+            document.getElementById('imagePlaceholder').style.display = 'none';
+
+            updateBadge(d);
+            updateArrows();
         }
 
-        // Update arrow button states
-        function updateArrowStates() {
-            const prevBtn = document.getElementById('prevBtn');
-            const nextBtn = document.getElementById('nextBtn');
-            
-            if (currentIndex === 0) {
-                prevBtn.classList.add('disabled');
+        function updateBadge(d) {
+            const badge = document.getElementById('reviewBadge');
+            badge.style.display = 'block';
+            if (d.review_status === null || d.review_status === undefined) {
+                badge.className = 'review-badge-overlay pending';
+                badge.textContent = 'Pending Review';
+            } else if (d.review_status == 1) {
+                badge.className = 'review-badge-overlay correct';
+                badge.textContent = '✓ Correct';
             } else {
-                prevBtn.classList.remove('disabled');
-            }
-            
-            if (currentIndex === detections.length - 1) {
-                nextBtn.classList.add('disabled');
-            } else {
-                nextBtn.classList.remove('disabled');
+                badge.className = 'review-badge-overlay wrong';
+                badge.textContent = '✗ Wrong';
             }
         }
 
-        // Navigation functions
-        function navigatePrev() {
-            if (currentIndex > 0) {
-                currentIndex--;
-                updateDisplay();
-            }
+        function updateArrows() {
+            document.getElementById('prevBtn').classList.toggle('disabled', currentIndex === 0);
+            document.getElementById('nextBtn').classList.toggle('disabled', currentIndex === detections.length - 1);
         }
 
-        function navigateNext() {
-            if (currentIndex < detections.length - 1) {
-                currentIndex++;
-                updateDisplay();
-            }
+        function updateStatsUI() {
+            document.getElementById('statTotal').textContent   = stats.total;
+            document.getElementById('statPending').textContent = stats.pending;
+            document.getElementById('statCorrect').textContent = stats.correct;
+            document.getElementById('statWrong').textContent   = stats.wrong;
         }
 
-        // Action handlers
-        async function markWrong() {
-            const detection = detections[currentIndex];
-            try {
-                const response = await fetch('api/mark_sorting_wrong.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        sorting_id: detection.id,
-                        device_identity: deviceIdentity
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok && result.success) {
-                    // Update local state
-                    const wasReviewed = detection.review_status !== null;
-                    const wasCorrect = detection.review_status == 1;
-                    
-                    // Update statistics
-                    if (!wasReviewed) {
-                        stats.pending--;
-                        stats.wrong++;
-                    } else if (wasCorrect) {
-                        stats.correct--;
-                        stats.wrong++;
-                    }
-                    
-                    // Update detection review status
-                    detection.review_status = 0;
-                    
-                    // Update displays
-                    updateStatsDisplay();
-                    updateReviewStatusBadge(detection);
-                    
-                    // Update table
-                    addOrUpdateTableRow(detection, false);
-                    
-                    // Visual feedback
-                    const btn = document.getElementById('wrongBtn');
-                    const icon = btn.querySelector('.btn-icon');
-                    icon.style.background = '#dc2626';
-                    icon.style.color = 'white';
-                    setTimeout(() => {
-                        icon.style.background = '';
-                        icon.style.color = '';
-                        if (currentIndex < detections.length - 1) {
-                            navigateNext();
-                        }
-                    }, 500);
-                } else {
-                    throw new Error(result.message || 'Failed to mark as wrong');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to mark detection as wrong: ' + error.message);
-            }
-        }
-
-        async function markCorrect() {
-            const detection = detections[currentIndex];
-            try {
-                const response = await fetch('api/mark_sorting_correct.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        sorting_id: detection.id,
-                        device_identity: deviceIdentity
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok && result.success) {
-                    // Update local state
-                    const wasReviewed = detection.review_status !== null;
-                    const wasWrong = detection.review_status == 0;
-                    
-                    // Update statistics
-                    if (!wasReviewed) {
-                        stats.pending--;
-                        stats.correct++;
-                    } else if (wasWrong) {
-                        stats.wrong--;
-                        stats.correct++;
-                    }
-                    
-                    // Update detection review status
-                    detection.review_status = 1;
-                    
-                    // Update displays
-                    updateStatsDisplay();
-                    updateReviewStatusBadge(detection);
-                    
-                    // Update table
-                    addOrUpdateTableRow(detection, true);
-                    
-                    // Visual feedback
-                    const btn = document.getElementById('correctBtn');
-                    const icon = btn.querySelector('.btn-icon');
-                    icon.style.background = '#16a34a';
-                    icon.style.color = 'white';
-                    setTimeout(() => {
-                        icon.style.background = '';
-                        icon.style.color = '';
-                        if (currentIndex < detections.length - 1) {
-                            navigateNext();
-                        }
-                    }, 500);
-                } else {
-                    throw new Error(result.message || 'Failed to mark as correct');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to mark detection as correct: ' + error.message);
-            }
-        }
-
-        // Event listeners
-        document.getElementById('prevBtn').addEventListener('click', navigatePrev);
-        document.getElementById('nextBtn').addEventListener('click', navigateNext);
-        document.getElementById('wrongBtn').addEventListener('click', markWrong);
-        document.getElementById('correctBtn').addEventListener('click', markCorrect);
-
-        // Table filter functionality
-        document.getElementById('tableFilter').addEventListener('change', function() {
-            const filter = this.value;
-            const rows = document.querySelectorAll('#reviewedTableBody tr');
-            
-            rows.forEach(row => {
-                const status = row.dataset.status;
-                if (filter === 'all' || status === filter) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+        // ── Navigation ──
+        document.getElementById('prevBtn').addEventListener('click', () => { if (currentIndex > 0) { currentIndex--; updateDisplay(); } });
+        document.getElementById('nextBtn').addEventListener('click', () => { if (currentIndex < detections.length - 1) { currentIndex++; updateDisplay(); } });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowLeft')  document.getElementById('prevBtn').click();
+            if (e.key === 'ArrowRight') document.getElementById('nextBtn').click();
         });
 
-        // Export ZIP functionality
-        document.getElementById('exportZipBtn').addEventListener('click', function() {
-            const filter = document.getElementById('tableFilter').value;
-            const url = `api/export_reviewed_images.php?identity=${encodeURIComponent(deviceIdentity)}&date=<?php echo $selectedDate; ?>&filter=${filter}`;
-            
-            // Direct download using window.location
-            window.location.href = url;
-        });
+        // ── Review ──
+        async function markDetection(isCorrect) {
+            if (detections.length === 0) return;
+            const d   = detections[currentIndex];
+            const url = isCorrect ? 'api/mark_sorting_correct.php' : 'api/mark_sorting_wrong.php';
+            try {
+                const res    = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sorting_id: d.id, device_identity: deviceIdentity }) });
+                const result = await res.json();
+                if (!result.success) throw new Error(result.message);
 
-        // View image in main viewer
-        function viewImage(index) {
-            currentIndex = index;
-            updateDisplay();
-            // Scroll to review card
-            document.querySelector('.review-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const wasReviewed = d.review_status !== null;
+                const wasCorrect  = d.review_status == 1;
+
+                if (!wasReviewed) {
+                    stats.pending--;
+                    isCorrect ? stats.correct++ : stats.wrong++;
+                } else {
+                    if (wasCorrect && !isCorrect)  { stats.correct--; stats.wrong++; }
+                    if (!wasCorrect && isCorrect)  { stats.wrong--;  stats.correct++; }
+                }
+
+                d.review_status = isCorrect ? 1 : 0;
+                updateBadge(d);
+                updateStatsUI();
+                addOrUpdateTableRow(d, isCorrect);
+
+                // Flash icon
+                const icon = document.querySelector(`#${isCorrect ? 'correctBtn' : 'wrongBtn'} .rev-btn-icon`);
+                icon.style.background = isCorrect ? '#059669' : '#dc2626';
+                icon.style.color      = '#fff';
+                setTimeout(() => {
+                    icon.style.background = '';
+                    icon.style.color      = '';
+                    if (currentIndex < detections.length - 1) { currentIndex++; updateDisplay(); }
+                }, 400);
+
+            } catch (err) {
+                alert('Failed to save review: ' + err.message);
+            }
         }
 
-        // Function to add row to table after marking
-        function addOrUpdateTableRow(detection, isCorrect) {
+        document.getElementById('wrongBtn').addEventListener('click',   () => markDetection(false));
+        document.getElementById('correctBtn').addEventListener('click',  () => markDetection(true));
+
+        // ── Table ──
+        function addOrUpdateTableRow(d, isCorrect) {
             const tbody = document.getElementById('reviewedTableBody');
-            const existingRow = tbody.querySelector(`tr[data-id="${detection.id}"]`);
-            
-            const categoryMap = {
-                'bio': 'Biodegradable',
-                'nbio': 'Non-Biodegradable',
-                'hazardous': 'Hazardous',
-                'mixed': 'Mixed'
-            };
-            const categoryDisplay = categoryMap[detection.trash_type] || detection.trash_type;
-            const statusClass = isCorrect ? 'correct' : 'wrong';
-            const statusText = isCorrect ? 'Correct' : 'Wrong';
-            const statusIcon = isCorrect ? 'check-circle-fill' : 'x-circle-fill';
-            const confidence = (detection.confidence * 100).toFixed(1);
-            const sortedTime = new Date(detection.sorted_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-            
-            const rowHtml = `
-                <td>
-                    <img src="data:image/jpeg;base64,${detection.image_data}" 
-                         class="table-thumbnail" 
-                         alt="Detection"
-                         onclick="viewImage(${detections.indexOf(detection)})">
-                </td>
-                <td>
-                    <span class="category-badge category-${detection.trash_type}">
-                        ${categoryDisplay}
-                    </span>
-                </td>
-                <td>${detection.trash_class}</td>
-                <td>${confidence}%</td>
-                <td>${sortedTime}</td>
-                <td>
-                    <span class="status-pill ${statusClass}"><i class="bi bi-${statusIcon} me-1"></i>${statusText}</span>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="viewImage(${detections.indexOf(detection)})">
-                        <i class="bi bi-eye"></i>
-                    </button>
-                </td>
+            const existing = tbody.querySelector(`tr[data-id="${d.id}"]`);
+            const catMap = { bio:'Biodegradable', nbio:'Non-Biodegradable', hazardous:'Hazardous', mixed:'Mixed' };
+            const catLabel  = catMap[d.trash_type] || d.trash_type;
+            const statusCls = isCorrect ? 'correct' : 'wrong';
+            const statusTxt = isCorrect ? 'Correct' : 'Wrong';
+            const statusIco = isCorrect ? 'check-circle-fill' : 'x-circle-fill';
+            const conf      = (d.confidence * 100).toFixed(1);
+            const sortTime  = new Date(d.sorted_at).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true});
+            const idx       = detections.indexOf(d);
+
+            const inner = `
+                <td><img src="data:image/jpeg;base64,${d.image_data}" class="table-thumbnail" onclick="viewImage(${idx})" alt="img"></td>
+                <td><span class="category-badge category-${d.trash_type}">${catLabel}</span></td>
+                <td>${d.trash_class || '—'}</td>
+                <td>${conf}%</td>
+                <td>${sortTime}</td>
+                <td><span class="status-pill-sm ${statusCls}"><i class="bi bi-${statusIco}"></i> ${statusTxt}</span></td>
+                <td><button class="btn btn-sm btn-outline-secondary" onclick="viewImage(${idx})" style="border-radius:7px;font-size:0.75rem;"><i class="bi bi-eye"></i></button></td>
             `;
-            
-            if (existingRow) {
-                existingRow.dataset.status = statusClass;
-                existingRow.innerHTML = rowHtml;
+
+            if (existing) {
+                existing.dataset.status = statusCls;
+                existing.innerHTML = inner;
             } else {
-                const newRow = document.createElement('tr');
-                newRow.dataset.id = detection.id;
-                newRow.dataset.status = statusClass;
-                newRow.innerHTML = rowHtml;
-                tbody.insertBefore(newRow, tbody.firstChild);
+                const row = document.createElement('tr');
+                row.dataset.id     = d.id;
+                row.dataset.status = statusCls;
+                row.innerHTML      = inner;
+                tbody.insertBefore(row, tbody.firstChild);
             }
-            
-            // Hide "no reviewed" message and enable export
-            document.getElementById('noReviewedMessage').style.display = 'none';
+
+            document.getElementById('noReviewedMsg').style.display = 'none';
             document.getElementById('exportZipBtn').disabled = false;
-            
-            // Apply current filter
-            const currentFilter = document.getElementById('tableFilter').value;
-            if (currentFilter !== 'all' && statusClass !== currentFilter) {
-                const row = tbody.querySelector(`tr[data-id="${detection.id}"]`);
+
+            const filter = document.getElementById('tableFilter').value;
+            if (filter !== 'all' && statusCls !== filter) {
+                const row = tbody.querySelector(`tr[data-id="${d.id}"]`);
                 if (row) row.style.display = 'none';
             }
         }
 
-        // Keyboard navigation
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') navigatePrev();
-            if (e.key === 'ArrowRight') navigateNext();
+        function viewImage(index) {
+            currentIndex = index;
+            updateDisplay();
+            document.querySelector('.review-outer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        document.getElementById('tableFilter').addEventListener('change', function () {
+            const f = this.value;
+            document.querySelectorAll('#reviewedTableBody tr').forEach(row => {
+                row.style.display = (f === 'all' || row.dataset.status === f) ? '' : 'none';
+            });
         });
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            updateTime();
-            setInterval(updateTime, 1000);
-            updateDisplay();
+        document.getElementById('exportZipBtn').addEventListener('click', () => {
+            const f = document.getElementById('tableFilter').value;
+            window.location.href = `api/export_reviewed_images.php?identity=${encodeURIComponent(deviceIdentity)}&date=<?= $selectedDate ?>&filter=${f}`;
+        });
+
+        // ── Init ──
+        document.addEventListener('DOMContentLoaded', () => {
+            if (detections.length > 0) updateDisplay();
         });
     </script>
 </body>
