@@ -5,10 +5,7 @@ require_once 'gs_DB/connection.php';
 require_once 'gs_DB/activity_logs.php';
 
 if (isset($_GET['logout'])) {
-    // Log logout before destroying session
-    if (isset($_SESSION['user_id'])) {
-        log_logout($_SESSION['user_id']);
-    }
+    if (isset($_SESSION['user_id'])) { log_logout($_SESSION['user_id']); }
     session_destroy();
     setcookie('user_logged_in', '', time() - 3600, '/');
     header("Location: GoSort_Login.php");
@@ -20,180 +17,101 @@ if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
     exit();
 }
 
-// Get device info - REQUIRED for this page
-$device_id = $_GET['device'] ?? null;
+$device_id       = $_GET['device']   ?? null;
 $device_identity = $_GET['identity'] ?? null;
 
-// Redirect if no device specified
 if (!$device_id || !$device_identity) {
-    header("Location: GoSort_Sorters.php");
+    header("Location: GoSort_AnalyticsNavpage.php");
     exit();
 }
 
-// Get specific device info
 $stmt = $pdo->prepare("SELECT * FROM sorters WHERE id = ? AND device_identity = ?");
 $stmt->execute([$device_id, $device_identity]);
 $device_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$device_info) {
-    header("Location: GoSort_Sorters.php");
+    header("Location: GoSort_AnalyticsNavpage.php");
     exit();
 }
 
-// Determine default time filter based on device status
 $default_filter = 'today';
 if ($device_info['status'] === 'offline') {
-    // Check if there's any activity today
     $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM sorting_history WHERE device_identity = ? AND DATE(sorted_at) = CURDATE()");
     $stmt->execute([$device_identity]);
-    $today_count = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
-    
-    if ($today_count == 0) {
-        $default_filter = 'all_time';
-    }
+    if ($stmt->fetch(PDO::FETCH_ASSOC)['count'] == 0) $default_filter = 'all_time';
 }
 
 $time_filter = $_GET['filter'] ?? $default_filter;
-
-// Calculate date range based on filter
-$date_condition = "";
 $params = [$device_identity];
 
-switch ($time_filter) {
-    case 'today':
-        $date_condition = "AND DATE(sorted_at) = CURDATE()";
-        break;
-    case 'yesterday':
-        $date_condition = "AND DATE(sorted_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)";
-        break;
-    case 'last_7_days':
-        $date_condition = "AND sorted_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
-        break;
-    case 'this_month':
-        $date_condition = "AND MONTH(sorted_at) = MONTH(CURDATE()) AND YEAR(sorted_at) = YEAR(CURDATE())";
-        break;
-    case 'all_time':
-        $date_condition = "";
-        break;
-}
+$date_condition = match($time_filter) {
+    'today'      => "AND DATE(sorted_at) = CURDATE()",
+    'yesterday'  => "AND DATE(sorted_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)",
+    'last_7_days'=> "AND sorted_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
+    'this_month' => "AND MONTH(sorted_at) = MONTH(CURDATE()) AND YEAR(sorted_at) = YEAR(CURDATE())",
+    default      => "",
+};
 
-// Get sorting history for this specific device
-$base_query = "
-    SELECT 
-        trash_type,
-        COUNT(*) as count,
-        is_maintenance,
-        DATE(sorted_at) as date,
-        HOUR(sorted_at) as hour
+$stmt = $pdo->prepare("
+    SELECT trash_type, COUNT(*) as count, is_maintenance,
+           DATE(sorted_at) as date, HOUR(sorted_at) as hour
     FROM sorting_history
-    WHERE device_identity = ?
-    $date_condition
+    WHERE device_identity = ? $date_condition
     GROUP BY trash_type, is_maintenance, DATE(sorted_at), HOUR(sorted_at)
     ORDER BY date ASC, hour ASC
-";
-
-$stmt = $pdo->prepare($base_query);
+");
 $stmt->execute($params);
-
-// Fetch and process data
 $sorting_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-$dates = array();
-$bio_counts = array();
-$nbio_counts = array();
-$hazardous_counts = array();
-$mixed_counts = array();
-$maintenance_counts = array();
+
+$dates = []; $bio_counts = []; $nbio_counts = []; $hazardous_counts = []; $mixed_counts = [];
 $hourly_activity = array_fill(0, 24, 0);
 $total_items_processed = 0;
 
 foreach ($sorting_data as $record) {
     $date = $record['date'];
-    if (!in_array($date, $dates)) {
-        $dates[] = $date;
-    }
-    
+    if (!in_array($date, $dates)) $dates[] = $date;
     $count = intval($record['count']);
-    $type = $record['trash_type'];
-    $is_maintenance = $record['is_maintenance'];
-    $hour = intval($record['hour']);
-    
+    $type  = $record['trash_type'];
+    $hour  = intval($record['hour']);
     $total_items_processed += $count;
     $hourly_activity[$hour] += $count;
-
-    if ($is_maintenance) {
-        $maintenance_counts[$date][$type] = ($maintenance_counts[$date][$type] ?? 0) + $count;
-    } else {
+    if (!$record['is_maintenance']) {
         switch ($type) {
-            case 'bio':
-                $bio_counts[$date] = ($bio_counts[$date] ?? 0) + $count;
-                break;
-            case 'nbio':
-                $nbio_counts[$date] = ($nbio_counts[$date] ?? 0) + $count;
-                break;
-            case 'hazardous':
-                $hazardous_counts[$date] = ($hazardous_counts[$date] ?? 0) + $count;
-                break;
-            case 'mixed':
-                $mixed_counts[$date] = ($mixed_counts[$date] ?? 0) + $count;
-                break;
+            case 'bio':       $bio_counts[$date]       = ($bio_counts[$date] ?? 0) + $count; break;
+            case 'nbio':      $nbio_counts[$date]      = ($nbio_counts[$date] ?? 0) + $count; break;
+            case 'hazardous': $hazardous_counts[$date] = ($hazardous_counts[$date] ?? 0) + $count; break;
+            case 'mixed':     $mixed_counts[$date]     = ($mixed_counts[$date] ?? 0) + $count; break;
         }
     }
 }
 
-// Get total counts
-$total_bio = array_sum($bio_counts);
-$total_nbio = array_sum($nbio_counts);
+$total_bio       = array_sum($bio_counts);
+$total_nbio      = array_sum($nbio_counts);
 $total_hazardous = array_sum($hazardous_counts);
-$total_mixed = array_sum($mixed_counts);
+$total_mixed     = array_sum($mixed_counts);
+$total_sorted    = $total_bio + $total_nbio + $total_hazardous + $total_mixed;
 
-// Calculate maintenance counts
-$maintenance_bio = 0;
-$maintenance_nbio = 0;
-$maintenance_hazardous = 0;
-$maintenance_mixed = 0;
-
-foreach ($maintenance_counts as $date_counts) {
-    $maintenance_bio += $date_counts['bio'] ?? 0;
-    $maintenance_nbio += $date_counts['nbio'] ?? 0;
-    $maintenance_hazardous += $date_counts['hazardous'] ?? 0;
-    $maintenance_mixed += $date_counts['mixed'] ?? 0;
-}
-
-// Calculate performance metrics
-$total_sorted = $total_bio + $total_nbio + $total_hazardous + $total_mixed;
-$operating_days = count($dates) > 0 ? count($dates) : 1;
-$avg_per_day = $total_sorted / $operating_days;
-
-// Find peak hour
-$peak_hour = array_keys($hourly_activity, max($hourly_activity))[0];
+$operating_days  = count($dates) > 0 ? count($dates) : 1;
+$avg_per_day     = $total_sorted / $operating_days;
+$peak_hour       = array_keys($hourly_activity, max($hourly_activity))[0];
 $peak_hour_count = max($hourly_activity);
 
-// Calculate sorting rate (items per hour during operating hours 6am-6pm)
 $operating_hours_total = 0;
-for ($h = 6; $h <= 18; $h++) {
-    $operating_hours_total += $hourly_activity[$h];
-}
-$operating_hours_count = $operating_days * 12; // 12 hours per day
-$items_per_hour = $operating_hours_count > 0 ? $operating_hours_total / $operating_hours_count : 0;
+for ($h = 6; $h <= 18; $h++) $operating_hours_total += $hourly_activity[$h];
+$items_per_hour   = ($operating_days * 12) > 0 ? $operating_hours_total / ($operating_days * 12) : 0;
+$recyclable_items = $total_bio + $total_nbio;
+$total_weight     = $total_sorted * 0.3;
+$co2_saved        = $recyclable_items * 0.3 * 0.5;
+$recycling_rate   = $total_sorted > 0 ? ($recyclable_items / $total_sorted * 100) : 0;
 
-// Environmental impact calculations (example values - adjust based on your research)
-$co2_per_kg_recycled = 0.5; // kg CO2 saved per kg recycled
-$avg_weight_per_item = 0.3; // kg (assumption)
-$recyclable_items = $total_bio + $total_nbio; // bio and nbio can be recycled
-$total_weight = $total_sorted * $avg_weight_per_item;
-$co2_saved = ($recyclable_items * $avg_weight_per_item * $co2_per_kg_recycled);
-$recycling_rate = $total_sorted > 0 ? (($recyclable_items) / $total_sorted * 100) : 0;
-
-// Get last 5 sorting records for recent activity
 $recent_stmt = $pdo->prepare("
     SELECT trash_type, sorted_at, is_maintenance 
-    FROM sorting_history 
-    WHERE device_identity = ? 
-    ORDER BY sorted_at DESC 
-    LIMIT 10
+    FROM sorting_history WHERE device_identity = ? ORDER BY sorted_at DESC LIMIT 10
 ");
+
 $recent_stmt->execute([$device_identity]);
 $recent_activities = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -204,391 +122,316 @@ $recent_activities = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/dark-mode-global.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="js/theme-manager.js"></script>
     <script src="js/chart.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
-            --primary-green: #274a17ff;
-            --light-green: #7AF146;
-            --dark-gray: #1f2937;
-            --medium-gray: #6b7280;
-            --light-gray: #f3f4f6;
-            --border-color: #368137;
-            --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            --bio-color: #10b981;
-            --nbio-color: #ef4444;
+            --primary-green:   #274a17;
+            --light-green:     #7AF146;
+            --mid-green:       #368137;
+            --dark-gray:       #1f2937;
+            --medium-gray:     #6b7280;
+            --border-color:    #e5e7eb;
+            --card-shadow:     0 1px 3px rgba(0,0,0,0.07);
+            --bio-color:       #10b981;
+            --nbio-color:      #ef4444;
             --hazardous-color: #f59e0b;
-            --mixed-color: #6b7280;
+            --mixed-color:     #6b7280;
         }
 
         body {
-            background-color: #F3F3EF !important;
-            font-family: 'Inter', sans-serif !important;
+            background-color: #e8f1e6;
+            font-family: 'Poppins', sans-serif !important;
             color: var(--dark-gray);
         }
 
-        .page-header {
-            padding-top: 1rem;
-            margin-bottom: 1.5rem;
+        #main-content-wrapper {
+            margin-left: 240px;
+            padding: 100px 0 20px 0;
+            height: 100vh;
+            overflow-y: auto;
         }
 
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--dark-gray);
-            margin-left: 6px;
-        }
-
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .device-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background-color: var(--light-green);
-            color: var(--primary-green);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-        }
-
-        .status-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 0.25rem;
-        }
-
-        .status-online {
-            background-color: #10b981;
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
-        }
-
-        .status-offline {
-            background-color: #ef4444;
-        }
-
-        .time-filter-dropdown {
-            position: relative;
-        }
-
-        .time-filter-btn {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 10px;
-            padding: 0.5rem 2rem 0.5rem 1rem;
-            font-weight: 600;
-            color: var(--dark-gray);
-            cursor: pointer;
-            transition: all 0.2s;
-            appearance: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23274a17' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.75rem center;
-            background-size: 12px;
-            min-width: 160px;
-        }
-
-        .time-filter-btn:hover, .time-filter-btn:focus {
-            background-color: #efffe8ff;
-            color: var(--primary-green);
-            border-color: var(--primary-green);
-            outline: none;
-        }
-
-        .time-filter-btn option {
-            background: white;
-            color: var(--dark-gray);
-            font-weight: 500;
-            padding: 8px;
-        }
-
-        .export-btn {
-            background: var(--primary-green);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .export-btn:hover {
-            background-color: #1e3a11;
-            transform: translateY(-1px);
-        }
-
-        .stat-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
+        /* ── Section wrappers ── */
+        .section-container {
+            background: #fff;
+            border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: var(--card-shadow);
-            height: 100%;
-            transition: all 0.2s;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #eeeeee;
         }
 
-        .stat-card:hover {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
+        .section-block {
+            background: linear-gradient(135deg, rgb(236,251,234) 0%, #d5f5dc 100%);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .section-block:last-child { margin-bottom: 0; }
+
+        .section-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #000000b1;
+            margin-bottom: 1.25rem;
         }
 
-        .stat-card-header {
+        /* ── Page header ── */
+        .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 3px solid var(--border-color);
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
         }
-
-        .stat-card-title {
-            font-size: 1rem;
-            font-weight: 600;
+        .page-title {
+            font-size: 1.4rem;
+            font-weight: 700;
             color: var(--dark-gray);
             margin: 0;
         }
-
-        .stat-icon {
-            width: 40px;
-            height: 40px;
-            background-color: var(--light-green);
-            border-radius: 10px;
+        .page-header-right {
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 0.6rem;
+        }
+
+        /* ── Device badge ── */
+        .device-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #e8f5e1;
             color: var(--primary-green);
-            font-size: 1.25rem;
+            padding: 0.35rem 0.85rem;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 600;
         }
-
-        .quick-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
+        .device-badge .dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
         }
+        .device-badge .dot.online  { background: #15803d; box-shadow: 0 0 6px rgba(21,128,61,0.5); }
+        .device-badge .dot.offline { background: #dc2626; }
 
-        .quick-stat-box {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: var(--card-shadow);
+        /* ── Filter select ── */
+        .filter-select {
+            background: #fff;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.45rem 2rem 0.45rem 0.75rem;
+            font-size: 0.82rem;
+            font-family: 'Poppins', sans-serif;
+            color: var(--dark-gray);
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.65rem center;
+        }
+        .filter-select:focus { border-color: var(--mid-green); }
+
+        /* ── Export button ── */
+        .btn-export {
+            background: linear-gradient(135deg, var(--mid-green) 0%, var(--primary-green) 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 0.47rem 1rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            font-family: 'Poppins', sans-serif;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
             transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(39,74,23,0.15);
+        }
+        .btn-export:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(39,74,23,0.25);
+        }
+
+        /* ── Back link ── */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--medium-gray);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--primary-green); }
+
+        /* ── Quick stat boxes ── */
+        .quick-stat-box {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            box-shadow: var(--card-shadow);
             position: relative;
             overflow: hidden;
+            transition: all 0.2s;
+            height: 110px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
-
+        .quick-stat-box:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .quick-stat-box::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
             background: linear-gradient(to bottom, var(--light-green), var(--primary-green));
         }
+        .quick-stat-label { font-size: 0.72rem; font-weight: 600; color: var(--medium-gray); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; }
+        .quick-stat-value { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+        .quick-stat-sub   { font-size: 0.7rem; color: var(--medium-gray); margin-top: 0.3rem; }
 
-        .quick-stat-box:hover {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        /* ── White inner card ── */
+        .inner-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: var(--card-shadow);
+            height: 100%;
         }
-
-        .quick-stat-label {
-            font-size: 0.875rem;
-            color: var(--medium-gray);
-            font-weight: 500;
-            margin-bottom: 0.5rem;
+        .inner-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #f3f4f6;
         }
-
-        .quick-stat-value {
-            font-size: 2rem;
+        .inner-card-title {
+            font-size: 0.82rem;
             font-weight: 700;
             color: var(--dark-gray);
-            line-height: 1;
+            margin: 0;
         }
-
-        .quick-stat-change {
-            font-size: 0.75rem;
-            margin-top: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            color: var(--primary-green);
-        }
-
-        .chart-container {
-            position: relative;
-            height: 300px;
-        }
-
-        .insight-box {
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-            border-left: 4px solid var(--primary-green);
+        .inner-card-icon {
+            width: 32px; height: 32px;
+            background: #e8f5e1;
             border-radius: 8px;
-            padding: 1rem;
-            margin-top: 1rem;
-        }
-
-        .insight-title {
-            font-weight: 600;
+            display: flex; align-items: center; justify-content: center;
             color: var(--primary-green);
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            font-size: 0.9rem;
         }
 
-        .insight-text {
-            font-size: 0.875rem;
-            color: var(--dark-gray);
-            line-height: 1.5;
-        }
-
+        /* ── Metric grid inside cards ── */
         .metric-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.6rem;
         }
-
         .metric-item {
-            text-align: center;
-            padding: 1rem;
-            background: var(--light-gray);
+            background: #f9fafb;
             border-radius: 8px;
+            padding: 0.75rem 0.6rem;
+            text-align: center;
         }
-
         .metric-value {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 700;
             color: var(--primary-green);
+            line-height: 1;
+            margin-bottom: 0.2rem;
         }
-
         .metric-label {
-            font-size: 0.75rem;
+            font-size: 0.67rem;
             color: var(--medium-gray);
-            margin-top: 0.25rem;
+            font-weight: 500;
         }
 
-        .activity-log {
-            max-height: 300px;
-            overflow-y: auto;
+        /* ── Insight box ── */
+        .insight-box {
+            background: #f0fdf4;
+            border-left: 3px solid var(--primary-green);
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            margin-top: 0.85rem;
+            font-size: 0.78rem;
+            color: var(--dark-gray);
+            line-height: 1.6;
         }
+        .insight-box-title {
+            font-weight: 700;
+            color: var(--primary-green);
+            margin-bottom: 0.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.78rem;
+        }
+
+        /* ── Chart container ── */
+        .chart-wrap {
+            position: relative;
+            height: 260px;
+        }
+
+        /* ── Activity log ── */
+        .activity-log { max-height: 300px; overflow-y: auto; }
+        .activity-log::-webkit-scrollbar { width: 4px; }
+        .activity-log::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
 
         .activity-item {
             display: flex;
             align-items: center;
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--light-gray);
-            transition: background 0.2s;
+            gap: 0.75rem;
+            padding: 0.65rem 0.25rem;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.15s;
+            border-radius: 6px;
         }
-
-        .activity-item:hover {
-            background: var(--light-gray);
-        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-item:hover { background: #f9fafb; }
 
         .activity-icon {
-            width: 36px;
-            height: 36px;
+            width: 32px; height: 32px;
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 1rem;
-            font-size: 1rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
         }
+        .activity-icon.bio        { background: rgba(16,185,129,0.1); color: var(--bio-color); }
+        .activity-icon.nbio       { background: rgba(239,68,68,0.1);  color: var(--nbio-color); }
+        .activity-icon.hazardous  { background: rgba(245,158,11,0.1); color: var(--hazardous-color); }
+        .activity-icon.mixed      { background: rgba(107,114,128,0.1);color: var(--mixed-color); }
 
-        .activity-icon.bio { background: rgba(16, 185, 129, 0.1); color: var(--bio-color); }
-        .activity-icon.nbio { background: rgba(239, 68, 68, 0.1); color: var(--nbio-color); }
-        .activity-icon.hazardous { background: rgba(245, 158, 11, 0.1); color: var(--hazardous-color); }
-        .activity-icon.mixed { background: rgba(107, 114, 128, 0.1); color: var(--mixed-color); }
-
-        .activity-details {
-            flex: 1;
-        }
-
-        .activity-type {
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--dark-gray);
-        }
-
-        .activity-time {
-            font-size: 0.75rem;
-            color: var(--medium-gray);
-        }
-
-        .maintenance-badge {
-            background: rgba(245, 158, 11, 0.1);
+        .activity-type { font-size: 0.8rem; font-weight: 600; color: var(--dark-gray); }
+        .activity-time { font-size: 0.7rem; color: var(--medium-gray); }
+        .maintenance-tag {
+            background: rgba(245,158,11,0.12);
             color: var(--hazardous-color);
-            padding: 0.25rem 0.5rem;
+            padding: 0.1rem 0.4rem;
             border-radius: 4px;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 600;
-        }
-
-        .see-all-link {
-            font-size: 0.875rem;
-            color: var(--primary-green);
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .see-all-link:hover {
-            color: var(--border-color);
-        }
-
-        #main-content-wrapper {
-            margin-left: 260px;
-            transition: margin-left 0.3s ease;
-            padding: 20px;
-        }
-
-        #main-content-wrapper.collapsed {
-            margin-left: 80px;
+            margin-left: 0.3rem;
         }
 
         @media (max-width: 992px) {
-            #main-content-wrapper {
-                margin-left: 0;
-                padding: 12px;
-            }
-
-            .page-title {
-                font-size: 1.5rem;
-            }
-
-            .quick-stats {
-                grid-template-columns: 1fr;
-            }
-
-            .header-controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-        }
-
-        @media print {
-            .export-btn, .filter-btn, #sidebar { display: none; }
-            #main-content-wrapper { margin-left: 0; }
+            #main-content-wrapper { margin-left: 0; padding: 12px; }
+            .page-header { flex-direction: column; align-items: flex-start; }
         }
     </style>
 </head>
@@ -596,333 +439,270 @@ $recent_activities = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php include 'sidebar.php'; ?>
 
     <div id="main-content-wrapper">
-        <div class="container">
-            <div class="page-header d-flex align-items-center justify-content-between flex-wrap">
-                <div class="d-flex align-items-center mb-2 mb-md-0">
-                    <a href="GoSort_AnalyticsNavpage.php" class="text-decoration-none d-flex align-items-center">
-                        <i class="bi bi-arrow-left me-2 fs-4" style="color: var(--dark-gray);"></i>
-                        <h1 class="page-title">Analytics</h1>
-                    </a>
-                </div>
+        <div class="container-fluid">
 
-                <div class="header-controls">
-                    <div class="device-badge">
-                        <span class="status-indicator <?php echo $device_info['status'] === 'online' ? 'status-online' : 'status-offline'; ?>"></span>
-                        <i class="bi bi-hdd-rack"></i>
-                        <?php echo htmlspecialchars($device_info['device_name']); ?>
+            <?php include 'topbar.php'; ?>
+
+            <div class="section-container">
+
+                <!-- Page header -->
+                <div class="page-header">
+                    <div class="d-flex align-items-center gap-3">
+                        <a href="GoSort_AnalyticsNavpage.php" class="back-link">
+                            <i class="bi bi-arrow-left"></i> Back
+                        </a>
+                        <div class="device-badge">
+                            <span class="dot <?php echo $device_info['status']; ?>"></span>
+                            <i class="bi bi-cpu-fill"></i>
+                            <?php echo htmlspecialchars($device_info['device_name']); ?>
+                        </div>
                     </div>
-
-                   <div class="time-filter-dropdown-wrapper">
-                    <select class="time-filter-btn" id="timeFilter" onchange="changeFilter()">
-                        <option value="today" <?php echo $time_filter === 'today' ? 'selected' : ''; ?>>Today</option>
-                        <option value="yesterday" <?php echo $time_filter === 'yesterday' ? 'selected' : ''; ?>>Yesterday</option>
-                        <option value="last_7_days" <?php echo $time_filter === 'last_7_days' ? 'selected' : ''; ?>>Last 7 Days</option>
-                        <option value="this_month" <?php echo $time_filter === 'this_month' ? 'selected' : ''; ?>>This Month</option>
-                        <option value="all_time" <?php echo $time_filter === 'all_time' ? 'selected' : ''; ?>>All Time</option>
-                    </select>
-                    </div>
-
-
-                    <button class="export-btn" onclick="exportReport()">
-                        <i class="bi bi-download"></i>
-                        Export Report
-                    </button>
-                </div>
-            </div>
-            
-            <hr style="height: 1.5px; background-color: #000; opacity: 1; margin-left:6.5px;" class="mb-4">
-
-            <!-- Quick Stats -->
-            <div class="quick-stats">
-                <div class="quick-stat-box">
-                    <div class="quick-stat-label">Total Sorted</div>
-                    <div class="quick-stat-value" id="totalSorted"><?php echo number_format($total_sorted); ?></div>
-                    <div class="quick-stat-change">
-                        <span>↑</span> Live updating
+                    <div class="page-header-right">
+                        <select class="filter-select" id="timeFilter" onchange="changeFilter()">
+                            <option value="today"    <?= $time_filter === 'today'    ? 'selected' : '' ?>>Today</option>
+                            <option value="all_time" <?= $time_filter === 'all_time' ? 'selected' : '' ?>>All Time</option>
+                        </select>
+                        <button class="btn-export" onclick="exportReport()">
+                            <i class="bi bi-download"></i> Export
+                        </button>
                     </div>
                 </div>
-                <div class="quick-stat-box">
-                    <div class="quick-stat-label">Biodegradable</div>
-                    <div class="quick-stat-value" style="color: var(--bio-color);" id="totalBio"><?php echo number_format($total_bio); ?></div>
-                </div>
-                <div class="quick-stat-box">
-                    <div class="quick-stat-label">Non-Biodegradable</div>
-                    <div class="quick-stat-value" style="color: var(--nbio-color);" id="totalNbio"><?php echo number_format($total_nbio); ?></div>
-                </div>
-                <div class="quick-stat-box">
-                    <div class="quick-stat-label">Hazardous</div>
-                    <div class="quick-stat-value" style="color: var(--hazardous-color);" id="totalHazardous"><?php echo number_format($total_hazardous); ?></div>
-                </div>
-                <div class="quick-stat-box">
-                    <div class="quick-stat-label">Mixed</div>
-                    <div class="quick-stat-value" style="color: var(--mixed-color);" id="totalMixed"><?php echo number_format($total_mixed); ?></div>
-                </div>
-            </div>
 
-<!-- Performance Metrics -->
-<div class="row g-0 mb-4"> 
-    <div class="col-12 px-0 mb-4">
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <h5 class="stat-card-title">Performance Metrics</h5>
-                <div class="stat-icon">
-                    <i class="bi bi-speedometer2"></i>
-                </div>
-            </div>
-
-            <div class="metric-grid">
-                <div class="metric-item">
-                    <div class="metric-value"><?php echo number_format($avg_per_day, 1); ?></div>
-                    <div class="metric-label">Avg per Day</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-value"><?php echo number_format($items_per_hour, 1); ?></div>
-                    <div class="metric-label">Items/Hour</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-value"><?php echo $peak_hour_count > 0 ? date('g A', strtotime("$peak_hour:00")) : 'N/A'; ?></div>
-                    <div class="metric-label">Peak Hour</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-value"><?php echo number_format($recycling_rate, 1); ?>%</div>
-                    <div class="metric-label">Recycling Rate</div>
-                </div>
-            </div>
-
-            <div class="insight-box">
-                <div class="insight-title">
-                    <i class="bi bi-info-circle-fill"></i>
-                    Operating Hours Analysis
-                </div>
-                <div class="insight-text">
-                    <?php
-                    $morning_total = 0; // 6-12
-                    $afternoon_total = 0; // 12-18
-                    for ($h = 6; $h < 12; $h++) $morning_total += $hourly_activity[$h];
-                    for ($h = 12; $h <= 18; $h++) $afternoon_total += $hourly_activity[$h];
-                    
-                    if ($morning_total > $afternoon_total && $morning_total > 0) {
-                        echo "Device is more active in the <strong>morning hours</strong> (6 AM - 12 PM) with " . number_format($morning_total) . " items sorted.";
-                    } elseif ($afternoon_total > $morning_total && $afternoon_total > 0) {
-                        echo "Device is more active in the <strong>afternoon hours</strong> (12 PM - 6 PM) with " . number_format($afternoon_total) . " items sorted.";
-                    } elseif ($morning_total === $afternoon_total && $morning_total > 0) {
-                        echo "Activity is evenly distributed between morning and afternoon hours.";
-                    } else {
-                        echo "No activity recorded during operating hours (6 AM - 6 PM).";
-                    }
-                    ?>
-                </div>
-            </div>
-
-            <div class="insight-title">
-                <i class="bi bi-lightbulb-fill"></i>
-                Insight
-            </div>
-            <div class="insight-text">
-                <?php
-                $dominant_type = 'balanced';
-                $max_count = max($total_bio, $total_nbio, $total_hazardous, $total_mixed);
-                if ($max_count > 0) {
-                    if ($total_bio === $max_count) $dominant_type = 'biodegradable';
-                    elseif ($total_nbio === $max_count) $dominant_type = 'non-biodegradable';
-                    elseif ($total_hazardous === $max_count) $dominant_type = 'hazardous';
-                    elseif ($total_mixed === $max_count) $dominant_type = 'mixed';
-                }
-
-                if ($total_sorted === 0) {
-                    echo "No sorting activity recorded for this period. The device may be offline or inactive.";
-                } elseif ($peak_hour >= 6 && $peak_hour <= 18) {
-                    echo "Peak activity occurs at " . date('g A', strtotime("$peak_hour:00")) . " with $peak_hour_count items processed. ";
-                    if ($dominant_type !== 'balanced') {
-                        echo "Most sorted waste is <strong>$dominant_type</strong> (" . number_format(($max_count / $total_sorted) * 100, 1) . "%).";
-                    }
-                } else {
-                    echo "Processing " . number_format($avg_per_day, 0) . " items daily. ";
-                    if ($recycling_rate > 75) {
-                        echo "Excellent recycling rate of " . number_format($recycling_rate, 1) . "%!";
-                    } elseif ($recycling_rate > 50) {
-                        echo "Good recycling rate of " . number_format($recycling_rate, 1) . "%. Room for improvement.";
-                    } else {
-                        echo "Recycling rate is " . number_format($recycling_rate, 1) . "%. Consider user education.";
-                    }
-                }
-                ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-12 px-0"> 
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <h5 class="stat-card-title">Environmental Impact</h5>
-                <div class="stat-icon">
-                    <i class="bi bi-globe"></i>
-                </div>
-            </div>
-
-            <div class="metric-grid" style="grid-template-columns: 1fr;">
-                <div class="metric-item">
-                    <div class="metric-value"><?php echo number_format($co2_saved, 1); ?> kg</div>
-                    <div class="metric-label">CO₂ Emissions Saved</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-value"><?php echo number_format($total_weight, 1); ?> kg</div>
-                    <div class="metric-label">Total Weight Processed</div>
-                </div>
-            </div>
-
-            <div class="insight-box">
-                <div class="insight-title">
-                    <i class="bi bi-tree-fill"></i>
-                    Impact
-                </div>
-                <div class="insight-text">
-                    Proper waste sorting has saved approximately 
-                    <strong><?php echo number_format($co2_saved, 1); ?> kg of CO₂</strong> emissions, 
-                    equivalent to planting <?php echo ceil($co2_saved / 21); ?> trees!
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-            <!-- Charts Row -->
-            <div class="row g-4 mb-4">
-                <div class="col-lg-6">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <h5 class="stat-card-title">Waste Distribution</h5>
-                            <div class="stat-icon">
-                                <i class="bi bi-pie-chart-fill"></i>
+                <!-- Quick stats -->
+                <div class="section-block">
+                    <div class="section-label">Summary</div>
+                    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3">
+                        <div class="col">
+                            <div class="quick-stat-box">
+                                <div class="quick-stat-label">Total Sorted</div>
+                                <div class="quick-stat-value" id="totalSorted"><?php echo number_format($total_sorted); ?></div>
+                                <div class="quick-stat-sub">↑ Live updating</div>
                             </div>
                         </div>
-                        <div class="chart-container">
-                            <canvas id="totalPieChart"></canvas>
+                        <div class="col">
+                            <div class="quick-stat-box">
+                                <div class="quick-stat-label">Biodegradable</div>
+                                <div class="quick-stat-value" style="color:var(--bio-color);" id="totalBio"><?php echo number_format($total_bio); ?></div>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="quick-stat-box">
+                                <div class="quick-stat-label">Non-Biodegradable</div>
+                                <div class="quick-stat-value" style="color:var(--nbio-color);" id="totalNbio"><?php echo number_format($total_nbio); ?></div>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="quick-stat-box">
+                                <div class="quick-stat-label">Hazardous</div>
+                                <div class="quick-stat-value" style="color:var(--hazardous-color);" id="totalHazardous"><?php echo number_format($total_hazardous); ?></div>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="quick-stat-box">
+                                <div class="quick-stat-label">Mixed</div>
+                                <div class="quick-stat-value" style="color:var(--mixed-color);" id="totalMixed"><?php echo number_format($total_mixed); ?></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-6">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <h5 class="stat-card-title">Daily Sorting Trend</h5>
-                            <div class="stat-icon">
-                                <i class="bi bi-graph-up"></i>
+                <!-- Charts row -->
+                <div class="section-block">
+                    <div class="section-label">Charts</div>
+                    <div class="row g-3">
+                        <div class="col-lg-5">
+                            <div class="inner-card">
+                                <div class="inner-card-header">
+                                    <span class="inner-card-title">Waste Distribution</span>
+                                    <div class="inner-card-icon"><i class="bi bi-pie-chart-fill"></i></div>
+                                </div>
+                                <div class="chart-wrap">
+                                    <canvas id="totalPieChart"></canvas>
+                                </div>
                             </div>
                         </div>
-                        <div class="chart-container">
-                            <canvas id="trendLineChart"></canvas>
+                        <div class="col-lg-7">
+                            <div class="inner-card">
+                                <div class="inner-card-header">
+                                    <span class="inner-card-title">Daily Sorting Trend</span>
+                                    <div class="inner-card-icon"><i class="bi bi-graph-up"></i></div>
+                                </div>
+                                <div class="chart-wrap">
+                                    <canvas id="trendLineChart"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Hourly Activity & Recent Activity -->
-            <div class="row g-4 mb-4">
-                <div class="col-lg-8">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <h5 class="stat-card-title">Hourly Activity Pattern (6 AM - 6 PM)</h5>
-                            <div class="stat-icon">
-                                <i class="bi bi-clock-fill"></i>
-                            </div>
+                <!-- Hourly activity -->
+                <div class="section-block">
+                    <div class="section-label">Hourly Activity</div>
+                    <div class="inner-card">
+                        <div class="inner-card-header">
+                            <span class="inner-card-title">Activity Pattern (6 AM – 6 PM)</span>
+                            <div class="inner-card-icon"><i class="bi bi-clock-fill"></i></div>
                         </div>
-                        <div class="chart-container">
+                        <div class="chart-wrap">
                             <canvas id="hourlyBarChart"></canvas>
                         </div>
                         <div class="insight-box">
-                            <div class="insight-title">
-                                <i class="bi bi-info-circle-fill"></i>
-                                Peak Hours
-                            </div>
-                            <div class="insight-text">
-                                <?php
-                                $peak_hours = [];
-                                $threshold = $peak_hour_count * 0.8; // 80% of peak
-                                
-                                for ($h = 6; $h <= 18; $h++) {
-                                    if ($hourly_activity[$h] >= $threshold) {
-                                        $peak_hours[] = date('g A', strtotime("$h:00"));
-                                    }
-                                }
-
-                                if (count($peak_hours) > 0) {
-                                    echo "Peak sorting activity occurs at " . implode(', ', $peak_hours) . 
-                                         ". Consider focusing maintenance outside these hours.";
-                                } else {
-                                    echo "No significant peak hours detected during operating hours.";
-                                }
-                                ?>
-                            </div>
+                            <div class="insight-box-title"><i class="bi bi-info-circle-fill"></i> Peak Hours</div>
+                            <?php
+                            $peak_hours = [];
+                            $threshold  = $peak_hour_count * 0.8;
+                            for ($h = 6; $h <= 18; $h++) {
+                                if ($hourly_activity[$h] >= $threshold && $hourly_activity[$h] > 0)
+                                    $peak_hours[] = date('g A', strtotime("$h:00"));
+                            }
+                            echo count($peak_hours) > 0
+                                ? "Peak sorting activity at " . implode(', ', $peak_hours) . ". Consider scheduling maintenance outside these hours."
+                                : "No significant peak hours detected during operating hours.";
+                            ?>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-4">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <h5 class="stat-card-title">Recent Activity</h5>
-                            <div class="stat-icon">
-                                <i class="bi bi-activity"></i>
-                            </div>
-                        </div>
-                        <div class="activity-log">
-                            <?php foreach ($recent_activities as $activity): ?>
-                                <div class="activity-item">
-                                    <div class="activity-icon <?php echo htmlspecialchars($activity['trash_type']); ?>">
-                                        <i class="bi bi-trash"></i>
+                <!-- Performance + Environmental + Recent Activity -->
+                <div class="section-block">
+                    <div class="section-label">Performance & Activity</div>
+                    <div class="row g-3">
+
+                        <!-- Performance Metrics -->
+                        <div class="col-lg-4">
+                            <div class="inner-card">
+                                <div class="inner-card-header">
+                                    <span class="inner-card-title">Performance Metrics</span>
+                                    <div class="inner-card-icon"><i class="bi bi-speedometer2"></i></div>
+                                </div>
+                                <div class="metric-grid">
+                                    <div class="metric-item">
+                                        <div class="metric-value"><?php echo number_format($avg_per_day, 1); ?></div>
+                                        <div class="metric-label">Avg / Day</div>
                                     </div>
-                                    <div class="activity-details">
-                                        <div class="activity-type">
-                                            <?php 
-                                            $type = ucfirst($activity['trash_type']);
-                                            echo htmlspecialchars($type); 
-                                            if ($activity['is_maintenance']) {
-                                                echo ' <span class="maintenance-badge">Maintenance</span>';
-                                            }
-                                            ?>
-                                        </div>
-                                        <div class="activity-time">
-                                            <?php 
-                                            $sorted_time = new DateTime($activity['sorted_at']);
-                                            $now = new DateTime();
-                                            $interval = $now->diff($sorted_time);
-                                            
-                                            if ($interval->days == 0) {
-                                                if ($interval->h == 0) {
-                                                    echo $interval->i . ' minutes ago';
-                                                } else {
-                                                    echo $interval->h . ' hours ago';
-                                                }
-                                            } else if ($interval->days == 1) {
-                                                echo 'Yesterday';
-                                            } else {
-                                                echo $sorted_time->format('M j, Y');
-                                            }
-                                            ?>
-                                        </div>
+                                    <div class="metric-item">
+                                        <div class="metric-value"><?php echo number_format($items_per_hour, 1); ?></div>
+                                        <div class="metric-label">Items / Hour</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-value"><?php echo $peak_hour_count > 0 ? date('g A', strtotime("$peak_hour:00")) : 'N/A'; ?></div>
+                                        <div class="metric-label">Peak Hour</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-value"><?php echo number_format($recycling_rate, 1); ?>%</div>
+                                        <div class="metric-label">Recycling Rate</div>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
+                                <div class="insight-box">
+                                    <div class="insight-box-title"><i class="bi bi-lightbulb-fill"></i> Insight</div>
+                                    <?php
+                                    $morning = 0; $afternoon = 0;
+                                    for ($h = 6; $h < 12; $h++)  $morning   += $hourly_activity[$h];
+                                    for ($h = 12; $h <= 18; $h++) $afternoon += $hourly_activity[$h];
+                                    if ($morning > $afternoon && $morning > 0)
+                                        echo "More active in the <strong>morning</strong> (6 AM–12 PM) with " . number_format($morning) . " items.";
+                                    elseif ($afternoon > $morning && $afternoon > 0)
+                                        echo "More active in the <strong>afternoon</strong> (12 PM–6 PM) with " . number_format($afternoon) . " items.";
+                                    elseif ($morning === $afternoon && $morning > 0)
+                                        echo "Evenly distributed between morning and afternoon.";
+                                    else
+                                        echo "No activity recorded during operating hours.";
+                                    ?>
+                                </div>
+                            </div>
                         </div>
-                        <div class="mt-3 text-center border-top pt-3">
-                            <a href="#" class="see-all-link d-inline-flex">
-                                See All Device Activity log
-                                <i class="bi bi-arrow-right"></i>
-                            </a>
+
+                        <!-- Environmental Impact -->
+                        <div class="col-lg-4">
+                            <div class="inner-card">
+                                <div class="inner-card-header">
+                                    <span class="inner-card-title">Environmental Impact</span>
+                                    <div class="inner-card-icon"><i class="bi bi-globe"></i></div>
+                                </div>
+                                <div class="metric-grid">
+                                    <div class="metric-item" style="grid-column: span 2;">
+                                        <div class="metric-value"><?php echo number_format($co2_saved, 1); ?> kg</div>
+                                        <div class="metric-label">CO₂ Emissions Saved</div>
+                                    </div>
+                                    <div class="metric-item" style="grid-column: span 2;">
+                                        <div class="metric-value"><?php echo number_format($total_weight, 1); ?> kg</div>
+                                        <div class="metric-label">Total Weight Processed</div>
+                                    </div>
+                                </div>
+                                <div class="insight-box">
+                                    <div class="insight-box-title"><i class="bi bi-tree-fill"></i> Impact</div>
+                                    Proper sorting saved ~<strong><?php echo number_format($co2_saved, 1); ?> kg CO₂</strong>,
+                                    equivalent to planting <strong><?php echo ceil($co2_saved / 21); ?> trees</strong>!
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Recent Activity -->
+                        <div class="col-lg-4">
+                            <div class="inner-card">
+                                <div class="inner-card-header">
+                                    <span class="inner-card-title">Recent Activity</span>
+                                    <div class="inner-card-icon"><i class="bi bi-activity"></i></div>
+                                </div>
+                                <div class="activity-log">
+                                    <?php foreach ($recent_activities as $activity):
+                                        $tz  = new DateTimeZone('Asia/Manila');
+                                        $at  = new DateTime($activity['sorted_at'], $tz);
+                                        $now = new DateTime('now', $tz);
+                                        $diff = $now->diff($at);
+                                        if ($diff->days == 0) {
+                                            $timeAgo = $diff->h == 0 ? $diff->i . ' min ago' : $diff->h . ' hr ago';
+                                        } elseif ($diff->days == 1) {
+                                            $timeAgo = 'Yesterday';
+                                        } else {
+                                            $timeAgo = $at->format('M j, Y');
+                                        }
+                                        $binLabel = match($activity['trash_type']) {
+                                            'bio'       => 'Biodegradable Bin',
+                                            'nbio'      => 'Non-Biodegradable Bin',
+                                            'hazardous' => 'Hazardous Bin',
+                                            'mixed'     => 'Mixed Waste Bin',
+                                            default     => ucfirst($activity['trash_type']) . ' Bin',
+                                        };
+                                    ?>
+                                    <div class="activity-item">
+                                        <div class="activity-icon <?php echo htmlspecialchars($activity['trash_type']); ?>">
+                                            <i class="bi bi-trash"></i>
+                                        </div>
+                                        <div style="flex:1; min-width:0;">
+                                            <div class="activity-type">
+                                                Item sorted into <strong><?php echo $binLabel; ?></strong>
+                                                <?php if ($activity['is_maintenance']): ?>
+                                                    <span class="maintenance-tag">Maintenance</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="activity-time"><?php echo $timeAgo; ?></div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                    <?php if (count($recent_activities) === 0): ?>
+                                        <div style="text-align:center; padding:1.5rem; color:var(--medium-gray); font-size:0.8rem;">
+                                            No recent activity recorded.
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
-            </div>
+
+            </div><!-- /section-container -->
         </div>
     </div>
-<script>
 
-    Chart.defaults.font.family = "'Inter', sans-serif";
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script>
+    Chart.defaults.font.family = "'Poppins', sans-serif";
     Chart.defaults.color = '#6b7280';
 
-
-    const pieCtx = document.getElementById('totalPieChart').getContext('2d');
-    const totalPieChart = new Chart(pieCtx, {
+    // Pie chart
+    new Chart(document.getElementById('totalPieChart').getContext('2d'), {
         type: 'pie',
         data: {
             labels: ['Biodegradable', 'Non-Biodegradable', 'Hazardous', 'Mixed'],
@@ -938,251 +718,140 @@ $recent_activities = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: {
-                        padding: 15,
-                        usePointStyle: true,
-                        font: { size: 12 }
-                    }
+                    labels: { padding: 12, usePointStyle: true, font: { size: 11 } }
                 }
             }
         }
     });
 
-    // LINE CHART
-    const lineCtx = document.getElementById('trendLineChart').getContext('2d');
-    const trendLineChart = new Chart(lineCtx, {
+    // Line chart
+    const trendLineChart = new Chart(document.getElementById('trendLineChart').getContext('2d'), {
         type: 'line',
         data: {
-            labels: <?php echo json_encode(array_map(function($date) {
-                return date('M j', strtotime($date));
-            }, $dates)); ?>,
-            datasets: [{
-                label: 'Biodegradable',
-                data: <?php echo json_encode(array_map(fn($date) => $bio_counts[$date] ?? 0, $dates)); ?>,
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                tension: 0.4,
-                fill: true
-            }, {
-                label: 'Non-Biodegradable',
-                data: <?php echo json_encode(array_map(fn($date) => $nbio_counts[$date] ?? 0, $dates)); ?>,
-                borderColor: '#ef4444',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                tension: 0.4,
-                fill: true
-            }, {
-                label: 'Hazardous',
-                data: <?php echo json_encode(array_map(fn($date) => $hazardous_counts[$date] ?? 0, $dates)); ?>,
-                borderColor: '#f59e0b',
-                backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                tension: 0.4,
-                fill: true
-            }, {
-                label: 'Mixed',
-                data: <?php echo json_encode(array_map(fn($date) => $mixed_counts[$date] ?? 0, $dates)); ?>,
-                borderColor: '#6b7280',
-                backgroundColor: 'rgba(107, 114, 128, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
+            labels: <?php echo json_encode(array_map(fn($d) => date('M j', strtotime($d)), $dates)); ?>,
+            datasets: [
+                { label: 'Biodegradable',     data: <?php echo json_encode(array_map(fn($d) => $bio_counts[$d]       ?? 0, $dates)); ?>, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)',  tension: 0.4, fill: true },
+                { label: 'Non-Biodegradable', data: <?php echo json_encode(array_map(fn($d) => $nbio_counts[$d]      ?? 0, $dates)); ?>, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)',   tension: 0.4, fill: true },
+                { label: 'Hazardous',         data: <?php echo json_encode(array_map(fn($d) => $hazardous_counts[$d] ?? 0, $dates)); ?>, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', tension: 0.4, fill: true },
+                { label: 'Mixed',             data: <?php echo json_encode(array_map(fn($d) => $mixed_counts[$d]     ?? 0, $dates)); ?>, borderColor: '#6b7280', backgroundColor: 'rgba(107,114,128,0.08)',tension: 0.4, fill: true }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 15,
-                        usePointStyle: true,
-                        font: { size: 12 }
-                    }
-                }
-            },
+            plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } } },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f3f4f6' }
-                },
-                x: {
-                    grid: { display: false }
-                }
+                y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                x: { grid: { display: false } }
             }
         }
     });
 
-    // BAR CHART — Maintenance Mode
-    const maintenanceBarChart = new Chart(document.getElementById('maintenanceBarChart'), {
+    // Hourly bar chart
+    const hourlyLabels = [];
+    const hourlyData   = [];
+    <?php for ($h = 6; $h <= 18; $h++): ?>
+        hourlyLabels.push('<?php echo date('g A', strtotime("$h:00")); ?>');
+        hourlyData.push(<?php echo $hourly_activity[$h]; ?>);
+    <?php endfor; ?>
+
+    new Chart(document.getElementById('hourlyBarChart').getContext('2d'), {
         type: 'bar',
         data: {
-            labels: ['Biodegradable', 'Non-Biodegradable', 'Hazardous', 'Mixed'],
+            labels: hourlyLabels,
             datasets: [{
-                label: 'Normal Operation',
-                data: [0, 0, 0, 0],
-                backgroundColor: '#10b981',
-                borderRadius: 6
-            }, {
-                label: 'Maintenance Mode',
-                data: [0, 0, 0, 0],
-                backgroundColor: '#f59e0b',
+                label: 'Items Sorted',
+                data: hourlyData,
+                backgroundColor: 'rgba(39,74,23,0.15)',
+                borderColor: '#368137',
+                borderWidth: 1.5,
                 borderRadius: 6
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 15,
-                        usePointStyle: true,
-                        font: { size: 12 }
-                    }
-                }
-            },
+            plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true, stacked: true, grid: { color: '#f3f4f6' } },
-                x: { stacked: true, grid: { display: false } }
+                y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                x: { grid: { display: false } }
             }
         }
     });
 
-    // Update only the BAR CHART dynamically (since pie/line are PHP-preloaded)
-    function updateCharts() {
-        const queryParams = new URLSearchParams(window.location.search);
-        const deviceId = queryParams.get('device');
-        const deviceIdentity = queryParams.get('identity');
-
-        const url = 'gs_DB/get_statistics_data.php?device=' + deviceId + '&identity=' + deviceIdentity;
-
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                // Update Bar Chart
-                maintenanceBarChart.data.datasets[0].data = [
-                    data.maintenance.normal.bio,
-                    data.maintenance.normal.nbio,
-                    data.maintenance.normal.hazardous,
-                    data.maintenance.normal.mixed
-                ];
-                maintenanceBarChart.data.datasets[1].data = [
-                    data.maintenance.maintenance.bio,
-                    data.maintenance.maintenance.nbio,
-                    data.maintenance.maintenance.hazardous,
-                    data.maintenance.maintenance.mixed
-                ];
-                maintenanceBarChart.update();
-            })
-            .catch(error => console.error('Error fetching data:', error));
+    function changeFilter() {
+        const filter = document.getElementById('timeFilter').value;
+        const params = new URLSearchParams(window.location.search);
+        params.set('filter', filter);
+        window.location.href = '?' + params.toString();
     }
-
-    // Initial and periodic update for maintenance chart
-    updateCharts();
-    setInterval(updateCharts, 1000);
 
     function exportReport() {
         try {
-            // Create a new workbook
             const wb = XLSX.utils.book_new();
-            
-            // Get device info and time range
-            const deviceName = document.querySelector('.device-badge').textContent.trim();
-            const timeRange = document.getElementById('timeFilter').options[document.getElementById('timeFilter').selectedIndex].text;
-            
-            // Quick Stats worksheet
-            const quickStats = [
-                ['GoSort Analytics Report', ''],
+            const deviceName = '<?php echo htmlspecialchars($device_info['device_name']); ?>';
+            const timeRange  = document.getElementById('timeFilter').options[document.getElementById('timeFilter').selectedIndex].text;
+
+            // Sheet 1: Summary
+            const ws1 = XLSX.utils.aoa_to_sheet([
+                ['GoSort Analytics Report'],
                 ['Device', deviceName],
                 ['Time Range', timeRange],
-                ['', ''],
-                ['Quick Statistics', ''],
+                ['Exported On', new Date().toLocaleString()],
+                [],
                 ['Category', 'Count'],
-                ['Total Sorted', document.getElementById('totalSorted').textContent],
-                ['Biodegradable', document.getElementById('totalBio').textContent],
-                ['Non-Biodegradable', document.getElementById('totalNbio').textContent],
-                ['Hazardous', document.getElementById('totalHazardous').textContent],
-                ['Mixed', document.getElementById('totalMixed').textContent]
-            ];
-            const wsQuickStats = XLSX.utils.aoa_to_sheet(quickStats);
-            XLSX.utils.book_append_sheet(wb, wsQuickStats, 'Quick Stats');
-            
-            // Performance Metrics worksheet
-            const metrics = document.querySelectorAll('.metric-grid .metric-item');
-            const perfMetrics = [
-                ['Performance Metrics', ''],
-                ['Metric', 'Value'],
-                ['Average per Day', metrics[0].querySelector('.metric-value').textContent],
-                ['Items per Hour', metrics[1].querySelector('.metric-value').textContent],
-                ['Peak Hour', metrics[2].querySelector('.metric-value').textContent],
-                ['Recycling Rate', metrics[3].querySelector('.metric-value').textContent]
-            ];
-            const wsPerfMetrics = XLSX.utils.aoa_to_sheet(perfMetrics);
-            XLSX.utils.book_append_sheet(wb, wsPerfMetrics, 'Performance');
+                ['Total Sorted',       document.getElementById('totalSorted').textContent],
+                ['Biodegradable',      document.getElementById('totalBio').textContent],
+                ['Non-Biodegradable',  document.getElementById('totalNbio').textContent],
+                ['Hazardous',          document.getElementById('totalHazardous').textContent],
+                ['Mixed',              document.getElementById('totalMixed').textContent],
+            ]);
+            XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
 
-            // Environmental Impact worksheet
-            const envMetrics = document.querySelectorAll('.col-12.px-0:last-child .metric-item');
-            const envImpact = [
-                ['Environmental Impact', ''],
-                ['Metric', 'Value'],
-                ['CO₂ Emissions Saved', envMetrics[0].querySelector('.metric-value').textContent],
-                ['Total Weight Processed', envMetrics[1].querySelector('.metric-value').textContent]
+            // Sheet 2: Daily Breakdown (all dates from PHP)
+            const dailyRows = [
+                ['Daily Breakdown'],
+                ['Date', 'Biodegradable', 'Non-Biodegradable', 'Hazardous', 'Mixed', 'Daily Total'],
             ];
-            const wsEnvImpact = XLSX.utils.aoa_to_sheet(envImpact);
-            XLSX.utils.book_append_sheet(wb, wsEnvImpact, 'Environmental');
+            const dates      = <?php echo json_encode($dates); ?>;
+            const bioData    = <?php echo json_encode(array_map(fn($d) => $bio_counts[$d]       ?? 0, $dates)); ?>;
+            const nbioData   = <?php echo json_encode(array_map(fn($d) => $nbio_counts[$d]      ?? 0, $dates)); ?>;
+            const hazData    = <?php echo json_encode(array_map(fn($d) => $hazardous_counts[$d] ?? 0, $dates)); ?>;
+            const mixedData  = <?php echo json_encode(array_map(fn($d) => $mixed_counts[$d]     ?? 0, $dates)); ?>;
+            dates.forEach((date, i) => {
+                const total = bioData[i] + nbioData[i] + hazData[i] + mixedData[i];
+                dailyRows.push([date, bioData[i], nbioData[i], hazData[i], mixedData[i], total]);
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dailyRows), 'Daily Breakdown');
 
-            // Charts Data
-            // Pie Chart Data
-            const pieData = [
-                ['Waste Distribution', ''],
-                ['Category', 'Count'],
-                ...totalPieChart.data.labels.map((label, i) => [
-                    label,
-                    totalPieChart.data.datasets[0].data[i]
-                ])
-            ];
-            const wsPieData = XLSX.utils.aoa_to_sheet(pieData);
-            XLSX.utils.book_append_sheet(wb, wsPieData, 'Waste Distribution');
+            // Sheet 3: Performance & Environmental
+            const ws3 = XLSX.utils.aoa_to_sheet([
+                ['Performance Metrics'],
+                ['Avg per Day',    '<?php echo number_format($avg_per_day, 1); ?>'],
+                ['Items per Hour', '<?php echo number_format($items_per_hour, 1); ?>'],
+                ['Peak Hour',      '<?php echo $peak_hour_count > 0 ? date('g A', strtotime("$peak_hour:00")) : "N/A"; ?>'],
+                ['Recycling Rate', '<?php echo number_format($recycling_rate, 1); ?>%'],
+                [],
+                ['Environmental Impact'],
+                ['CO2 Saved (kg)',     '<?php echo number_format($co2_saved, 1); ?>'],
+                ['Total Weight (kg)',  '<?php echo number_format($total_weight, 1); ?>'],
+            ]);
+            XLSX.utils.book_append_sheet(wb, ws3, 'Metrics');
 
-            // Line Chart Data
-            const lineData = [
-                ['Daily Sorting Trend', ''],
-                ['Date', ...trendLineChart.data.datasets.map(d => d.label)],
-                ...trendLineChart.data.labels.map((label, i) => [
-                    label,
-                    ...trendLineChart.data.datasets.map(d => d.data[i])
-                ])
-            ];
-            const wsLineData = XLSX.utils.aoa_to_sheet(lineData);
-            XLSX.utils.book_append_sheet(wb, wsLineData, 'Daily Trend');
+            // Sheet 4: Hourly Activity
+            const hourlyRows = [['Hourly Activity'], ['Hour', 'Items Sorted']];
+            <?php for ($h = 6; $h <= 18; $h++): ?>
+                hourlyRows.push(['<?php echo date('g A', strtotime("$h:00")); ?>', <?php echo $hourly_activity[$h]; ?>]);
+            <?php endfor; ?>
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hourlyRows), 'Hourly Activity');
 
-            // Recent Activity
-            const recentActivity = [
-                ['Recent Activity Log', ''],
-                ['Type', 'Time'],
-                ...Array.from(document.querySelectorAll('.activity-item')).map(item => [
-                    item.querySelector('.activity-type').textContent.trim(),
-                    item.querySelector('.activity-time').textContent.trim()
-                ])
-            ];
-            const wsRecentActivity = XLSX.utils.aoa_to_sheet(recentActivity);
-            XLSX.utils.book_append_sheet(wb, wsRecentActivity, 'Recent Activity');
-
-            // Generate filename with device name and date
             const date = new Date().toISOString().split('T')[0];
-            const sanitizedDeviceName = deviceName.replace(/[^a-z0-9]/gi, '_');
-            const fileName = `GoSort_Analytics_${sanitizedDeviceName}_${date}.xlsx`;
-
-            // Save the file
-            XLSX.writeFile(wb, fileName);
-        } catch (error) {
-            console.error('Error during export:', error);
-            alert('An error occurred while exporting the report. Please try again.');
+            XLSX.writeFile(wb, `GoSort_Analytics_${deviceName.replace(/[^a-z0-9]/gi,'_')}_${timeRange.replace(/ /g,'_')}_${date}.xlsx`);
+        } catch (e) {
+            console.error(e);
+            alert('Export failed. Please try again.');
         }
     }
-</script>
-
-<script src="js/bootstrap.bundle.min.js"></script>
-
+    </script>
 </body>
 </html>

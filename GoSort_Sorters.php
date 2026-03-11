@@ -7,11 +7,9 @@ require_once 'gs_DB/activity_logs.php';
 
 // Handle logout
 if (isset($_GET['logout'])) {
-    // Log logout before destroying session
     if (isset($_SESSION['user_id'])) {
         log_logout($_SESSION['user_id']);
     }
-    // Clean up maintenance mode if active
     require_once 'gs_DB/maintenance_tracking.php';
     if (isset($_SESSION['user_id'])) {
         endMaintenanceMode($_SESSION['user_id']);
@@ -27,770 +25,549 @@ if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
     exit();
 }
 
-// Fetch all sorters from the database
-$sort = $_GET['sort'] ?? 'recent'; // default recently added
+$sort = $_GET['sort'] ?? 'recent';
 
 switch ($sort) {
-    case 'name':
-        $orderBy = "device_name ASC";
-        break;
-    case 'active':
-        $orderBy = "last_active DESC";
-        break;
-    case 'recent':
-    default:
-        $orderBy = "id DESC"; 
-        break;
+    case 'name':   $orderBy = "device_name ASC"; break;
+    case 'active': $orderBy = "last_active DESC"; break;
+    case 'recent': default: $orderBy = "id DESC"; break;
 }
 
 $stmt = $pdo->query("SELECT * FROM sorters ORDER BY $orderBy");
 $sorters = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $currentSortLabel = match($sort) {
-    'name' => 'Name (A-Z)',
+    'name'   => 'Name (A-Z)',
     'active' => 'Last Active',
-    default => 'Most Recent',
+    default  => 'Most Recent',
 };
-
-// Device addition is now handled by gs_DB/add_device.php
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoSort - Sorters</title>
+    <title>GoSort - Devices</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/dark-mode-global.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="js/theme-manager.js"></script>
-</head>
-<style>
+    <style>
+        :root {
+            --primary-green:  #274a17;
+            --light-green:    #7AF146;
+            --mid-green:      #368137;
+            --dark-gray:      #1f2937;
+            --medium-gray:    #6b7280;
+            --border-color:   #e5e7eb;
+            --card-shadow:    0 1px 3px rgba(0,0,0,0.07);
+        }
+
         body {
-            position: relative;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-            transition: margin-left 0.3s ease;
-            background-color: #F3F3EF !important;
-            font-family: 'inter', sans-serif !important;
+            background-color: #e8f1e6;
+            font-family: 'Poppins', sans-serif !important;
+            color: var(--dark-gray);
         }
 
-        /* Green compact toggle buttons */
-        .btn-outline-secondary, .btn-outline-secondary:focus, .btn-outline-secondary:active {
-            border-color: #368137 !important;
-            color: #368137 !important;
-            background: #fff !important;
-            box-shadow: none !important;
-            padding: 0.5rem 1rem !important;
-            max-height: 2.5rem;
-        }
-        .btn-check:checked + .btn-outline-secondary, .btn-outline-secondary.active {
-            background: #368137 !important;
-            color: #fff !important;
-            border-color: #368137 !important;
-        }
-        .btn-outline-secondary:hover {
-            background: #eafbe7 !important;
-            color: #368137 !important;
-            border-color: #368137 !important;
-        }
-
-        .sort-dropdown-wrapper {
-            background: #fff;
-            border: 1px solid #368137;
-            border-radius: 6px;
-            padding: 0.1rem 0.7rem 0.1rem 0.7rem;
-            display: flex;
-            align-items: center;
-            box-shadow: none;
-            margin: 0rem 1rem 0rem 0.2rem;
-            max-height: 2.5rem;
-        }
-
-        .sort-dropdown-wrapper .btn-link ,
-        .sort-dropdown-wrapper .btn-link:focus {
-            text-decoration: none !important;
-        }
-
-        .sort-dropdown-wrapper:hover {
-            background: #eafbe7 !important;
-        }
-
-        .border-dashed {
-            border-style: dashed !important;
-            border-width: 2px !important;
-            background-color: rgba(0,0,0,0.01);
-        }
         #main-content-wrapper {
-            margin-left: 260px; 
-            transition: margin-left 0.3s ease;
-            padding: 20px; 
-        }
-        #main-content-wrapper.collapsed {
-            margin-left: 80px; 
+            margin-left: 240px;
+            padding: 100px 0px 20px 0px;
+            height: 100vh;
+            overflow-y: auto;
         }
 
-        .shadow-dark {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        .section-container {
+            background: #fff;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #eeeeee;
         }
 
-        .badge-online {
-            background-color: #CDFFB7 !important; 
-            color: #14AE31 !important;
-            padding: 6px 10px !important
-        }
-
-        .badge-maintenance {
-            background-color: #eff5a3ff !important; 
-            color: #212529 !important; 
-            padding: 6px 10px !important
-        }
-
-        .badge-offline {
-            background-color: #FFA6A7 !important; 
-            color: #FF1E1E !important;
-            padding: 6px 10px !important;
-        }
-        .add-device-card {
-            border: 3px dashed #368137 !important;
-            border-radius: 16px !important;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            cursor: pointer;
-            background-color: #fff;
+        .section-block {
+            background: linear-gradient(135deg, rgb(236,251,234) 0%, #d5f5dc 100%);
+            border-radius: 12px;
+            padding: 1.25rem;
             margin-bottom: 1rem;
-            padding-top: 10px;
         }
+        .section-block:last-child { margin-bottom: 0; }
 
-        .add-device-card:hover {
-            background-color: #f9fff5;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .add-device-icon {
-            font-size: 3rem;
-            color: #368137;
-            margin-bottom: 0.5rem;
-        }
-
-        .add-device-text {
-            font-size: 1.25rem;
+        .section-label {
+            font-size: 0.75rem;
             font-weight: 600;
-            color: #000;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #000000b1;
+            margin-bottom: 1.25rem;
         }
-        .image {
-            width: 30px;
-            height: 30px;
-            margin-right: 5px;
+
+        /* ── Page header ── */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
         }
-        .card-title{
+        .page-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+            margin: 0;
+        }
+        .page-header-right {
             display: flex;
             align-items: center;
+            gap: 0.6rem;
         }
-        .d-flex
-        {
-            margin: 0px 5px;
+
+        /* ── Search ── */
+        .search-wrap { position: relative; }
+        .search-wrap input {
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.45rem 0.75rem 0.45rem 2.1rem;
+            font-size: 0.82rem;
+            font-family: 'Poppins', sans-serif;
+            color: var(--dark-gray);
+            width: 200px;
+            outline: none;
+            transition: border-color 0.2s;
         }
-        .badge {
-            margin:0px 5px;
+        .search-wrap input:focus { border-color: var(--mid-green); }
+        .search-wrap .search-icon {
+            position: absolute;
+            left: 0.65rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--medium-gray);
+            font-size: 0.8rem;
+            pointer-events: none;
         }
-        .bi {
-            margin-right: 5px;
+
+        /* ── Sort dropdown ── */
+        .sort-btn {
+            background: #fff;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.45rem 0.85rem;
+            font-size: 0.82rem;
+            font-family: 'Poppins', sans-serif;
+            color: var(--dark-gray);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: border-color 0.2s;
         }
+        .sort-btn:hover { border-color: var(--mid-green); }
+        .sort-btn .sort-icon { font-size: 0.78rem; margin: 0; }
+
         .custom-drive-dropdown {
-            border-radius: 14px !important;
-            box-shadow: 0 4px 24px rgba(60,64,67,0.15), 0 1.5px 4px rgba(60,64,67,0.15);
-            border: none;
-            padding: 8px !important;
-            min-width: 180px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            border: 1px solid #efefef !important;
+            padding: 6px !important;
+            min-width: 170px !important;
             background: #fff;
         }
         .custom-drive-dropdown .dropdown-item {
+            border-radius: 7px;
+            padding: 7px 10px;
+            font-size: 0.82rem;
+            font-family: 'Poppins', sans-serif;
+            color: var(--dark-gray);
+        }
+        .custom-drive-dropdown .dropdown-item:hover { background: #f1f3f4; }
+        .custom-drive-dropdown .dropdown-item.text-danger { color: #d93025 !important; }
+        .custom-drive-dropdown .dropdown-item.text-danger:hover { background: #fce8e6; color: #a50e0e !important; }
+        .custom-drive-dropdown .dropdown-item.active-sort { background: #e8f5e1 !important; color: var(--primary-green) !important; font-weight: 600; }
+        .dropdown-item:active { background-color: inherit !important; color: inherit !important; }
+
+        /* ── Add Device button ── */
+        .btn-add-device {
+            background: linear-gradient(135deg, rgb(236,251,234) 0%, #84ca92 100%);
+            border: none;
             border-radius: 8px;
-            margin: 0px;
-            padding: 8px 5px;
-            color: #202124;
-            font-size: 15px;
-            box-sizing: border-box;
-        }
-        .custom-drive-dropdown .dropdown-item:hover, .custom-drive-dropdown .dropdown-item:focus {
-            background: #f1f3f4;
-            color: #202124;
-        }
-        .custom-drive-dropdown .dropdown-item.text-danger {
-            color: #d93025 !important;
-        }
-        .custom-drive-dropdown .dropdown-item.text-danger:hover {
-            background: #fce8e6;
-            color: #a50e0e !important;
-        }
-        .custom-drive-dropdown .dropdown-divider {
-            margin: 4px 0;
-        }
-        .dropdown-item:active {
-            background-color: inherit !important;
-            color: inherit !important;
-        }
-
-        .dropdown-item.active-sort {
-            background-color: #e3e5e8 !important;
-            color: #202124 !important;
-        }
-
-        .list-view .item {
-            display: block;
-            width: 100%;
-        }
-        .grid-view {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 1rem;
-        }
-        #deviceWrapper {
-            min-height: 400px;
-            max-height: 75vh;   
-            overflow-y: auto;   
-            overflow-x: hidden; 
-            padding-right: 10px; 
-        }
-
-        #listContainer {
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-            overflow: hidden;
-            min-height: 400px;
-        }
-
-        #listContainer table {
-            margin: 0;
-            width: 100%;
-            border: 2px solid #368137;
-            border-radius: 16px !important;
-        }
-
-        #listContainer thead th {
-            background-color: #ffffffff !important;
+            padding: 0.47rem 1rem;
+            font-size: 0.82rem;
             font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-            letter-spacing: 0.5px;
-            color: #155724;
-            padding: 12px 16px;
-            border: 2px 0px solid #368137;
+            font-family: 'Poppins', sans-serif;
+            color: var(--primary-green);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(39,74,23,0.12);
         }
-
-        #listContainer tbody tr {
-            background-color: #f7f7f7ff !important;
-            transition: background 0.2s ease;
+        .btn-add-device:hover {
+            background: linear-gradient(135deg, #84ca92 0%, #58C542 100%);
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(39,74,23,0.2);
+            transform: translateY(-1px);
         }
+        .btn-add-device .btn-add-icon { font-size: 0.95rem; margin: 0; }
 
-        #listContainer tbody tr:hover {
-            background-color: #f9fff5 !important;
-        }
-
-        #listContainer td {
-            font-family: 'Inter', sans-serif !important;
-            padding: 12px 16px;
-            vertical-align: middle;
-            border-top: 1px solid #368137;
-            font-size: 0.95rem;
-        }
-
-        #listContainer td:first-child {
-            font-weight: 600;
-            color: #000000ff;
-        }
-
-        #addDeviceModal .modal-content {
-            border-radius: 16px;
-            border: 2px solid #368137;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-            overflow: hidden;
-        }
-
-        #addDeviceModal .modal-header {
-            background: linear-gradient(135deg, #14AE31 0%, #7AF146 100%);
-            color: white;
-            border-bottom: none;
-            padding: 1.5rem 2rem;
-        }
-
-        #addDeviceModal .modal-title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 700;
-            font-size: 1.5rem;
-        }
-
-        #addDeviceModal .btn-close {
-            filter: brightness(0) invert(1);
-            opacity: 0.8;
-        }
-
-        #addDeviceModal .btn-close:hover {
-            opacity: 1;
-        }
-
-        #addDeviceModal .modal-body {
-            padding: 2rem;
+        /* ── Device card ── */
+        .device-card {
             background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.1rem 1.2rem;
+            box-shadow: var(--card-shadow);
+            transition: all 0.2s;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .device-card:hover {
+            box-shadow: 0 4px 14px rgba(0,0,0,0.09);
+            transform: translateY(-2px);
+        }
+        .device-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 16px; bottom: 16px;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
+        }
+        .device-card.status-online::before     { background: #15803d; }
+        .device-card.status-offline::before    { background: #dc2626; }
+        .device-card.status-maintenance::before { background: #1d4ed8; }
+
+        .device-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.85rem;
+        }
+        .device-icon-wrap {
+            width: 38px; height: 38px;
+            background: #e8f5e1;
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--primary-green);
+            flex-shrink: 0;
+        }
+        .device-icon-wrap img { width: 20px; height: 20px; }
+
+        .device-name {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+            margin: 0 0 0.25rem 0;
         }
 
-        #addDeviceModal .form-label {
-            font-family: 'Inter', sans-serif;
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.68rem;
             font-weight: 600;
-            color: #2d6b2e;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
+            padding: 0.18rem 0.55rem;
+            border-radius: 20px;
         }
-
-        #addDeviceModal .form-control {
-            font-family: 'Inter', sans-serif;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+        .status-pill .dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: currentColor;
         }
+        .status-pill.online      { background: #dcfce7; color: #15803d; }
+        .status-pill.offline     { background: #fee2e2; color: #dc2626; }
+        .status-pill.maintenance { background: #dbeafe; color: #1d4ed8; }
 
-        #addDeviceModal .form-control:focus {
-            border-color: #368137;
-            box-shadow: 0 0 0 0.2rem rgba(54, 129, 55, 0.15);
+        .device-meta {
+            font-size: 0.74rem;
+            color: var(--medium-gray);
+            display: flex;
+            flex-direction: column;
+            gap: 0.22rem;
+            margin-top: 0.5rem;
         }
+        .device-meta-row { display: flex; align-items: center; gap: 0.3rem; }
+        .device-meta-row i { font-size: 0.72rem; color: #9ca3af; margin: 0; }
 
-        #addDeviceModal .form-control.is-invalid {
-            border-color: #dc3545;
-            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15);
+        .device-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.85rem;
+            padding-top: 0.7rem;
+            border-top: 1px solid #f3f4f6;
         }
-
-        #addDeviceModal .form-control.is-valid {
-            border-color: #368137;
-        }
-
-        #addDeviceModal .invalid-feedback {
-            font-family: 'Inter', sans-serif;
-            font-size: 0.8rem;
-            color: #dc3545;
-            margin-top: 0.35rem;
-        }
-
-        #addDeviceModal .form-text {
-            font-family: 'Inter', sans-serif;
-            font-size: 0.78rem;
-            color: #6c757d;
-            margin-top: 0.3rem;
-        }
-
-        #addDeviceModal .modal-footer {
-            background: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
-            padding: 1.25rem 2rem;
-        }
-
-        #addDeviceModal .btn {
-            font-family: 'Inter', sans-serif;
+        .analytics-link {
+            font-size: 0.76rem;
+            color: var(--primary-green);
+            text-decoration: none;
             font-weight: 600;
-            border-radius: 10px;
-            padding: 0.65rem 1.5rem;
-            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            transition: opacity 0.15s;
+        }
+        .analytics-link:hover { opacity: 0.7; color: var(--primary-green); }
+        .analytics-link i { margin: 0; font-size: 0.76rem; }
+        .device-id-label {
+            font-size: 0.7rem;
+            color: #9ca3af;
         }
 
-        #addDeviceModal .btn-secondary {
-            background: #9d9d9dff;
+        /* kebab */
+        .kebab-btn {
+            background: none;
             border: none;
+            padding: 0.2rem 0.35rem;
+            color: var(--medium-gray);
+            border-radius: 6px;
+            transition: background 0.15s;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .kebab-btn:hover { background: #f3f4f6; color: var(--dark-gray); }
+        .kebab-btn i { margin: 0; font-size: 1rem; }
+
+        /* scroll wrapper */
+       #deviceWrapper {
+            min-height: 400px;
+            overflow: visible;
+            padding-right: 4px;
         }
 
-        #addDeviceModal .btn-secondary:hover {
-            background: #6d6d6dff;
-            transform: translateY(-1px);
-        }
+        #deviceWrapper::-webkit-scrollbar { width: 5px; }
+        #deviceWrapper::-webkit-scrollbar-track { background: transparent; }
+        #deviceWrapper::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
 
-        #addDeviceModal .btn-primary {
-            background: linear-gradient(135deg, #14AE31 0%, #14AE31 100%);
-            border: none;
-        }
-
-        #addDeviceModal .btn-primary:hover {
-            background: linear-gradient(135deg, #368137 0%, #368137 100%);
-            transform: translateY(-1px);
-        }
-            
+        /* ── Modals ── */
+        #addDeviceModal .modal-content,
         #statusModal .modal-content {
             border-radius: 16px;
-            border: 2px solid #368137;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            border: 2px solid var(--mid-green);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.13);
             overflow: hidden;
         }
-
+        #addDeviceModal .modal-header,
         #statusModal .modal-header {
-            background: linear-gradient(135deg, #14AE31 0%, #7AF146 100%);
-            color: white;
+            background: linear-gradient(135deg, rgb(236,251,234) 0%, #84ca92 100%);
             border-bottom: none;
-            padding: 1.5rem 2rem;
+            padding: 1.25rem 1.5rem;
         }
-
+        #addDeviceModal .modal-title,
         #statusModal .modal-title {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Poppins', sans-serif;
             font-weight: 700;
-            font-size: 1.5rem;
+            font-size: 1.05rem;
+            color: var(--primary-green);
         }
-
-        #statusModal .btn-close {
-            filter: brightness(0) invert(1);
-            opacity: 0.8;
-        }
-
-        #statusModal .btn-close:hover {
-            opacity: 1;
-        }
-
-        #statusModal .modal-body {
-            padding: 2rem;
-            background: #fff;
-            min-height: 120px;
-        }
-
-        #statusModal #statusMessage {
-            font-family: 'Inter', sans-serif;
-            font-size: 1rem;
-            line-height: 1.6;
-        }
-
-        #statusModal #statusMessage.text-success {
-            color: #00e904ff !important;
+        #addDeviceModal .btn-close,
+        #statusModal .btn-close { opacity: 0.5; }
+        #addDeviceModal .modal-body,
+        #statusModal .modal-body { padding: 1.5rem; background: #fff; }
+        #addDeviceModal .form-label {
+            font-family: 'Poppins', sans-serif;
             font-weight: 600;
+            color: var(--primary-green);
+            font-size: 0.8rem;
+            margin-bottom: 0.4rem;
         }
+        #addDeviceModal .form-control {
+            font-family: 'Poppins', sans-serif;
+            border: 1.5px solid var(--border-color);
+            border-radius: 9px;
+            padding: 0.6rem 0.9rem;
+            font-size: 0.86rem;
+            transition: border-color 0.2s;
+        }
+        #addDeviceModal .form-control:focus { border-color: var(--mid-green); box-shadow: 0 0 0 0.18rem rgba(54,129,55,0.13); }
+        #addDeviceModal .form-control.is-invalid { border-color: #dc3545; }
+        #addDeviceModal .form-control.is-valid   { border-color: var(--mid-green); }
+        #addDeviceModal .modal-footer,
+        #statusModal .modal-footer { background: #f8f9fa; border-top: 1px solid var(--border-color); padding: 1rem 1.5rem; }
+        #addDeviceModal .btn, #statusModal .btn {
+            font-family: 'Poppins', sans-serif; font-weight: 600;
+            border-radius: 9px; padding: 0.52rem 1.2rem; font-size: 0.83rem; border: none; transition: all 0.2s;
+        }
+        #addDeviceModal .btn-secondary, #statusModal .btn-secondary { background: #9d9d9d; color: #fff; }
+        #addDeviceModal .btn-secondary:hover, #statusModal .btn-secondary:hover { background: #6d6d6d; }
+        #addDeviceModal .btn-primary {
+            background: linear-gradient(135deg, var(--mid-green) 0%, var(--primary-green) 100%); color: #fff;
+        }
+        #addDeviceModal .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(39,74,23,0.2); }
 
-        #statusModal #statusMessage.text-danger {
-            color: #ff0019ff !important;
-            font-weight: 600;
-        }
+        #statusModal #statusMessage { font-family: 'Poppins', sans-serif; font-size: 0.9rem; line-height: 1.6; }
+        #statusModal #statusMessage.text-success { color: #15803d !important; font-weight: 600; }
+        #statusModal #statusMessage.text-danger  { color: #dc2626 !important; font-weight: 600; }
+        #statusModal .progress { height: 7px; border-radius: 10px; background: #e9ecef; }
+        #statusModal .progress-bar { background: linear-gradient(90deg, var(--mid-green) 0%, var(--primary-green) 100%); }
 
-        #statusModal .progress {
-            height: 8px;
-            border-radius: 10px;
-            background-color: #e9ecef;
-            overflow: hidden;
-        }
-
-        #statusModal .progress-bar {
-            background: linear-gradient(90deg, #368137 0%, #2d6b2e 100%);
-        }
-
-        #statusModal .modal-footer {
-            background: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
-            padding: 1.25rem 2rem;
-        }
-
-        #statusModal .btn {
-            font-family: 'Inter', sans-serif;
-            font-weight: 600;
-            border-radius: 10px;
-            padding: 0.65rem 1.5rem;
-            transition: all 0.3s ease;
-        }
-
-        #statusModal .btn-secondary {
-            background: #9d9d9dff;
-            border: none;
-            color: white;
-        }
-
-        #statusModal .btn-secondary:hover {
-            background: #6d6d6dff;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-              
         #deleteModal .modal-content {
-            border-radius: 16px;
-            border: 2px solid #dc3545;
-            box-shadow: 0 8px 24px rgba(220, 53, 69, 0.2);
-            overflow: hidden;
+            border-radius: 16px; border: 2px solid #dc3545;
+            box-shadow: 0 8px 24px rgba(220,53,69,0.18); overflow: hidden;
         }
-
         #deleteModal .modal-header {
             background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            color: white;
-            border-bottom: none;
-            padding: 1.5rem 2rem;
+            color: white; border-bottom: none; padding: 1.25rem 1.5rem;
         }
-
-        #deleteModal .modal-title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 700;
-            font-size: 1.5rem;
-        }
-
-        #deleteModal .btn-close {
-            filter: brightness(0) invert(1);
-            opacity: 0.8;
-        }
-
-        #deleteModal .btn-close:hover {
-            opacity: 1;
-        }
-
-        #deleteModal .modal-body {
-            padding: 2rem;
-            background: #fff;
-        }
-
-        #deleteModal .modal-body p {
-            font-family: 'Inter', sans-serif;
-            font-size: 1rem;
-            line-height: 1.6;
-            margin-bottom: 1rem;
-            color: #333;
-        }
-
-        #deleteModal .modal-body p:last-child {
-            margin-bottom: 0;
-        }
-
+        #deleteModal .modal-title { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 1.05rem; }
+        #deleteModal .btn-close { filter: brightness(0) invert(1); opacity: 0.8; }
+        #deleteModal .modal-body { padding: 1.5rem; background: #fff; }
+        #deleteModal .modal-body p { font-family: 'Poppins', sans-serif; font-size: 0.88rem; line-height: 1.6; color: #333; margin-bottom: 0.75rem; }
         #deleteModal .modal-body .text-danger {
-            color: #dc3545 !important;
-            background: #fff5f5;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            border-left: 4px solid #dc3545;
+            background: #fff5f5; padding: 0.65rem 0.9rem;
+            border-radius: 8px; border-left: 4px solid #dc3545; color: #dc3545 !important;
         }
-
-        #deleteModal .modal-body #deleteDeviceName {
-            font-weight: 700;
-            color: #dc3545;
-        }
-
-        #deleteModal .modal-footer {
-            background: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
-            padding: 1.25rem 2rem;
-        }
-
+        #deleteModal #deleteDeviceName { font-weight: 700; color: #dc3545; }
+        #deleteModal .modal-footer { background: #f8f9fa; border-top: 1px solid var(--border-color); padding: 1rem 1.5rem; }
         #deleteModal .btn {
-            font-family: 'Inter', sans-serif;
-            font-weight: 600;
-            border-radius: 10px;
-            padding: 0.65rem 1.5rem;
-            transition: all 0.3s ease;
-            border: none;
+            font-family: 'Poppins', sans-serif; font-weight: 600;
+            border-radius: 9px; padding: 0.52rem 1.2rem; font-size: 0.83rem; border: none; transition: all 0.2s;
         }
-
-        #deleteModal .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        #deleteModal .btn-secondary:hover {
-            background: #5a6268;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-
+        #deleteModal .btn-secondary { background: #6c757d; color: white; }
+        #deleteModal .btn-secondary:hover { background: #5a6268; transform: translateY(-1px); }
         #deleteModal .btn-danger {
             background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            color: white;
-            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+            color: white; box-shadow: 0 3px 8px rgba(220,53,69,0.3);
         }
-
-        #deleteModal .btn-danger:hover {
-            background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 12px rgba(220, 53, 69, 0.4);
-        }
+        #deleteModal .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(220,53,69,0.4); }
 
         @media (max-width: 992px) {
-            #main-content-wrapper {
-                margin-left: 0;
-                padding: 12px;
-            }
+            #main-content-wrapper { margin-left: 0; padding: 12px; }
+            .page-header { flex-direction: column; align-items: flex-start; }
+            .search-wrap input { width: 100%; }
         }
-
-</style>
+    </style>
+</head>
 <body>
     <?php include 'sidebar.php'; ?>
 
-   <div id="main-content-wrapper">
-  <div class="container-fluid">
+    <div id="main-content-wrapper">
+        <div class="container-fluid">
 
-            <div class="d-flex justify-content-between align-items-center mb-2">
-            <h2 class="fw-bold mb-0 mt-3">Devices</h2>
-            <!-- Search bar -->
-            <div class="input-group mt-3" style="max-width: 300px;">
-            <input type="text" id="searchDevice" class="form-control" placeholder="Search Device">
-            <button class="btn btn-outline-secondary" type="button">
-                <i class="bi bi-search"></i>
-            </button>
-            </div>
+            <?php include 'topbar.php'; ?>
 
-            </div>
-            <hr style="height: 1.5px; background-color: #000; opacity: 1; margin-left:6.5px;" class="mb-2">
-            <div class="d-flex justify-content-end mb-2">
-                <div class="btn-group me-2" role="group" aria-label="View toggle">
-                    <input type="radio" class="btn-check" name="viewToggle" id="listView" autocomplete="off">
-                    <label class="btn btn-outline-secondary" for="listView">
-                        <i class="bi bi-list"></i>
-                    </label>
+            <div class="section-container">
 
-                    <input type="radio" class="btn-check" name="viewToggle" id="gridView" autocomplete="off" checked>
-                    <label class="btn btn-outline-secondary" for="gridView">
-                        <i class="bi bi-grid-fill"></i>
-                    </label>
-                </div>
+                <!-- Page header -->
+                <div class="page-header">
+                    <div class="page-header-right">
+                        <div class="search-wrap">
+                            <i class="bi bi-search search-icon"></i>
+                            <input type="text" id="searchDevice" placeholder="Search device…">
+                        </div>
 
-                <div class="sort-dropdown-wrapper">
-                    <div class="dropdown">
-                        <button class="btn btn-link text-dark dropdown-toggle px-0" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            Sort by
+                        <div class="dropdown">
+                            <button class="sort-btn dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-arrow-down-up sort-icon"></i>
+                                <?php echo $currentSortLabel; ?>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown">
+                                <li><a class="dropdown-item<?= $sort === 'recent' ? ' active-sort' : '' ?>" href="?sort=recent">Most Recent</a></li>
+                                <li><a class="dropdown-item<?= $sort === 'name'   ? ' active-sort' : '' ?>" href="?sort=name">Name (A–Z)</a></li>
+                                <li><a class="dropdown-item<?= $sort === 'active' ? ' active-sort' : '' ?>" href="?sort=active">Last Active</a></li>
+                            </ul>
+                        </div>
+
+                        <button class="btn-add-device" data-bs-toggle="modal" data-bs-target="#addDeviceModal" id="openAddDevice">
+                            <i class="bi bi-plus-lg btn-add-icon"></i> Add Device
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown" aria-labelledby="sortDropdown">
-                            <li><a class="dropdown-item<?= $sort === 'recent' ? ' active-sort' : '' ?>" href="?sort=recent">Recently Added</a></li>
-                            <li><a class="dropdown-item<?= $sort === 'name' ? ' active-sort' : '' ?>" href="?sort=name">Name (A-Z)</a></li>
-                            <li><a class="dropdown-item<?= $sort === 'active' ? ' active-sort' : '' ?>" href="?sort=active">Last Active</a></li>
-                        </ul>
                     </div>
                 </div>
-            </div>
-        <div id="deviceWrapper">
-            <!-- CARD VIEW (Grid) -->
-             <div class="card h-100 add-device-card" 
-                        data-bs-toggle="modal" 
-                        data-bs-target="#addDeviceModal">
-                        <div class="card-body d-flex flex-column align-items-center justify-content-center text-center">
-                        <div class="add-device-text add-device-icon">
-                            <i class="bi bi-plus-square"></i> Add New Device
-                        </div>
-                        </div>
-                    </div>
 
-            <div id="gridContainer" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
-                <?php foreach ($sorters as $sorter): ?>
-                    <div class="col"  data-device="<?php echo htmlspecialchars($sorter['device_name']); ?>">
-                        <div class="card h-100 shadow-dark border-success border-2 rounded-4">
-                            <div class="card-body">
-                                <!-- Header: Device Name + Menu -->
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <h5 class="card-title fw-bold mb-0">
-                                        <img class="image" src="images/icons/devices.svg" alt="Sorter Icon">
-                                        <?php echo htmlspecialchars($sorter['device_name']); ?>
-                                    </h5>
-                                    <!-- Kebab menu -->
-                                    <div class="dropdown">
-                                        <button class="btn btn-link text-dark p-0" type="button" id="dropdownMenu<?php echo $sorter['id']; ?>" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-three-dots-vertical fs-5"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown" aria-labelledby="dropdownMenu<?php echo $sorter['id']; ?>">
-                                            <li>
-                                                <a class="dropdown-item d-flex" href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>">
-                                                    <i class="bi bi-bar-chart me-2"></i> Analytics
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <button class="dropdown-item d-flex text-danger delete-btn" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
-                                                    <i class="bi bi-trash me-2"></i> Delete
+                <!-- Devices section -->
+                <div class="section-block">
+                    <div class="section-label">All Devices (<?php echo count($sorters); ?>)</div>
+
+                    <div id="deviceWrapper">
+                        <div id="gridContainer" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+
+                            <?php foreach ($sorters as $sorter): ?>
+                                <div class="col" data-device="<?php echo htmlspecialchars($sorter['device_name']); ?>">
+                                    <div class="device-card status-<?php echo htmlspecialchars($sorter['status']); ?>">
+
+                                        <div class="device-card-header">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="device-icon-wrap">
+                                                    <img src="images/icons/devices.svg" alt="Device">
+                                                </div>
+                                                <div>
+                                                    <div class="device-name"><?php echo htmlspecialchars($sorter['device_name']); ?></div>
+                                                    <div class="status-pill <?php echo htmlspecialchars($sorter['status']); ?>">
+                                                        <span class="dot"></span>
+                                                        <?php echo ucfirst($sorter['status']); ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="dropdown">
+                                                <button class="kebab-btn" type="button"
+                                                    data-bs-toggle="dropdown"
+                                                    id="dropdownMenu<?php echo $sorter['id']; ?>">
+                                                    <i class="bi bi-three-dots-vertical"></i>
                                                 </button>
-                                            </li>
-                                        </ul>
+                                                <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown"
+                                                    aria-labelledby="dropdownMenu<?php echo $sorter['id']; ?>">
+                                                    <li>
+                                                        <button class="dropdown-item text-danger delete-btn"
+                                                            onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
+                                                            <i class="bi bi-trash"></i> Delete
+                                                        </button>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+
+                                        <div class="device-meta">
+                                            <div class="device-meta-row">
+                                                <i class="bi bi-geo-alt-fill"></i>
+                                                <?php echo htmlspecialchars($sorter['location']); ?>
+                                            </div>
+                                            <div class="device-meta-row">
+                                                <i class="bi bi-clock"></i>
+                                                <?php echo date('M j, Y', strtotime($sorter['last_active'])); ?>
+                                            </div>
+                                        </div>
+
+                                        <div class="device-footer">
+                                            <a class="analytics-link"
+                                               href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>">
+                                                <i class="bi bi-graph-up"></i> View Analytics
+                                            </a>
+                                            <span class="device-id-label">ID: <?php echo htmlspecialchars($sorter['device_identity']); ?></span>
+                                        </div>
+
                                     </div>
                                 </div>
+                            <?php endforeach; ?>
 
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div class="d-flex flex-column">
-                                        <small class="text-muted mb-1">
-                                            <i class="bi bi-geo-alt-fill"></i>
-                                            <?php echo htmlspecialchars($sorter['location']); ?>
-                                        </small>
-                                       <small class="text-muted">
-                                            <i class="bi bi-clock"></i>
-                                            <?php echo date('M j, Y', strtotime($sorter['last_active'])); ?>
-                                        </small>
-                                    </div>
-                                   <span class="badge rounded-pill <?php 
-                                        echo match($sorter['status']) {
-                                            'online' => 'badge-online',
-                                            'maintenance' => 'badge-maintenance',
-                                            default => 'badge-offline'
-                                        };
-                                    ?>">
-                                        <?php echo ucfirst(htmlspecialchars($sorter['status'])); ?>
-                                    </span>
+                            <?php if (count($sorters) === 0): ?>
+                                <div class="py-5 text-center" style="color:var(--medium-gray); width:100%;">
+                                    <i class="bi bi-cpu" style="font-size:2.5rem; display:block; margin-bottom:0.5rem; color:#9ca3af;"></i>
+                                    <p style="font-size:0.88rem; margin:0;">No devices registered yet.</p>
                                 </div>
-                            </div>
+                            <?php endif; ?>
+
                         </div>
                     </div>
-                <?php endforeach; ?>
-            </div>
+                </div>
 
-            <!-- LIST VIEW (Table) -->
-                <div  id="listContainer" class="table-responsive d-none">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 50%;">Device Name</th>
-                            <th style="width: 16.6%;">Location</th>
-                            <th style="width: 16.6%;">Last Active</th>
-                            <th style="width: 15%;">Status</th>
-                            <th style="width: 2%;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                      
-                        <?php foreach ($sorters as $sorter): ?>
-                            <tr data-device="<?php echo htmlspecialchars($sorter['device_name']); ?>">
-                                <td><?php echo htmlspecialchars($sorter['device_name']); ?></td>
-                                <td><?php echo htmlspecialchars($sorter['location']); ?></td>
-                                <td><?php echo date('M j, Y', strtotime($sorter['last_active'])); ?></td>
-                                <td>
-                                    <span class="badge rounded-pill <?php 
-                                        echo match($sorter['status']) {
-                                            'online' => 'badge-online',
-                                            'maintenance' => 'badge-maintenance',
-                                            default => 'badge-offline'
-                                        };
-                                    ?>">
-                                        <?php echo ucfirst(htmlspecialchars($sorter['status'])); ?>
-                                    </span>
-                                </td>
-                                <td class="text-end px-2">
-                                     <div class="dropdown">
-                                        <button class="btn btn-link text-dark p-0" type="button" id="dropdownMenu<?php echo $sorter['id']; ?>" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-three-dots-vertical fs-5"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end custom-drive-dropdown" aria-labelledby="dropdownMenu<?php echo $sorter['id']; ?>">
-                                            <li>
-                                                <a class="dropdown-item d-flex" href="GoSort_Statistics.php?device=<?php echo $sorter['id']; ?>&identity=<?php echo urlencode($sorter['device_identity']); ?>">
-                                                    <i class="bi bi-bar-chart me-2"></i> Analytics
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <button class="dropdown-item d-flex text-danger delete-btn" onclick="confirmDelete('<?php echo $sorter['id']; ?>', '<?php echo htmlspecialchars($sorter['device_name']); ?>')">
-                                                    <i class="bi bi-trash me-2"></i> Delete
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
+            </div><!-- /section-container -->
         </div>
     </div>
 
+    <!-- Status Modal -->
     <div id="statusModal" class="modal fade" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Device Registration Status</h5>
+                    <h5 class="modal-title">Device Registration</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div id="statusMessage"></div>
                     <div class="progress mt-3 d-none">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -800,41 +577,49 @@ $currentSortLabel = match($sort) {
         </div>
     </div>
 
-<div class="modal fade" id="addDeviceModal" tabindex="-1" aria-labelledby="addDeviceModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addDeviceModalLabel">Add New Device</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addDeviceForm" novalidate>
-                    <div class="mb-3">
-                        <label for="deviceName" class="form-label">Device Name</label>
-                        <input type="text" class="form-control" id="deviceName" name="deviceName">
-                        <div class="invalid-feedback">Please enter a device name.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="location" class="form-label">Location</label>
-                        <input type="text" class="form-control" id="location" name="location">
-                        <div class="invalid-feedback">Please enter the device location.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="deviceIdentity" class="form-label">Device Identity</label>
-                        <input type="text" class="form-control" id="deviceIdentity" name="deviceIdentity">
-                        <div class="invalid-feedback">Please enter the device identity.</div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" form="addDeviceForm" class="btn btn-primary">Add Device</button>
+    <!-- Add Device Modal -->
+    <div class="modal fade" id="addDeviceModal" tabindex="-1" aria-labelledby="addDeviceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addDeviceModalLabel">Add New Device</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addDeviceForm" novalidate>
+                        <div class="mb-3">
+                            <label for="deviceName" class="form-label">Device Name</label>
+                            <input type="text" class="form-control" id="deviceName" name="deviceName">
+                            <div class="invalid-feedback">Please enter a device name.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <select class="form-control" id="location" name="location">
+                                <option value="" disabled selected>Select a floor…</option>
+                                <option value="1st Floor">1st Floor</option>
+                                <option value="2nd Floor">2nd Floor</option>
+                                <option value="3rd Floor">3rd Floor</option>
+                                <option value="4th Floor">4th Floor</option>
+                                <option value="5th Floor">5th Floor</option>
+                            </select>
+                            <div class="invalid-feedback">Please select the device location.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="deviceIdentity" class="form-label">Device Identity</label>
+                            <input type="text" class="form-control" id="deviceIdentity" name="deviceIdentity">
+                            <div class="invalid-feedback">Please enter the device identity.</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="addDeviceForm" class="btn btn-primary">Add Device</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- Delete Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -843,7 +628,7 @@ $currentSortLabel = match($sort) {
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to delete the device "<span id="deleteDeviceName"></span>"?</p>
+                    <p>Are you sure you want to delete <strong><span id="deleteDeviceName"></span></strong>?</p>
                     <p class="text-danger"><strong>Warning:</strong> This action cannot be undone.</p>
                 </div>
                 <div class="modal-footer">
@@ -856,13 +641,12 @@ $currentSortLabel = match($sort) {
 
     <script src="js/bootstrap.bundle.min.js"></script>
     <script>
-    const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
+    const statusModal   = new bootstrap.Modal(document.getElementById('statusModal'));
     const statusMessage = document.getElementById('statusMessage');
-    const progressBar = document.querySelector('#statusModal .progress');
-    const addDeviceModal = document.getElementById('addDeviceModal');
+    const progressBar   = document.querySelector('#statusModal .progress');
 
-    // Flag: reopen the Add Device modal after the status/error modal is closed
     let reopenAddModalAfterStatus = false;
+
     document.getElementById('statusModal').addEventListener('hidden.bs.modal', function () {
         if (reopenAddModalAfterStatus) {
             reopenAddModalAfterStatus = false;
@@ -870,96 +654,18 @@ $currentSortLabel = match($sort) {
         }
     });
 
-    // Clear the form every time the Add Device card is clicked
-    document.querySelector('.add-device-card').addEventListener('click', function () {
+    document.getElementById('openAddDevice').addEventListener('click', function () {
         const form = document.getElementById('addDeviceForm');
         if (form) form.reset();
     });
-
-    addDeviceModal.addEventListener('show.bs.modal', function (event) {
-        const backdrop = document.querySelector('.modal-backdrop');
-        if (backdrop) {
-            backdrop.style.backgroundColor = 'rgba(124, 124, 124, 0.15)';
-        }
-    });
-    // Function to show status alerts
-    function showStatusAlert(message, type = 'danger', dismissible = true) {
-        const alertContainer = document.getElementById('statusAlertContainer');
-        const alertClass = type === 'success' ? 'alert-success' : 
-                           type === 'warning' ? 'alert-warning' : 
-                           type === 'info' ? 'alert-info' : 'alert-danger';
-        
-        const dismissButton = dismissible ? 
-            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' : '';
-        
-        const alertHtml = `
-            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
-                ${message}
-                ${dismissButton}
-            </div>
-        `;
-        
-        alertContainer.innerHTML = alertHtml;
-        
-        // Auto-dismiss success messages after 5 seconds
-        if (type === 'success') {
-            setTimeout(() => {
-                const alert = alertContainer.querySelector('.alert');
-                if (alert) {
-                    const bsAlert = new bootstrap.Alert(alert);
-                    bsAlert.close();
-                }
-            }, 5000);
-        }
-    }
-
-    // Function to check maintenance status before proceeding
-    function checkMaintenanceStatus(deviceId, deviceName, deviceIdentity) {
-        // Show loading state
-        showStatusAlert(`Checking status for ${deviceName}...`, 'info', false);
-        
-        fetch('gs_DB/check_device_status.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                device_id: deviceId,
-                device_identity: deviceIdentity
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Clear any existing alerts
-                document.getElementById('statusAlertContainer').innerHTML = '';
-                // Proceed to maintenance page
-                window.location.href = `GoSort_Maintenance.php?device=${deviceId}&name=${encodeURIComponent(deviceName)}&identity=${encodeURIComponent(deviceIdentity)}`;
-            } else {
-                // Show error message
-                let alertType = 'danger';
-                if (data.error === 'maintenance_active') {
-                    alertType = 'warning';
-                }
-                showStatusAlert(`<strong>Error:</strong> ${data.message}`, alertType);
-            }
-        })
-        .catch(error => {
-            showStatusAlert(`<strong>Error:</strong> Failed to check device status. Please try again.`, 'danger');
-            console.error('Error:', error);
-        });
-    }
 
     function showStatus(message, isError = false, showProgress = false) {
         statusMessage.innerHTML = message;
         statusMessage.className = isError ? 'text-danger' : 'text-success';
         progressBar.className = showProgress ? 'progress mt-3' : 'progress mt-3 d-none';
-        if (!statusModal._isShown) {
-            statusModal.show();
-        }
+        if (!statusModal._isShown) statusModal.show();
     }
 
-    // Inline validation: clear error state on input
     document.querySelectorAll('#addDeviceForm .form-control').forEach(function(input) {
         input.addEventListener('input', function() {
             if (this.value.trim() !== '') {
@@ -974,8 +680,6 @@ $currentSortLabel = match($sort) {
     document.getElementById('addDeviceForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const form = this;
-
-        // Client-side validation
         let isValid = true;
         form.querySelectorAll('.form-control').forEach(function(input) {
             if (input.value.trim() === '') {
@@ -987,82 +691,57 @@ $currentSortLabel = match($sort) {
                 input.classList.add('is-valid');
             }
         });
-
         if (!isValid) return;
 
         const formData = new FormData(form);
         const deviceIdentity = formData.get('deviceIdentity');
-        
-        // First check if the device is trying to connect
-        showStatus(`Checking if device "${deviceIdentity}" is attempting to connect...`, false, true);
-        
-        // Convert FormData to JSON
+        showStatus(`Checking if device "${deviceIdentity}" is attempting to connect…`, false, true);
+
         const jsonData = {
-            deviceName: formData.get('deviceName'),
-            location: formData.get('location'),
+            deviceName:     formData.get('deviceName'),
+            location:       formData.get('location'),
             deviceIdentity: formData.get('deviceIdentity')
         };
 
         fetch('gs_DB/add_device_new.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(jsonData)
         })
         .then(response => {
             if (!response.ok) {
                 return response.text().then(text => {
-                    console.error('Server response:', text);
-                    try {
-                        const jsonError = JSON.parse(text);
-                        throw new Error(jsonError.message || 'Server error');
-                    } catch (e) {
-                        throw new Error('Server returned: ' + text);
-                    }
+                    try { const j = JSON.parse(text); throw new Error(j.message || 'Server error'); }
+                    catch (e) { throw new Error('Server returned: ' + text); }
                 });
             }
             return response.json();
         })
-       .then(data => {
-    if (data.success) {
-        // Close the Add Device Modal first
-        const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
-        if (addModal) {
-            addModal.hide();
-        }
-        
-        // Then show success message
-        showStatus(`✅ ${data.message}`, false, false);
-        
-        // Reload the page to show the newly added device
-        setTimeout(() => {
-            location.reload();
-        }, 2000);
-    } else {
-        // Close add-device modal so the error modal isn't hidden behind it
-        const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
-        if (addModal) addModal.hide();
-        reopenAddModalAfterStatus = true;
-        showStatus(`❌ ${data.message}`, true, false);
-    }
-})
+        .then(data => {
+            if (data.success) {
+                const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
+                if (addModal) addModal.hide();
+                showStatus(`✅ ${data.message}`, false, false);
+                setTimeout(() => { location.reload(); }, 2000);
+            } else {
+                const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
+                if (addModal) addModal.hide();
+                reopenAddModalAfterStatus = true;
+                showStatus(`❌ ${data.message}`, true, false);
+            }
+        })
         .catch(error => {
             const addModal = bootstrap.Modal.getInstance(document.getElementById('addDeviceModal'));
             if (addModal) addModal.hide();
             reopenAddModalAfterStatus = true;
-            showStatus(`❌ Server error: ${error.message}. Please try again or contact support.`, true, false);
-            console.error('Error:', error);
+            showStatus(`❌ Server error: ${error.message}. Please try again.`, true, false);
         });
     });
 
-    // Pre-fill device name based on identity
     document.getElementById('deviceIdentity').addEventListener('input', function(e) {
-        const identity = e.target.value;
-        document.getElementById('deviceName').value = 'GS-' + identity;
+        document.getElementById('deviceName').value = 'GS-' + e.target.value;
     });
 
-    // Delete device functionality
     const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
     let deviceToDelete = null;
 
@@ -1074,176 +753,71 @@ $currentSortLabel = match($sort) {
 
     document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
         if (!deviceToDelete) return;
-
         fetch('gs_DB/delete_device.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                deviceId: deviceToDelete
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId: deviceToDelete })
         })
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
             deleteModal.hide();
             if (data.success) {
                 showStatus('✅ ' + data.message, false, false);
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
+                setTimeout(() => { location.reload(); }, 2000);
             } else {
                 showStatus('❌ ' + data.message, true, false);
             }
         })
-        .catch(error => {
+        .catch(() => {
             deleteModal.hide();
             showStatus('❌ Error deleting device. Please try again.', true, false);
-            console.error('Error:', error);
         });
     });
 
     function shutdownDevice(deviceIdentity, deviceName) {
-        if (!confirm(`Are you sure you want to shut down the device "${deviceName}"? This will force the computer to power off immediately.`)) {
-            return;
-        }
-        showStatus(`Sending shutdown command to "${deviceName}"...`, false, true);
+        if (!confirm(`Shut down "${deviceName}"? This will force the device to power off.`)) return;
+        showStatus(`Sending shutdown command to "${deviceName}"…`, false, true);
         fetch('gs_DB/save_maintenance_command.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                device_identity: deviceIdentity,
-                command: 'shutdown'
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_identity: deviceIdentity, command: 'shutdown' })
         })
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
-            if (data.success) {
-                showStatus(`✅ Shutdown command sent to "${deviceName}". The device will shut down shortly.`, false, false);
-            } else {
-                showStatus(`❌ Failed to send shutdown command: ${data.message}`, true, false);
-            }
+            if (data.success) showStatus(`✅ Shutdown command sent to "${deviceName}".`, false, false);
+            else showStatus(`❌ Failed: ${data.message}`, true, false);
         })
-        .catch(error => {
-            showStatus(`❌ Error sending shutdown command: ${error.message}`, true, false);
-            console.error('Error:', error);
-        });
+        .catch(error => { showStatus(`❌ Error: ${error.message}`, true, false); });
     }
 
-    // Update device statuses every 3s for immediate offline detection
+    // Live status polling every 3s
     setInterval(() => {
         fetch('gs_DB/connection_status.php')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
             .then(data => {
-                if (data.success && data.devices) {
-                    // Update status badges for each device
-                    data.devices.forEach(device => {
-                        const deviceCard = document.querySelector(`[data-device="${device.device_name}"]`);
-                        if (deviceCard) {
-                            const badge = deviceCard.querySelector('.badge');
-                            const statusClass = {
-                                'online': 'badge-online',
-                                'offline': 'badge-offline',
-                                'maintenance': 'badge-maintenance'
-                            }[device.status] || 'badge-offline';
-
-                            badge.className = `badge rounded-pill ${statusClass}`;
-                            badge.textContent = device.status.charAt(0).toUpperCase() + device.status.slice(1);
-
-                            // Update last active time
-                            const lastActive = deviceCard.querySelector('.last-active');
-                            if (lastActive && device.last_active) {
-                                const date = new Date(device.last_active);
-                                if (!isNaN(date)) {
-                                    lastActive.textContent = date.toLocaleString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric',
-                                        hour: 'numeric',
-                                        minute: 'numeric',
-                                        hour12: true
-                                    });
-                                }
-                            }
-                        }
-                    });
-
-                    // Show/hide buttons
-                    data.devices.forEach(device => {
-                        const deviceCard = document.querySelector(`[data-device="${device.device_name}"]`);
-                        if (deviceCard) {
-                            const maintenanceBtn = deviceCard.querySelector('.maintenance-btn');
-                            const deleteBtn = deviceCard.querySelector('.delete-btn');
-                            if (maintenanceBtn && deleteBtn) {
-                                if (device.status === 'online') {
-                                    maintenanceBtn.style.display = '';
-                                    deleteBtn.style.display = 'none';
-                                } else {
-                                    maintenanceBtn.style.display = 'none';
-                                    deleteBtn.style.display = '';
-                                }
-                            }
-                        }
-                    });
-                }
+                if (!data.success || !data.devices) return;
+                data.devices.forEach(device => {
+                    const col = document.querySelector(`[data-device="${device.device_name}"]`);
+                    if (!col) return;
+                    const card = col.querySelector('.device-card');
+                    const pill = col.querySelector('.status-pill');
+                    if (card) card.className = card.className.replace(/status-\w+/, `status-${device.status}`);
+                    if (pill) {
+                        pill.className = `status-pill ${device.status}`;
+                        pill.innerHTML = `<span class="dot"></span>${device.status.charAt(0).toUpperCase() + device.status.slice(1)}`;
+                    }
+                });
             })
-            .catch(error => {
-                console.error('Error updating device statuses:', error);
-            });
+            .catch(() => {});
     }, 3000);
 
-        document.getElementById('searchDevice').addEventListener('keyup', function() {
-        const searchValue = this.value.toLowerCase().trim();
-        const deviceCols = document.querySelectorAll('[data-device]'); 
-
-        deviceCols.forEach(col => {
-            const deviceName = col.getAttribute('data-device').toLowerCase();
-            col.style.display = deviceName.includes(searchValue) ? '' : 'none';
+    // Search
+    document.getElementById('searchDevice').addEventListener('keyup', function() {
+        const val = this.value.toLowerCase().trim();
+        document.querySelectorAll('[data-device]').forEach(col => {
+            col.style.display = col.getAttribute('data-device').toLowerCase().includes(val) ? '' : 'none';
         });
     });
- 
-document.addEventListener("DOMContentLoaded", () => {
-    const gridContainer = document.getElementById("gridContainer");
-    const listContainer = document.getElementById("listContainer");
-    const listViewBtn = document.getElementById("listView");
-    const gridViewBtn = document.getElementById("gridView");
-
-    const savedView = sessionStorage.getItem('deviceView') || 'grid';
-
-    if (savedView === 'list') {
-        listViewBtn.checked = true;
-        listContainer.classList.remove("d-none");
-        gridContainer.classList.add("d-none");
-    } else {
-        gridViewBtn.checked = true;
-        gridContainer.classList.remove("d-none");
-        listContainer.classList.add("d-none");
-    }
-
-    listViewBtn.addEventListener("change", () => {
-        if (listViewBtn.checked) {
-            listContainer.classList.remove("d-none");
-            gridContainer.classList.add("d-none");
-            sessionStorage.setItem('deviceView', 'list');
-        }
-    });
-
-    gridViewBtn.addEventListener("change", () => {
-        if (gridViewBtn.checked) {
-            gridContainer.classList.remove("d-none");
-            listContainer.classList.add("d-none");
-            sessionStorage.setItem('deviceView', 'grid');
-        }
-    });
-});
     </script>
-    <script src="js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

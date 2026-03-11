@@ -5,7 +5,6 @@ require_once 'gs_DB/connection.php';
 require_once 'gs_DB/activity_logs.php';
 
 if (isset($_GET['logout'])) {
-    // Log logout before destroying session
     if (isset($_SESSION['user_id'])) {
         log_logout($_SESSION['user_id']);
     }
@@ -20,7 +19,6 @@ if (!isset($_SESSION['user_id']) || !isset($_COOKIE['user_logged_in'])) {
     exit();
 }
 
-// Get overall system statistics
 $stmt = $pdo->prepare("SELECT COUNT(*) as total_devices, 
                        SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END) as online_devices,
                        SUM(CASE WHEN status = 'offline' THEN 1 ELSE 0 END) as offline_devices
@@ -28,7 +26,6 @@ $stmt = $pdo->prepare("SELECT COUNT(*) as total_devices,
 $stmt->execute();
 $system_stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Get today's sorting statistics
 $stmt = $pdo->prepare("SELECT 
     COUNT(*) as total_sorted,
     SUM(CASE WHEN trash_type = 'bio' THEN 1 ELSE 0 END) as bio_count,
@@ -40,18 +37,20 @@ $stmt = $pdo->prepare("SELECT
 $stmt->execute();
 $today_stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Get recent activities (last 10 activity logs)
 $recent_activities = get_activity_logs(null, null, 10, 0);
 
-// Get system alerts (Note: this system alerts backend must be changed)
 $stmt = $pdo->prepare("SELECT * FROM sorters WHERE status = 'offline' OR status = 'maintenance'");
 $stmt->execute();
 $system_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Calculate uptime percentage
-$total_devices = $system_stats['total_devices'];
+// NEW: fetch all devices for status overview
+$stmt = $pdo->prepare("SELECT id, device_name, status, location FROM sorters ORDER BY device_name ASC");
+$stmt->execute();
+$all_devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$total_devices  = $system_stats['total_devices'];
 $online_devices = $system_stats['online_devices'];
-$system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 : 0;
+$system_uptime  = $total_devices > 0 ? ($online_devices / $total_devices) * 100 : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -62,483 +61,282 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/dark-mode-global.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="js/theme-manager.js"></script>
     <style>
         :root {
-            --primary-green: #274a17ff;
-            --light-green: #7AF146;
-            --dark-gray: #1f2937;
-            --medium-gray: #6b7280;
-            --light-gray: #f3f4f6;
-            --border-color: #368137;
-            --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            --bio-color: #10b981;
-            --nbio-color: #ef4444;
+            --primary-green:   #274a17;
+            --light-green:     #7AF146;
+            --dark-gray:       #1f2937;
+            --medium-gray:     #6b7280;
+            --light-gray:      #f3f4f6;
+            --border-color:    #e5e7eb;
+            --card-shadow:     0 1px 3px rgba(0,0,0,0.07);
+            --bio-color:       #10b981;
+            --nbio-color:      #ef4444;
             --hazardous-color: #f59e0b;
-            --mixed-color: #6b7280;
+            --mixed-color:     #6b7280;
         }
 
         body {
-            background-color: #F3F3EF !important;
-            font-family: 'Inter', sans-serif !important;
+            background-color: #e8f1e6;
+            font-family: 'Poppins', sans-serif !important;
             color: var(--dark-gray);
         }
 
         #main-content-wrapper {
-            margin-left: 260px;
-            transition: margin-left 0.3s ease;
-            padding: 20px;
-        }
-
-        #main-content-wrapper.collapsed {
-            margin-left: 80px;
-        }
-
-        .page-header {
-            padding-top: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--dark-gray);
-            margin-left: 6px;
-        }
-
-        .welcome-card {
-            background: linear-gradient(135deg, var(--primary-green) 0%, #368137 100%);
-            border-radius: 16px;
-            padding: 2rem;
-            color: white;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .welcome-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .welcome-subtitle {
-            font-size: 1rem;
-            opacity: 0.9;
-            margin-bottom: 1.5rem;
-        }
-
-        .welcome-stats {
-            display: flex;
-            gap: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .welcome-stat {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .welcome-stat-icon {
-            width: 48px;
-            height: 48px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-
-        .welcome-stat-info h3 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .welcome-stat-info p {
-            font-size: 0.875rem;
-            margin: 0;
-            opacity: 0.9;
-        }
-
-        .stat-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: var(--card-shadow);
-            transition: all 0.2s;
-        }
-
-        .stat-card:hover {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .stat-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .stat-card-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--medium-gray);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 0;
-        }
-
-        .stat-icon {
-            width: 40px;
-            height: 40px;
-            background-color: var(--light-green);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary-green);
-            font-size: 1.25rem;
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--dark-gray);
-            line-height: 1;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            font-size: 0.875rem;
-            color: var(--medium-gray);
-        }
-
-        .quick-action-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 50%;
-            width: 90px;
-            height: 90px;
-            box-shadow: var(--card-shadow);
-            cursor: pointer;
-            transition: all 0.25s ease;
-            text-decoration: none;
-            color: var(--primary-green);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto;
-        }
-
-        .quick-action-card:hover {
-            background: var(--light-green);
-            transform: scale(1.05);
-            box-shadow: 0 6px 10px rgba(0,0,0,0.15);
-        }
-
-        .quick-action-card i {
-            font-size: 1.75rem;
-            color: var(--primary-green);
-        }
-
-        .quick-action-card:hover i {
-            color: white;
-        }
-
-        .quick-action-title {
-            margin-top: 0.75rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--dark-gray);
-            text-align: center;
-        }
-
-        .about-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: var(--card-shadow);
-        }
-
-        .about-header {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .about-icon {
-            width: 64px;
-            height: 64px;
-            background: var(--light-green);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            color: var(--primary-green);
-        }
-
-        .about-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--dark-gray);
-            margin: 0;
-        }
-
-        .about-content p {
-            font-size: 0.95rem;
-            line-height: 1.7;
-            color: var(--dark-gray);
-            margin-bottom: 1rem;
-        }
-
-        .feature-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-
-        .feature-item {
-            display: flex;
-            align-items: start;
-            gap: 0.75rem;
-        }
-
-        .feature-icon {
-            width: 32px;
-            height: 32px;
-            background: var(--light-green);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary-green);
-            flex-shrink: 0;
-            margin-top: 0.25rem;
-        }
-
-        .feature-text h6 {
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin: 0 0 0.25rem 0;
-        }
-
-        .feature-text p {
-            font-size: 0.8rem;
-            color: var(--medium-gray);
-            margin: 0;
-        }
-
-        .activity-log {
-            max-height: 595px;
+            margin-left: 240px;
+            padding: 100px 0px 20px 0px;
+            height: 100vh;
             overflow-y: auto;
         }
 
-        .activity-item {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--light-gray);
-            transition: background 0.2s;
-        }
-
-        .activity-item:hover {
-            background: var(--light-gray);
-        }
-
-        .activity-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 1rem;
-            font-size: 1rem;
-            flex-shrink: 0;
-        }
-
-        .activity-icon.bio { background: rgba(16, 185, 129, 0.1); color: var(--bio-color); }
-        .activity-icon.nbio { background: rgba(239, 68, 68, 0.1); color: var(--nbio-color); }
-        .activity-icon.hazardous { background: rgba(245, 158, 11, 0.1); color: var(--hazardous-color); }
-        .activity-icon.mixed { background: rgba(107, 114, 128, 0.1); color: var(--mixed-color); }
-
-        .activity-details {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .activity-device {
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--dark-gray);
-        }
-
-        .activity-type {
-            font-size: 0.8rem;
-            color: var(--medium-gray);
-        }
-
-        .activity-time {
-            font-size: 0.75rem;
-            color: var(--medium-gray);
-            text-align: right;
-            flex-shrink: 0;
-        }
-
-        .alert-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
+        .section-container {
+            background: #fff;
+            border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: var(--card-shadow);
+            margin-bottom: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #eeeeee;
         }
 
-        .alert-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            background: #fff3cd;
-            border-left: 4px solid #f59e0b;
-            border-radius: 8px;
-            margin-bottom: 0.75rem;
+        .section-block {
+            background: linear-gradient(135deg, rgb(236, 251, 234) 0%, #d5f5dc 100%);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
         }
+        .section-block:last-child { margin-bottom: 0; }
 
-        .alert-item.offline {
-            background: #fee2e2;
-            border-left-color: #ef4444;
-        }
-
-        .alert-item.maintenance {
-            background: #dbeafe;
-            border-left-color: #3b82f6;
-        }
-
-        .alert-icon {
-            font-size: 1.5rem;
-        }
-
-        .alert-content h6 {
-            font-size: 0.875rem;
+        .section-label {
+            font-size: 0.75rem;
             font-weight: 600;
-            margin: 0 0 0.25rem 0;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #000000b1;
+            margin-bottom: 1.25rem;
         }
 
-        .alert-content p {
-            font-size: 0.8rem;
-            color: var(--medium-gray);
-            margin: 0;
-        }
-
-        .no-alerts {
-            text-align: center;
-            padding: 2rem;
-            color: var(--medium-gray);
-        }
-
-        .no-alerts i {
-            font-size: 3rem;
-            color: var(--bio-color);
+        /* ── Welcome card ── */
+        .welcome-card {
+            background: linear-gradient(135deg, rgb(236, 251, 234) 0%, #84ca92 100%) !important;
+            border-radius: 12px;
+            padding: 1.75rem;
+            color: black;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
             margin-bottom: 1rem;
         }
 
-        .team-card {
+        .welcome-title    { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.2rem; }
+        .welcome-subtitle { font-size: 0.875rem; opacity: 0.85; margin-bottom: 1.5rem; }
+        .welcome-stats    { display: flex; gap: 2rem; flex-wrap: wrap; }
+        .welcome-stat     { display: flex; align-items: center; gap: 0.75rem; }
+        .welcome-stat-icon {
+            width: 44px; height: 44px;
+            background: rgb(253, 255, 254);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+        }
+        .welcome-stat-info h3 { font-size: 1.6rem; font-weight: 700; margin: 0; }
+        .welcome-stat-info p  { font-size: 0.8rem; margin: 0; opacity: 0.88; }
+
+        /* ── Stat cards ── */
+        .stat-card {
             background: white;
-            border: 2px solid var(--border-color);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 1.25rem;
             box-shadow: var(--card-shadow);
+            transition: all 0.2s;
+            height: 100%;
         }
-
-        .team-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+        .stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .stat-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0.75rem;
         }
-
-        .team-member {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+        .stat-card-title {
+            font-size: 0.75rem; font-weight: 600;
+            color: var(--medium-gray);
+            text-transform: uppercase; letter-spacing: 0.5px; margin: 0;
         }
+        .stat-icon {
+            width: 36px; height: 36px;
+            background: #e8f5e1;
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--primary-green); font-size: 1.1rem;
+        }
+        .stat-value {
+            font-size: 2.2rem; font-weight: 700;
+            line-height: 1; margin-bottom: 0.35rem;
+        }
+        .stat-label { font-size: 0.8rem; color: var(--medium-gray); }
 
-        .team-avatar {
-            width: 40px;
-            height: 40px;
+        /* ── Quick actions ── */
+        .quick-action-card {
+            background: white;
+            border: 1.5px solid var(--border-color);
             border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .dev-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
+            width: 80px; height: 80px;
             box-shadow: var(--card-shadow);
+            cursor: pointer;
+            transition: all 0.22s ease;
+            text-decoration: none;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto;
+        }
+        .quick-action-card:hover {
+            background: var(--light-green);
+            transform: scale(1.07);
+            box-shadow: 0 6px 14px rgba(88,197,66,0.3);
+            border-color: var(--light-green);
+        }
+        .quick-action-card i { font-size: 1.6rem; color: var(--primary-green); }
+        .quick-action-card:hover i { color: white; }
+        .quick-action-title {
+            margin-top: 0.6rem; font-size: 0.8rem; font-weight: 600;
+            color: var(--dark-gray); text-align: center;
         }
 
-        .dev-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+        /* ── Alerts ── */
+        .alert-item {
+            display: flex; align-items: center; gap: 1rem;
+            padding: 0.9rem 1rem;
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px; margin-bottom: 0.6rem;
+            background: #fff3cd;
         }
+        .alert-item.offline     { background: #fee2e2; border-left-color: #ef4444; }
+        .alert-item.maintenance { background: #dbeafe; border-left-color: #3b82f6; }
+        .alert-icon   { font-size: 1.3rem; }
+        .alert-content h6 { font-size: 0.85rem; font-weight: 600; margin: 0 0 0.2rem 0; }
+        .alert-content p  { font-size: 0.78rem; color: var(--medium-gray); margin: 0; }
 
-        .dev-member {
-            display: flex;
-            align-items: center;
+        .no-alerts { text-align: center; padding: 1.5rem; color: var(--medium-gray); }
+        .no-alerts i { font-size: 2.5rem; color: var(--bio-color); display: block; margin-bottom: 0.5rem; }
+
+        /* ── Device status grid ── */
+        .device-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             gap: 0.75rem;
         }
-
-        .dev-icon {
-            font-size: 1.5rem;
-            color: var(--primary-green);
-        }
-
-        .insight-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
+        .device-status-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
             box-shadow: var(--card-shadow);
+            border: 1px solid var(--border-color);
+        }
+        .device-status-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .device-status-location {
+            font-size: 0.7rem;
+            color: var(--medium-gray);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .device-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.55rem;
+            border-radius: 20px;
+            width: fit-content;
+        }
+        .device-status-pill.online      { background: #dcfce7; color: #15803d; }
+        .device-status-pill.offline     { background: #fee2e2; color: #dc2626; }
+        .device-status-pill.maintenance { background: #dbeafe; color: #1d4ed8; }
+        .device-status-pill .dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: currentColor;
         }
 
-        .insight-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
+        /* ── Activity feed ── */
+        .activity-feed { display: flex; flex-direction: column; gap: 0; }
 
-        .insight-list li {
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
+        .activity-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.85rem;
+            padding: 0.75rem 0.5rem;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: background 0.15s;
+            border-radius: 8px;
+        }
+        .activity-row:last-child { border-bottom: none; }
+        .activity-row:hover { background: rgba(255,255,255,0.6); }
+
+        .activity-avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: #d4edda;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .activity-avatar i { font-size: 0.9rem; color: var(--primary-green); }
+
+        .activity-body { flex: 1; min-width: 0; }
+
+        .activity-top {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-bottom: 0.2rem;
+        }
+        .activity-user {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+        }
+        .activity-action {
+            font-size: 0.82rem;
+            font-weight: 600;
             color: var(--dark-gray);
         }
-
+        .activity-device {
+            font-size: 0.75rem;
+            color: var(--primary-green);
+            background: #e8f5e1;
+            padding: 0.1rem 0.5rem;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        .activity-device i { font-size: 0.7rem; }
+        .activity-details {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .activity-time {
+            font-size: 0.72rem;
+            color: #9ca3af;
+            white-space: nowrap;
+            flex-shrink: 0;
+            padding-top: 3px;
+        }
 
         @media (max-width: 992px) {
-            #main-content-wrapper {
-                margin-left: 0;
-                padding: 12px;
-            }
-
-            .page-title {
-                font-size: 1.5rem;
-            }
-
-            .welcome-stats {
-                flex-direction: column;
-                gap: 1rem;
-            }
-
+            #main-content-wrapper { margin-left: 0; padding: 12px; }
+            .welcome-stats { flex-direction: column; gap: 1rem; }
         }
     </style>
 </head>
@@ -547,232 +345,209 @@ $system_uptime = $total_devices > 0 ? ($online_devices / $total_devices) * 100 :
 
     <div id="main-content-wrapper">
         <div class="container-fluid">
-            <!-- Page Header -->
-            <div class="page-header">
-                <h1 class="page-title">Dashboard</h1>
-            </div>
 
-            <hr style="height: 1.5px; background-color: #000; opacity: 1; margin-left:6.5px;" class="mb-4">
+            <?php include 'topbar.php'; ?>
 
-            <!-- Welcome Card -->
-            <div class="welcome-card">
-                <div class="welcome-title">Welcome back, <?php echo htmlspecialchars($_SESSION['username'] ?? 'User'); ?>!</div>
-                <div class="welcome-subtitle">Here's what's happening with your GoSort system today</div>
-                <div class="welcome-stats">
-                    <div class="welcome-stat">
-                        <div class="welcome-stat-icon">
-                            <i class="bi bi-box-seam"></i>
-                        </div>
-                        <div class="welcome-stat-info">
-                            <h3><?php echo number_format($today_stats['total_sorted']); ?></h3>
-                            <p>Items Sorted Today</p>
-                        </div>
-                    </div>
-                    <div class="welcome-stat">
-                        <div class="welcome-stat-icon">
-                            <i class="bi bi-hdd-rack"></i>
-                        </div>
-                        <div class="welcome-stat-info">
-                            <h3><?php echo $system_stats['online_devices'] ?? 0; ?></h3>
-                            <p>Devices Online</p>
-                        </div>
-                    </div>
-                    <div class="welcome-stat">
-                        <div class="welcome-stat-icon">
-                            <i class="bi bi-speedometer2"></i>
-                        </div>
-                        <div class="welcome-stat-info">
-                            <h3><?php echo number_format($system_uptime, 1); ?>%</h3>
-                            <p>System Uptime</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div class="section-container">
 
-            <!-- Today's Statistics -->
-            <h5 class="mb-3" style="font-weight: 600; color: var(--dark-gray); margin-left: 6px;">Today's Statistics</h5>
-            <div class="row g-3 mb-4">
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">Biodegradable</span>
-                            <div class="stat-icon">
-                                <i class="bi bi-recycle"></i>
+                <!-- Welcome -->
+                    <div class="welcome-card">
+                        <div class="welcome-title">Welcome back, <?php echo htmlspecialchars($_SESSION['username'] ?? 'User'); ?>!</div>
+                        <div class="welcome-subtitle">Here's what's happening with your GoSort system today</div>
+                        <div class="welcome-stats">
+                            <div class="welcome-stat">
+                                <div class="welcome-stat-icon"><i class="bi bi-box-seam"></i></div>
+                                <div class="welcome-stat-info">
+                                    <h3><?php echo number_format($today_stats['total_sorted']); ?></h3>
+                                    <p>Items Sorted Today</p>
+                                </div>
+                            </div>
+                            <div class="welcome-stat">
+                                <div class="welcome-stat-icon"><i class="bi bi-hdd-rack"></i></div>
+                                <div class="welcome-stat-info">
+                                    <h3><?php echo $system_stats['online_devices'] ?? 0; ?></h3>
+                                    <p>Devices Online</p>
+                                </div>
+                            </div>
+                            <div class="welcome-stat">
+                                <div class="welcome-stat-icon"><i class="bi bi-speedometer2"></i></div>
+                                <div class="welcome-stat-info">
+                                    <h3><?php echo number_format($system_uptime, 1); ?>%</h3>
+                                    <p>System Uptime</p>
+                                </div>
                             </div>
                         </div>
-                        <div class="stat-value" style="color: var(--bio-color);"><?php echo number_format($today_stats['bio_count']); ?></div>
-                        <div class="stat-label">Items sorted</div>
                     </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">Non-Biodegradable</span>
-                            <div class="stat-icon">
-                                <i class="bi bi-trash"></i>
+
+                <!-- Today's Statistics -->
+                <div class="section-block">
+                    <div class="section-label">Today's Statistics</div>
+                    <div class="row g-3">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-card-title">Biodegradable</span>
+                                    <div class="stat-icon"><i class="bi bi-recycle"></i></div>
+                                </div>
+                                <div class="stat-value" style="color:var(--bio-color);"><?php echo number_format($today_stats['bio_count']); ?></div>
+                                <div class="stat-label">Items sorted</div>
                             </div>
                         </div>
-                        <div class="stat-value" style="color: var(--nbio-color);"><?php echo number_format($today_stats['nbio_count']); ?></div>
-                        <div class="stat-label">Items sorted</div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">Hazardous</span>
-                            <div class="stat-icon">
-                                <i class="bi bi-exclamation-triangle"></i>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-card-title">Non-Biodegradable</span>
+                                    <div class="stat-icon"><i class="bi bi-trash"></i></div>
+                                </div>
+                                <div class="stat-value" style="color:var(--nbio-color);"><?php echo number_format($today_stats['nbio_count']); ?></div>
+                                <div class="stat-label">Items sorted</div>
                             </div>
                         </div>
-                        <div class="stat-value" style="color: var(--hazardous-color);"><?php echo number_format($today_stats['hazardous_count']); ?></div>
-                        <div class="stat-label">Items sorted</div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">Mixed Waste</span>
-                            <div class="stat-icon">
-                                <i class="bi bi-collection"></i>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-card-title">Hazardous</span>
+                                    <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                                </div>
+                                <div class="stat-value" style="color:var(--hazardous-color);"><?php echo number_format($today_stats['hazardous_count']); ?></div>
+                                <div class="stat-label">Items sorted</div>
                             </div>
                         </div>
-                        <div class="stat-value" style="color: var(--mixed-color);"><?php echo number_format($today_stats['mixed_count']); ?></div>
-                        <div class="stat-label">Items sorted</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <h5 class="mb-4" style="font-weight: 600; color: var(--dark-gray); margin-left: 6px;">Quick Actions</h5>
-            <div class="row g-3 mb-4">
-                <div class="col-lg-3 col-md-6 text-center">
-                    <a href="GoSort_Sorters.php" class="quick-action-card">
-                        <i class="bi bi-hdd-rack"></i>
-                    </a>
-                    <div class="quick-action-title">View Devices</div>
-                </div>
-
-                <div class="col-lg-3 col-md-6 text-center">
-                    <a href="GoSort_AnalyticsNavpage.php" class="quick-action-card">
-                        <i class="bi bi-graph-up"></i>
-                    </a>
-                    <div class="quick-action-title">View Analytics</div>
-                </div>
-
-                <div class="col-lg-3 col-md-6 text-center">
-                    <a href="GoSort_MaintenanceNavpage.php" class="quick-action-card">
-                        <i class="bi bi-tools"></i>
-                    </a>
-                    <div class="quick-action-title">View Maintenance</div>
-                </div>
-
-                <div class="col-lg-3 col-md-6 text-center">
-                    <a href="GoSort_Settings.php" class="quick-action-card">
-                        <i class="bi bi-gear"></i>
-                    </a>
-                    <div class="quick-action-title">View System Settings</div>
-                </div>
-            </div>
-            
-                <!-- System Alerts & Recent Activity -->
-                <div class="col-lg-12">
-                    <!-- System Alerts -->
-                    <div class="alert-card mb-4">
-                        <div class="stat-card-header mb-3">
-                            <h5 class="stat-card-title">System Alerts</h5>
-                            <div class="stat-icon">
-                                <i class="bi bi-bell"></i>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-card-title">Mixed Waste</span>
+                                    <div class="stat-icon"><i class="bi bi-collection"></i></div>
+                                </div>
+                                <div class="stat-value" style="color:var(--mixed-color);"><?php echo number_format($today_stats['mixed_count']); ?></div>
+                                <div class="stat-label">Items sorted</div>
                             </div>
                         </div>
-                        <?php if (count($system_alerts) > 0): ?>
-                            <?php foreach ($system_alerts as $alert): ?>
-                                <div class="alert-item <?php echo $alert['status']; ?>">
-                                    <div class="alert-icon">
-                                        <?php if ($alert['status'] === 'offline'): ?>
-                                            <i class="bi bi-exclamation-circle" style="color: #ef4444;"></i>
-                                        <?php else: ?>
-                                            <i class="bi bi-tools" style="color: #3b82f6;"></i>
+                    </div>
+                </div>
+
+                <!-- Device Status + System Alerts side by side -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="section-block h-100 mb-0">
+                            <div class="section-label">Device Status</div>
+                            <?php if (count($all_devices) > 0): ?>
+                                <div class="device-status-grid">
+                                    <?php foreach ($all_devices as $device): ?>
+                                        <div class="device-status-card">
+                                            <div class="device-status-name"><?php echo htmlspecialchars($device['device_name']); ?></div>
+                                            <?php if (!empty($device['location'])): ?>
+                                                <div class="device-status-location"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($device['location']); ?></div>
+                                            <?php endif; ?>
+                                            <div class="device-status-pill <?php echo htmlspecialchars($device['status']); ?>">
+                                                <span class="dot"></span>
+                                                <?php echo ucfirst($device['status']); ?>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="no-alerts">
+                                    <i class="bi bi-cpu"></i>
+                                    <p>No devices registered</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="section-block h-100 mb-0">
+                            <div class="section-label">System Alerts</div>
+                            <?php if (count($system_alerts) > 0): ?>
+                                <?php foreach ($system_alerts as $alert): ?>
+                                    <div class="alert-item <?php echo htmlspecialchars($alert['status']); ?>">
+                                        <div class="alert-icon">
+                                            <?php if ($alert['status'] === 'offline'): ?>
+                                                <i class="bi bi-exclamation-circle" style="color:#ef4444;"></i>
+                                            <?php else: ?>
+                                                <i class="bi bi-tools" style="color:#3b82f6;"></i>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="alert-content">
+                                            <h6><?php echo htmlspecialchars($alert['device_name']); ?></h6>
+                                            <p><?php echo ucfirst($alert['status']); ?> — Requires attention</p>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="no-alerts">
+                                    <i class="bi bi-check-circle"></i>
+                                    <p>All systems operational</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="section-block">
+                    <div class="section-label">Quick Actions</div>
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6 text-center">
+                            <a href="GoSort_Sorters.php" class="quick-action-card"><i class="bi bi-hdd-rack"></i></a>
+                            <div class="quick-action-title">View Devices</div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 text-center">
+                            <a href="GoSort_AnalyticsNavpage.php" class="quick-action-card"><i class="bi bi-graph-up"></i></a>
+                            <div class="quick-action-title">View Analytics</div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 text-center">
+                            <a href="GoSort_MaintenanceNavpage.php" class="quick-action-card"><i class="bi bi-tools"></i></a>
+                            <div class="quick-action-title">View Maintenance</div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 text-center">
+                            <a href="GoSort_Settings.php" class="quick-action-card"><i class="bi bi-gear"></i></a>
+                            <div class="quick-action-title">System Settings</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="section-block">
+                    <div class="section-label">Recent Activity</div>
+                    <?php if (count($recent_activities) > 0): ?>
+                        <div class="activity-feed">
+                            <?php foreach ($recent_activities as $activity): ?>
+                                <?php $at = new DateTime($activity['created_at']); ?>
+                                <div class="activity-row">
+                                    <div class="activity-avatar">
+                                        <i class="bi bi-person-fill"></i>
+                                    </div>
+                                    <div class="activity-body">
+                                        <div class="activity-top">
+                                            <span class="activity-action"><?php echo htmlspecialchars($activity['action']); ?></span>
+                                            <span class="activity-user"><?php echo htmlspecialchars($activity['username'] ?? 'System'); ?></span>
+                                            <?php if ($activity['device_name']): ?>
+                                                <span class="activity-device"><i class="bi bi-cpu"></i> <?php echo htmlspecialchars($activity['device_name']); ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php if (!empty($activity['details'])): ?>
+                                            <div class="activity-details"><?php echo htmlspecialchars($activity['details']); ?></div>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="alert-content">
-                                        <h6><?php echo htmlspecialchars($alert['device_name']); ?></h6>
-                                        <p><?php echo ucfirst($alert['status']); ?> - Requires attention</p>
-                                    </div>
+                                    <div class="activity-time"><?php echo $at->format('M d, g:i A'); ?></div>
                                 </div>
                             <?php endforeach; ?>
-                        <?php else: ?>
-                            <div class="no-alerts">
-                                <i class="bi bi-check-circle"></i>
-                                <p>All systems operational</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <!-- Recent Activity -->
-                    <div class="stat-card">
-                        <div class="stat-card-header mb-4">
-                            <h5 class="stat-card-title">Recent Activity</h5>
-                            <div class="stat-icon">
-                                <i class="bi bi-activity"></i>
-                            </div>
                         </div>
-                        <?php if (count($recent_activities) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0" style="border-collapse: separate; border-spacing: 0 8px;">
-                                    <thead>
-                                        <tr style="background-color: transparent;">
-                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Date</th>
-                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">User</th>
-                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Device</th>
-                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Action</th>
-                                            <th style="font-size: 0.9rem; font-weight: 700; color: var(--dark-gray); border: none; padding: 0.75rem 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Details</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($recent_activities as $activity): ?>
-                                            <tr style="background-color: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s;">
-                                                <td style="font-size: 0.9rem; color: var(--medium-gray); padding: 1rem; border: none; vertical-align: middle; font-weight: 600;">
-                                                    <?php 
-                                                    $activity_time = new DateTime($activity['created_at']);
-                                                    echo $activity_time->format('M d, Y g:i A');
-                                                    ?>
-                                                </td>
-                                                <td style="font-size: 0.95rem; font-weight: 600; color: var(--dark-gray); padding: 1rem; border: none; vertical-align: middle;">
-                                                    <i class="bi bi-person-circle" style="margin-right: 0.5rem; color: var(--primary-green);"></i><?php echo htmlspecialchars($activity['username'] ?? 'System'); ?>
-                                                </td>
-                                                <td style="font-size: 0.95rem; color: var(--medium-gray); padding: 1rem; border: none; vertical-align: middle;">
-                                                    <?php if($activity['device_name']): ?>
-                                                        <i class="bi bi-hdd-rack" style="margin-right: 0.5rem; color: var(--primary-green);"></i><?php echo htmlspecialchars($activity['device_name']); ?>
-                                                    <?php else: ?>
-                                                        <span style="color: var(--medium-gray);">—</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td style="font-size: 0.95rem; color: var(--dark-gray); padding: 1rem; border: none; vertical-align: middle;">
-                                                    <?php echo htmlspecialchars($activity['action']); ?>
-                                                </td>
-                                                <td style="font-size: 0.9rem; color: var(--medium-gray); padding: 1rem; border: none; vertical-align: middle;">
-                                                    <?php echo htmlspecialchars($activity['details'] ?? '—'); ?>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="no-alerts">
-                                <i class="bi bi-check-circle"></i>
-                                <p>No recent activity</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                    <?php else: ?>
+                        <div class="no-alerts">
+                            <i class="bi bi-clock-history"></i>
+                            <p>No recent activity</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
-            </div>
+
+            </div><!-- /section-container -->
+        </div>
+    </div>
+
     <script src="js/bootstrap.bundle.min.js"></script>
     <script>
-        // Auto-refresh statistics every 30 seconds
-        setInterval(function() {
-            location.reload();
-        }, 30000);
+        setInterval(function() { location.reload(); }, 30000);
     </script>
 </body>
 </html>
