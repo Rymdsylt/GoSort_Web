@@ -1,423 +1,319 @@
 <?php
-//Activity Logs - Connected to Database
+// Activity Logs - Connected to Database
+require_once __DIR__ . '/../gs_DB/connection.php';
+
+// Always fetch everything - JS handles category filtering client-side
+$user_actions = ['Login', 'Logout', 'Login Failed', 'User Added', 'User Deleted', 'User Updated', 'Profile Updated'];
+$user_actions_str = implode("','", array_map('addslashes', $user_actions));
+
+try {
+    $sql = "SELECT id, category, action, details, username, device_name, created_at,
+            CASE
+                WHEN category IN ('devices','maintenance') THEN category
+                WHEN action IN ('$user_actions_str') THEN 'users'
+                ELSE 'general'
+            END AS js_category
+            FROM activity_logs
+            ORDER BY created_at DESC LIMIT 500";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute();
+    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $logs = [];
+    $fetch_error = $e->getMessage();
+}
+
+// ── Badge helpers ─────────────────────────────────────────────────────────────
+function getActionBadge($action) {
+    $a = strtolower($action ?? '');
+    if (str_contains($a, 'login') && !str_contains($a, 'failed')) return ['login',       '#dcfce7','#15803d'];
+    if (str_contains($a, 'failed'))                                 return ['failed',      '#fee2e2','#dc2626'];
+    if (str_contains($a, 'logout'))                                 return ['logout',      '#f3f4f6','#4b5563'];
+    if (str_contains($a, 'added'))                                  return ['added',       '#dbeafe','#1d4ed8'];
+    if (str_contains($a, 'deleted') || str_contains($a, 'removed'))return ['deleted',     '#fee2e2','#dc2626'];
+    if (str_contains($a, 'updated') || str_contains($a, 'modified'))return ['updated',    '#fef9c3','#854d0e'];
+    if (str_contains($a, 'maintenance'))                            return ['maintenance', '#fef3c7','#92400e'];
+    if (str_contains($a, 'test') || str_contains($a, 'mapping'))   return ['maintenance', '#fef3c7','#92400e'];
+    if (str_contains($a, 'notification'))                           return ['notif',       '#ede9fe','#5b21b6'];
+    return ['general', '#f1f5f9','#475569'];
+}
+
+function getCatBadge($cat) {
+    switch ($cat) {
+        case 'devices':     return ['#dbeafe','#1d4ed8'];
+        case 'maintenance': return ['#fef3c7','#92400e'];
+        case 'general':     return ['#ede9fe','#5b21b6'];
+        default:            return ['#f1f5f9','#475569'];
+    }
+}
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <style>
-        :root {
-            --primary-green: #2e7d32;
-            --light-green: #66bb6a;
-            --dark-gray: #333;
-            --medium-gray: #6b7280;
-            --light-gray: #f9fafb;
-        }
 
-        body {
-            background-color: var(--light-gray);
-            font-family: 'Poppins', sans-serif;
-        }
+<div class="section-block">
+    <div class="section-label">Activity Logs</div>
 
-        .content-area {
-            padding: 0 0 2rem;
-            overflow-y: auto;
-        }
-
-        .log-card {
-            background-color: #fff;
-            border-radius: 16px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .section-header {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--dark-gray);
-            margin-bottom: 1.2rem;
-            border-bottom: 2px solid var(--primary-green);
-            padding-bottom: 6px;
-        }
-
-        .btn-main {
-            border-radius: 10px;
-            margin-right: 6px;
-            font-weight: 600;
-            transition: background-color 0.2s ease;
-        }
-
-        .btn-main.active {
-            background-color: var(--primary-green);
-            color: #fff;
-        }
-
-        .btn-sub {
-            border-radius: 8px;
-            margin-right: 5px;
-            font-weight: 500;
-        }
-
-        .table thead {
-            background-color: var(--light-green);
-            color: #fff;
-        }
-
-        .table td, .table th {
-            vertical-align: middle;
-        }
-
-        .empty-state {
-            text-align: center;
-            color: var(--medium-gray);
-            padding: 2rem;
-        }
-
-        .empty-state i {
-            font-size: 2rem;
-            color: var(--light-green);
-            display: block;
-            margin-bottom: 0.5rem;
-        }
-
-        .loading-spinner {
-            text-align: center;
-            padding: 2rem;
-        }
-
-        .loading-spinner .spinner-border {
-            color: var(--primary-green);
-        }
-
-        .badge-action {
-            font-size: 0.75rem;
-            padding: 4px 8px;
-            border-radius: 6px;
-        }
-
-        .badge-login { background-color: #10b981; color: white; }
-        .badge-logout { background-color: #6b7280; color: white; }
-        .badge-maintenance { background-color: #f59e0b; color: white; }
-        .badge-device { background-color: #3b82f6; color: white; }
-        .badge-notification { background-color: #8b5cf6; color: white; }
-        .badge-user { background-color: #ec4899; color: white; }
-        .badge-default { background-color: #64748b; color: white; }
-
-        .refresh-btn {
-            background: none;
-            border: none;
-            color: var(--primary-green);
-            cursor: pointer;
-            font-size: 1rem;
-            padding: 5px 10px;
-            border-radius: 6px;
-            transition: background-color 0.2s;
-        }
-
-        .refresh-btn:hover {
-            background-color: rgba(46, 125, 50, 0.1);
-        }
-
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* Dark mode styles are handled by css/dark-mode-global.css */
-    </style>
-</head>
-<body>
-<div class="content-area">
-    <div class="log-card">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <span>Activity Logs</span>
-            <div class="header-controls">
-                <button class="refresh-btn" onclick="refreshLogs()" title="Refresh logs">
-                    <i class="bi bi-arrow-clockwise"></i> Refresh
+    <div class="inner-card">
+        <!-- Header -->
+        <div class="inner-card-header">
+            <div class="inner-card-title">
+                <i class="bi bi-clock-history me-2" style="color:var(--primary-green);"></i>System Activity
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="search-wrap">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" id="logSearch" placeholder="Search logs…" oninput="filterLogs(this.value)">
+                </div>
+                <button class="btn-outline-green" onclick="exportLogsCSV()">
+                    <i class="bi bi-download"></i> Export CSV
                 </button>
             </div>
         </div>
-        <p class="text-secondary mb-4">
-            View all user, device, analytics, and maintenance activities in your GoSort system. 
-            Select a category below to view detailed history.
-        </p>
 
-        <!-- MAIN CATEGORY BUTTONS -->
-        <div id="mainButtons" class="mb-3">
-            <button class="btn btn-outline-success btn-main active" data-category="all">All</button>
-            <button class="btn btn-outline-success btn-main" data-category="devices">Devices</button>
-            <button class="btn btn-outline-success btn-main" data-category="analytics">Analytics</button>
-            <button class="btn btn-outline-success btn-main" data-category="maintenance">Maintenance</button>
-            <button class="btn btn-outline-success btn-main" data-category="general">General</button>
+        <!-- Category tabs -->
+        <div class="log-tabs mb-3">
+            <button class="log-tab-btn active" data-cat="all"          onclick="switchLogCat(this)"><i class="bi bi-list-ul"></i> All</button>
+            <button class="log-tab-btn"        data-cat="devices"      onclick="switchLogCat(this)"><i class="bi bi-cpu"></i> Devices</button>
+            <button class="log-tab-btn"        data-cat="maintenance"  onclick="switchLogCat(this)"><i class="bi bi-tools"></i> Maintenance</button>
+            <button class="log-tab-btn"        data-cat="users"        onclick="switchLogCat(this)"><i class="bi bi-people"></i> Users</button>
         </div>
 
-        <!-- SUBTOPIC BUTTONS (changes dynamically) -->
-        <div id="subButtons" class="mb-3"></div>
+        <?php if (!empty($fetch_error)): ?>
+        <div style="padding:1rem;background:#fee2e2;border-radius:8px;font-size:0.8rem;color:#dc2626;">
+            <i class="bi bi-exclamation-circle me-1"></i><?php echo htmlspecialchars($fetch_error); ?>
+        </div>
+        <?php elseif (empty($logs)): ?>
+        <div style="text-align:center;padding:2.5rem;color:var(--medium-gray);">
+            <i class="bi bi-clipboard-x" style="font-size:2rem;display:block;margin-bottom:0.5rem;color:#c8e6c9;"></i>
+            <span style="font-size:0.82rem;">No activity logs found.</span>
+        </div>
+        <?php else: ?>
 
-        <!-- TABLE CONTENT -->
-        <div id="logTableContainer"></div>
+        <div style="overflow-x:auto;">
+            <table id="logTable" style="width:100%;border-collapse:collapse;font-size:0.8rem;font-family:'Poppins',sans-serif;">
+                <thead>
+                    <tr>
+                        <th class="log-th" style="width:150px;">Date &amp; Time</th>
+                        <th class="log-th log-col-cat" style="width:110px;">Category</th>
+                        <th class="log-th" style="width:180px;">User</th>
+                        <th class="log-th" style="width:170px;white-space:nowrap;">Action</th>
+                        <th class="log-th log-col-device" style="width:120px;">Device</th>
+                        <th class="log-th">Details</th>
+                    </tr>
+                </thead>
+                <tbody id="logTbody">
+                <?php foreach ($logs as $log):
+                    [$badgeKey, $badgeBg, $badgeColor] = getActionBadge($log['action']);
+                    $date = $log['created_at'] ? date('M d, Y g:i A', strtotime($log['created_at'])) : '—';
+                    $user = htmlspecialchars($log['username'] ?? '—');
+                    $action = htmlspecialchars($log['action'] ?? '—');
+                    $details = htmlspecialchars($log['details'] ?? '—');
+                    $device = htmlspecialchars($log['device_name'] ?? '—');
+                    $cat = $log['category'] ?? 'general';
+                    $jsCat = htmlspecialchars($log['js_category'] ?? 'general');
+                    [$catBg, $catColor] = getCatBadge($cat);
+                ?>
+                <tr class="log-row" data-cat="<?php echo $jsCat; ?>">
+                    <td class="log-td" style="color:var(--medium-gray);font-size:0.74rem;white-space:nowrap;"><?php echo $date; ?></td>
+                    <td class="log-td log-col-cat">
+                        <span style="display:inline-flex;align-items:center;padding:0.15rem 0.5rem;border-radius:20px;font-size:0.67rem;font-weight:600;background:<?php echo $catBg; ?>;color:<?php echo $catColor; ?>;">
+                            <?php echo ucfirst($cat); ?>
+                        </span>
+                    </td>
+                    <td class="log-td" style="font-weight:600;"><?php echo $user; ?></td>
+                    <td class="log-td" style="white-space:nowrap;">
+                        <span style="display:inline-flex;align-items:center;padding:0.18rem 0.55rem;border-radius:20px;font-size:0.68rem;font-weight:600;white-space:nowrap;background:<?php echo $badgeBg; ?>;color:<?php echo $badgeColor; ?>;">
+                            <?php echo $action; ?>
+                        </span>
+                    </td>
+                    <td class="log-td log-col-device" style="color:var(--medium-gray);"><?php echo $device; ?></td>
+                    <td class="log-td" style="color:var(--medium-gray);font-size:0.78rem;"><?php echo $details; ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.9rem;flex-wrap:wrap;gap:0.5rem;">
+            <div style="font-size:0.74rem;color:var(--medium-gray);">
+                <i class="bi bi-info-circle me-1"></i>
+                Showing <span id="logRangeStart">1</span>–<span id="logRangeEnd">30</span>
+                of <span id="logTotal"><?php echo count($logs); ?></span> records
+            </div>
+            <div style="display:flex;align-items:center;gap:0.4rem;" id="paginationControls">
+                <button class="btn-outline-green" id="prevPageBtn" onclick="changePage(-1)" style="padding:0.3rem 0.7rem;font-size:0.75rem;" disabled>
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <span id="pageIndicator" style="font-size:0.78rem;font-weight:600;color:var(--dark-gray);min-width:70px;text-align:center;">Page 1</span>
+                <button class="btn-outline-green" id="nextPageBtn" onclick="changePage(1)" style="padding:0.3rem 0.7rem;font-size:0.75rem;">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <?php endif; ?>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<style>
+.log-tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 2px solid #f3f4f6;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+}
+.log-tabs::-webkit-scrollbar { display: none; }
+
+.log-tab-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--medium-gray);
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    border-radius: 8px 8px 0 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.log-tab-btn:hover { color: var(--dark-gray); background: #f9fafb; }
+.log-tab-btn.active { color: var(--primary-green); }
+.log-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--light-green), var(--primary-green));
+    z-index: 2;
+}
+
+.log-th {
+    font-size: 0.71rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--medium-gray);
+    border-bottom: 1px solid #f3f4f6;
+    padding: 0.6rem 0.75rem;
+    background: #fafafa;
+    text-align: left;
+}
+.log-td {
+    padding: 0.7rem 0.75rem;
+    border-bottom: 1px solid #f9fafb;
+    vertical-align: middle;
+    color: var(--dark-gray);
+}
+.log-row:hover .log-td { background: #f9fafb; }
+.log-row:last-child .log-td { border-bottom: none; }
+.log-row.hidden { display: none; }
+.log-col-cat    { }
+.log-col-device { }
+.hide-cat    .log-col-cat    { display: none; }
+.hide-device .log-col-device { display: none; }
+</style>
+
 <script>
-    const subtopics = {
-        all: [],
-        devices: ["Added Devices", "Deleted Devices", "Updated Devices"],
-        analytics: ["Sorting History", "Online Activity"],
-        maintenance: ["Device Mapping", "Testing", "Controls"],
-        general: ["Login History", "Notifications", "User Activity"]
-    };
+const ROWS_PER_PAGE = 30;
+let currentPage = 1;
+let allRows = [];
+let filteredRows = [];
 
-    let currentCategory = 'all';
-    let currentSubtopic = null;
+let currentCat = 'all';
 
-    const mainButtons = document.querySelectorAll('#mainButtons button');
-    const subButtonsContainer = document.getElementById('subButtons');
-    const logTableContainer = document.getElementById('logTableContainer');
+document.addEventListener('DOMContentLoaded', () => {
+    allRows = Array.from(document.querySelectorAll('#logTbody .log-row'));
+    filteredRows = [...allRows];
+    renderPage();
+});
 
-    function getActionBadgeClass(action) {
-        action = action.toLowerCase();
-        if (action.includes('login')) return 'badge-login';
-        if (action.includes('logout')) return 'badge-logout';
-        if (action.includes('maintenance')) return 'badge-maintenance';
-        if (action.includes('device')) return 'badge-device';
-        if (action.includes('notification')) return 'badge-notification';
-        if (action.includes('user')) return 'badge-user';
-        return 'badge-default';
+function switchLogCat(btn) {
+    document.querySelectorAll('.log-tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCat = btn.dataset.cat;
+    document.getElementById('logSearch').value = '';
+    // Toggle category column visibility
+    const table = document.getElementById('logTable');
+    if (table) {
+        table.classList.toggle('hide-cat',    currentCat !== 'all');
+        table.classList.toggle('hide-device', currentCat === 'users');
     }
+    applyFilters();
+    const wrapper = document.getElementById('main-content-wrapper');
+    if (wrapper) wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-    function renderSubtopics(category) {
-        currentCategory = category;
-        subButtonsContainer.innerHTML = '';
-        
-        // If "All" category, no subtopics needed
-        if (category === 'all') {
-            currentSubtopic = null;
-            fetchAllLogs();
-            return;
-        }
-        
-        subtopics[category].forEach((topic, i) => {
-            const btn = document.createElement('button');
-            btn.className = `btn btn-outline-secondary btn-sub ${i === 0 ? 'active' : ''}`;
-            btn.textContent = topic;
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('#subButtons button').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentSubtopic = topic;
-                fetchAndRenderLogs(category, topic);
-            });
-            subButtonsContainer.appendChild(btn);
-        });
-        currentSubtopic = subtopics[category][0];
-        fetchAndRenderLogs(category, subtopics[category][0]);
-    }
+function applyFilters() {
+    const q = (document.getElementById('logSearch').value || '').toLowerCase();
+    filteredRows = allRows.filter(row => {
+        const catMatch = currentCat === 'all' || row.dataset.cat === currentCat;
+        const searchMatch = !q || row.textContent.toLowerCase().includes(q);
+        return catMatch && searchMatch;
+    });
+    currentPage = 1;
+    renderPage();
+}
 
-    function fetchAllLogs() {
-        showLoading();
-        
-        fetch('api/activity_logs_api.php?all=1')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    renderTableAll(data.logs);
-                } else {
-                    renderError(data.message || 'Failed to fetch logs');
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching logs:', error);
-                renderError('Network error. Please try again.');
-            });
-    }
+function renderPage() {
+    const total = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / ROWS_PER_PAGE));
+    currentPage = Math.min(currentPage, totalPages);
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    const end   = Math.min(start + ROWS_PER_PAGE, total);
 
-    function showLoading() {
-        logTableContainer.innerHTML = `
-            <div class="loading-spinner">
-                <div class="spinner-border" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2 text-muted">Loading activity logs...</p>
-            </div>
-        `;
-    }
-
-    function fetchAndRenderLogs(category, topic) {
-        showLoading();
-        
-        fetch(`api/activity_logs_api.php?category=${encodeURIComponent(category)}&subtopic=${encodeURIComponent(topic)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    renderTable(category, topic, data.logs);
-                } else {
-                    renderError(data.message || 'Failed to fetch logs');
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching logs:', error);
-                renderError('Network error. Please try again.');
-            });
-    }
-
-    function renderTable(category, topic, logs) {
-        let tableHTML = `
-            <div class="card p-3 shadow-sm">
-                <h6 class="fw-bold text-success mb-3">${category.toUpperCase()} → ${topic}</h6>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover align-middle">
-                        <thead>
-                            <tr>
-                                <th style="width: 160px;">Date</th>
-                                <th style="width: 120px;">User</th>
-                                <th style="width: 120px;">Device</th>
-                                <th style="width: 140px;">Action</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-        `;
-
-        if (logs && logs.length > 0) {
-            logs.forEach(log => {
-                const badgeClass = getActionBadgeClass(log.action);
-                tableHTML += `
-                    <tr>
-                        <td><small>${log.date}</small></td>
-                        <td>${log.user || '-'}</td>
-                        <td>${log.device || '-'}</td>
-                        <td><span class="badge badge-action ${badgeClass}">${log.action}</span></td>
-                        <td><small class="text-muted">${log.details || '-'}</small></td>
-                    </tr>
-                `;
-            });
-        } else {
-            tableHTML += `
-                <tr>
-                    <td colspan="5">
-                        <div class="empty-state">
-                            <i class="bi bi-clipboard-x"></i>
-                            <p>No activity logs found for ${topic}.</p>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-
-        tableHTML += `
-                        </tbody>
-                    </table>
-                </div>
-                <div class="text-muted small mt-2">
-                    <i class="bi bi-info-circle"></i> Showing ${logs ? logs.length : 0} records
-                </div>
-            </div>
-        `;
-
-        logTableContainer.innerHTML = tableHTML;
-    }
-
-    function renderTableAll(logs) {
-        let tableHTML = `
-            <div class="card p-3 shadow-sm">
-                <h6 class="fw-bold text-success mb-3">ALL ACTIVITY LOGS</h6>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover align-middle">
-                        <thead>
-                            <tr>
-                                <th style="width: 160px;">Date</th>
-                                <th style="width: 100px;">Category</th>
-                                <th style="width: 120px;">User</th>
-                                <th style="width: 120px;">Device</th>
-                                <th style="width: 140px;">Action</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-        `;
-
-        if (logs && logs.length > 0) {
-            logs.forEach(log => {
-                const badgeClass = getActionBadgeClass(log.action);
-                const categoryBadge = getCategoryBadgeClass(log.category);
-                tableHTML += `
-                    <tr>
-                        <td><small>${log.date}</small></td>
-                        <td><span class="badge ${categoryBadge}">${log.category}</span></td>
-                        <td>${log.user || '-'}</td>
-                        <td>${log.device || '-'}</td>
-                        <td><span class="badge badge-action ${badgeClass}">${log.action}</span></td>
-                        <td><small class="text-muted">${log.details || '-'}</small></td>
-                    </tr>
-                `;
-            });
-        } else {
-            tableHTML += `
-                <tr>
-                    <td colspan="6">
-                        <div class="empty-state">
-                            <i class="bi bi-clipboard-x"></i>
-                            <p>No activity logs found.</p>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-
-        tableHTML += `
-                        </tbody>
-                    </table>
-                </div>
-                <div class="text-muted small mt-2">
-                    <i class="bi bi-info-circle"></i> Showing ${logs ? logs.length : 0} records
-                </div>
-            </div>
-        `;
-
-        logTableContainer.innerHTML = tableHTML;
-    }
-
-    function getCategoryBadgeClass(category) {
-        switch(category) {
-            case 'devices': return 'bg-primary';
-            case 'analytics': return 'bg-info';
-            case 'maintenance': return 'bg-warning text-dark';
-            case 'general': return 'bg-secondary';
-            default: return 'bg-secondary';
-        }
-    }
-
-    function renderError(message) {
-        logTableContainer.innerHTML = `
-            <div class="alert alert-danger" role="alert">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                ${message}
-            </div>
-        `;
-    }
-
-    function refreshLogs() {
-        if (currentCategory === 'all') {
-            fetchAllLogs();
-        } else {
-            fetchAndRenderLogs(currentCategory, currentSubtopic);
-        }
-    }
-
-    // Handle main category switching
-    mainButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            mainButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            renderSubtopics(btn.dataset.category);
-        });
+    // Hide all, show only current page slice
+    allRows.forEach(r => r.style.display = 'none');
+    filteredRows.forEach((r, i) => {
+        r.style.display = (i >= start && i < end) ? '' : 'none';
     });
 
-    // Initialize with All category
-    renderSubtopics('all');
+    // Update footer
+    document.getElementById('logRangeStart').textContent = total ? start + 1 : 0;
+    document.getElementById('logRangeEnd').textContent   = end;
+    document.getElementById('logTotal').textContent      = total;
+    document.getElementById('pageIndicator').textContent = `Page ${currentPage} / ${totalPages}`;
+    document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+    document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+
+    // Hide pagination if only 1 page
+    document.getElementById('paginationControls').style.display = totalPages <= 1 ? 'none' : 'flex';
+}
+
+function changePage(dir) {
+    currentPage += dir;
+    renderPage();
+    // Scroll to top of the wrapper
+    const wrapper = document.getElementById('main-content-wrapper');
+    if (wrapper) wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function filterLogs(query) {
+    applyFilters();
+}
+
+function exportLogsCSV() {
+    const table = document.getElementById('logTable');
+    if (!table) return;
+    // Show ALL rows temporarily for export
+    allRows.forEach(r => r.style.display = '');
+    let csv = '';
+    table.querySelectorAll('tr').forEach(row => {
+        const cols = row.querySelectorAll('th, td');
+        csv += Array.from(cols).map(c => `"${c.innerText.trim()}"`).join(',') + '\n';
+    });
+    // Restore pagination view
+    renderPage();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    a.download = 'GoSort_activity_logs.csv';
+    a.click();
+}
 </script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-</body>
-</html>

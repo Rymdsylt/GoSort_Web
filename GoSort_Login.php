@@ -18,12 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($email) || empty($password)) {
         $error = 'Please fill out all fields';
     } else {
-        $stmt = $pdo->prepare("SELECT id, password FROM users WHERE email = ?");
+        $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
+            $_SESSION['role']    = $user['role'];
             setcookie('user_logged_in', 'true', time() + (86400 * 30), "/");
             log_login($user['id']);
             header("Location: GoSort_Dashboard.php");
@@ -66,7 +67,6 @@ $has_error = !empty($error);
             margin: 0;
         }
 
-        /* ── Animations ───────────────────────────────────────────── */
         @keyframes fadeLeft {
             from { opacity: 0; transform: translateX(-22px); }
             to   { opacity: 1; transform: translateX(0); }
@@ -79,24 +79,20 @@ $has_error = !empty($error);
             overflow: hidden;
         }
 
-        /* right panel — no animation */
         .panel-right { animation: none; }
 
-        /* left panel elements slide in from left — only when no error */
         .animate .left-logo    { animation: fadeLeft 0.6s ease 0.2s both; }
         .animate .form-heading { animation: fadeLeft 0.6s ease 0.35s both; }
         .animate .field-wrap   { animation: fadeLeft 0.6s ease 0.5s both; }
         .animate .field-wrap + .field-wrap { animation-delay: 0.6s; }
         .animate .btn-login    { animation: fadeLeft 0.6s ease 0.7s both; }
 
-        /* ── Shared dotted background ─────────────────────────────── */
         .dotted-bg {
             background-color: #fff;
             background-image: radial-gradient(circle, var(--dot-color) 1.5px, transparent 1.5px);
             background-size: 22px 22px;
         }
 
-        /* ── Left — form side ─────────────────────────────────────── */
         .panel-left {
             flex: 1;
             display: flex;
@@ -107,7 +103,6 @@ $has_error = !empty($error);
             z-index: 2;
         }
 
-        /* fade dots into soft green at bottom */
         .panel-left::after {
             content: '';
             position: absolute;
@@ -142,7 +137,6 @@ $has_error = !empty($error);
             color: var(--muted);
         }
 
-        /* ── Inputs ───────────────────────────────────────────────── */
         .field-label {
             font-family: 'Poppins', sans-serif;
             font-size: 0.75rem;
@@ -227,7 +221,6 @@ $has_error = !empty($error);
             stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
         }
 
-        /* ── Button ───────────────────────────────────────────────── */
         .btn-login {
             font-family: 'Poppins', sans-serif;
             background: linear-gradient(135deg, var(--green), var(--green-dark));
@@ -250,7 +243,6 @@ $has_error = !empty($error);
         }
         .btn-login:active { transform: translateY(0); }
 
-        /* ── Error ────────────────────────────────────────────────── */
         .error-box {
             font-family: 'Poppins', sans-serif;
             font-size: 0.82rem; font-weight: 400;
@@ -266,7 +258,6 @@ $has_error = !empty($error);
             stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
         }
 
-        /* ── Right — image side ───────────────────────────────────── */
         .panel-right {
             flex: 1.8;
             position: relative;
@@ -300,7 +291,6 @@ $has_error = !empty($error);
             display: block;
         }
 
-        /* ── Mobile ───────────────────────────────────────────────── */
         @media (max-width: 768px) {
             .split-wrap { flex-direction: column; }
             .panel-right { display: none; }
@@ -317,8 +307,6 @@ $has_error = !empty($error);
 
 <div class="split-wrap">
 
-    <!-- ── Left: form ── -->
-    <!-- animate class added only when no error (GET request or fresh load) -->
     <div class="panel-left dotted-bg<?php echo $has_error ? '' : ' animate'; ?>">
 
         <img src="images/logos/splashlogo2.svg" alt="GoSort" class="left-logo"
@@ -371,7 +359,6 @@ $has_error = !empty($error);
 
     </div>
 
-    <!-- ── Right: visual ── -->
     <div class="panel-right">
         <div class="panel-right-dots"></div>
         <img class="panel-right-img" src="images/logos/login.png" alt="">

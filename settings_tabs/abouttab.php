@@ -1,158 +1,129 @@
 <?php
 //TO UPDATE BACKEND AND STATIC TEXTS
 ?>
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-</head>
-<body
-<!-- Main Content Grid -->
-    <!-- Left Column: About GoSort + Additional Cards -->
-    <div class="col-lg-12">
-        <!-- About GoSort -->
-        <div class="about-card mb-4">
-            <div class="about-header">
-                <div class="about-icon">
-                    <i class="bi bi-info-circle"></i>
-                </div>
-                <h2 class="about-title">About GoSort</h2>
-            </div>
-            <div class="about-content">
-                <p>
-                    <strong>GoSort</strong> is an intelligent waste management system designed to automate and optimize the sorting process. 
-                    GoSort helps organizations reduce waste, improve recycling rates, and contribute to a more sustainable future.
-                </p>
-                <p>
-                    Our system accurately categorizes waste into biodegradable, non-biodegradable, hazardous, and mixed categories, 
-                    ensuring proper disposal and maximizing resource recovery. With real-time monitoring and comprehensive analytics, 
-                    you gain complete visibility into your waste management operations.
-                </p>
 
-                <div class="feature-list">
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="bi bi-cpu"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h6>Automated Trash Sorting</h6>
-                            <p>Intelligent classification for accurate waste separation</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="bi bi-clock-history"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h6>Real-Time Monitoring</h6>
-                            <p>Live tracking of all sorting operations</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="bi bi-bar-chart"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h6>Advanced Analytics</h6>
-                            <p>Comprehensive insights and performance metrics</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="bi bi-shield-check"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h6>Safety Compliance</h6>
-                            <p>Proper handling of hazardous materials</p>
-                        </div>
-                    </div>
-                </div>
+<!-- ── About GoSort ── -->
+<div class="section-block">
+    <div class="section-label">About GoSort</div>
+    <div class="inner-card mb-3">
+        <div class="d-flex align-items-start gap-3 mb-3">
+            <div style="width:42px;height:42px;background:#e8f5e1;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bi bi-info-circle" style="font-size:1.2rem;color:var(--primary-green);"></i>
+            </div>
+            <div>
+                <div style="font-size:0.92rem;font-weight:700;color:var(--dark-gray);">GoSort System</div>
+                <div style="font-size:0.75rem;color:var(--medium-gray);">Intelligent Waste Sorting Management</div>
             </div>
         </div>
 
-        <div class="row">
-            <!-- Custodial Team -->
-            <div class="col-lg-6">
-                <div class="team-card mb-4">
-                    <div class="stat-card-header mb-3">
-                        <h5 class="stat-card-title">Custodial Team</h5>
-                        <div class="stat-icon">
-                            <i class="bi bi-people"></i>
-                        </div>
-                    </div>
-                    <div class="team-list">
-                        <div class="team-member">
-                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                            <div>
-                                <h6>Marlon Lagramada</h6>
-                                <p>Utility Head</p>
-                            </div>
-                        </div>
-                        <div class="team-member">
-                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                            <div>
-                                <h6>Digna De Cagayunan</h6>
-                                <p>Utility Member</p>
-                            </div>
-                        </div>
-                        <div class="team-member">
-                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                            <div>
-                                <h6>Janice Ison</h6>
-                                <p>Utility Member</p>
-                            </div>
-                        </div>
-                        <div class="team-member">
-                            <img src="images/icons/team.svg" alt="Custodian" class="team-avatar">
-                            <div>
-                                <h6>Mira Luna Villadares</h6>
-                                <p>Utility Member</p>
-                            </div>
-                        </div>
-                    </div>
+        <p style="font-size:0.82rem;color:var(--medium-gray);line-height:1.75;margin-bottom:0.65rem;">
+            <strong style="color:var(--primary-green);">GoSort</strong> is an intelligent waste management system designed to automate and optimize the sorting process.
+            GoSort helps organizations reduce waste, improve recycling rates, and contribute to a more sustainable future.
+        </p>
+        <p style="font-size:0.82rem;color:var(--medium-gray);line-height:1.75;margin-bottom:1.25rem;">
+            Our system accurately categorizes waste into biodegradable, non-biodegradable, hazardous, and mixed categories,
+            ensuring proper disposal and maximizing resource recovery. With real-time monitoring and comprehensive analytics,
+            you gain complete visibility into your waste management operations.
+        </p>
+
+        <!-- Feature list -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
+            <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.85rem;background:linear-gradient(135deg,#f8fdf6,#f0fdf4);border:1px solid #d4e8d4;border-radius:10px;">
+                <div style="width:32px;height:32px;background:#e8f5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-cpu" style="color:var(--primary-green);font-size:0.95rem;"></i>
+                </div>
+                <div>
+                    <div style="font-size:0.78rem;font-weight:700;color:var(--dark-gray);margin-bottom:0.15rem;">Automated Trash Sorting</div>
+                    <div style="font-size:0.7rem;color:var(--medium-gray);">Intelligent classification for accurate waste separation</div>
                 </div>
             </div>
-
-            <div class="col-lg-6">
-                <div class="dev-card mb-4">
-                    <div class="stat-card-header mb-3">
-                        <h5 class="stat-card-title">Developers Behind GoSort</h5>
-                        <div class="stat-icon">
-                            <i class="bi bi-code-slash"></i>
-                        </div>
-                    </div>
-                    <div class="dev-list">
-                        <div class="dev-member">
-                            <i class="bi bi-person-circle dev-icon"></i>
-                            <div>
-                                <h6>Gwyneth Beatrice Landero</h6>
-                                <p>Project Manager, UI/UX Designer</p>
-                            </div>
-                        </div>
-                        <div class="dev-member">
-                            <i class="bi bi-person-circle dev-icon"></i>
-                            <div>
-                                <h6>Michael Josh Bargabino</h6>
-                                <p>Mobile App Developer</p>
-                            </div>
-                        </div>
-                        <div class="dev-member">
-                            <i class="bi bi-person-circle dev-icon"></i>
-                            <div>
-                                <h6>Miguel Roberto Sta. Maria</h6>
-                                <p>Web Developer</p>
-                            </div>
-                        </div>
-                        <div class="dev-member">
-                            <i class="bi bi-person-circle dev-icon"></i>
-                            <div>
-                                <h6>Diosdado Tempra Jr.</h6>
-                                <p>Tester, Researcher</p>
-                            </div>
-                        </div>
-                    </div>
+            <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.85rem;background:linear-gradient(135deg,#f8fdf6,#f0fdf4);border:1px solid #d4e8d4;border-radius:10px;">
+                <div style="width:32px;height:32px;background:#e8f5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-clock-history" style="color:var(--primary-green);font-size:0.95rem;"></i>
+                </div>
+                <div>
+                    <div style="font-size:0.78rem;font-weight:700;color:var(--dark-gray);margin-bottom:0.15rem;">Real-Time Monitoring</div>
+                    <div style="font-size:0.7rem;color:var(--medium-gray);">Live tracking of all sorting operations</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.85rem;background:linear-gradient(135deg,#f8fdf6,#f0fdf4);border:1px solid #d4e8d4;border-radius:10px;">
+                <div style="width:32px;height:32px;background:#e8f5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-bar-chart" style="color:var(--primary-green);font-size:0.95rem;"></i>
+                </div>
+                <div>
+                    <div style="font-size:0.78rem;font-weight:700;color:var(--dark-gray);margin-bottom:0.15rem;">Advanced Analytics</div>
+                    <div style="font-size:0.7rem;color:var(--medium-gray);">Comprehensive insights and performance metrics</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.85rem;background:linear-gradient(135deg,#f8fdf6,#f0fdf4);border:1px solid #d4e8d4;border-radius:10px;">
+                <div style="width:32px;height:32px;background:#e8f5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-shield-check" style="color:var(--primary-green);font-size:0.95rem;"></i>
+                </div>
+                <div>
+                    <div style="font-size:0.78rem;font-weight:700;color:var(--dark-gray);margin-bottom:0.15rem;">Safety Compliance</div>
+                    <div style="font-size:0.7rem;color:var(--medium-gray);">Proper handling of hazardous materials</div>
                 </div>
             </div>
         </div>
     </div>
-</body>
-</html>
+
+    <!-- Teams row -->
+    <div class="row g-3">
+
+        <!-- Custodial Team -->
+        <div class="col-lg-6">
+            <div class="inner-card">
+                <div class="inner-card-header">
+                    <div class="inner-card-title">Custodial Team</div>
+                    <i class="bi bi-people" style="color:var(--primary-green);font-size:1rem;"></i>
+                </div>
+                <?php
+                $custodians = [
+                    ['Marlon Lagramada',      'Utility Head'],
+                    ['Digna De Cagayunan',    'Utility Member'],
+                    ['Janice Ison',           'Utility Member'],
+                    ['Mira Luna Villadares',  'Utility Member'],
+                ];
+                foreach ($custodians as $m): ?>
+                <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.5rem;border-bottom:1px solid #f3f4f6;">
+                    <img src="images/icons/team.svg" alt="Custodian"
+                        style="width:34px;height:34px;border-radius:50%;background:#e8f5e1;padding:4px;flex-shrink:0;">
+                    <div>
+                        <div style="font-size:0.8rem;font-weight:700;color:var(--dark-gray);"><?php echo $m[0]; ?></div>
+                        <div style="font-size:0.7rem;color:var(--medium-gray);"><?php echo $m[1]; ?></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <!-- Developers -->
+        <div class="col-lg-6">
+            <div class="inner-card">
+                <div class="inner-card-header">
+                    <div class="inner-card-title">Developers Behind GoSort</div>
+                    <i class="bi bi-code-slash" style="color:var(--primary-green);font-size:1rem;"></i>
+                </div>
+                <?php
+                $devs = [
+                    ['Gwyneth Beatrice Landero',  'Project Manager, UI/UX Designer'],
+                    ['Michael Josh Bargabino',     'Mobile App Developer'],
+                    ['Miguel Roberto Sta. Maria',  'Web Developer'],
+                    ['Diosdado Tempra Jr.',        'Tester, Researcher'],
+                ];
+                foreach ($devs as $d): ?>
+                <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.5rem;border-bottom:1px solid #f3f4f6;">
+                    <div style="width:34px;height:34px;background:#e8f5e1;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="bi bi-person-circle" style="font-size:1rem;color:var(--primary-green);"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:0.8rem;font-weight:700;color:var(--dark-gray);"><?php echo $d[0]; ?></div>
+                        <div style="font-size:0.7rem;color:var(--medium-gray);"><?php echo $d[1]; ?></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+    </div>
+</div>
