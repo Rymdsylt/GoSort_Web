@@ -55,17 +55,18 @@ try {
     }
     
     // Query to get the last 20 entries for the given device
-    $query = "
-        SELECT bf.*,
-               CASE 
-                   WHEN distance < 0.5 THEN -1 -- Sensor failure indicator
-                   WHEN distance >= 60.96 THEN 0 -- Empty (2 feet or more)
-                   ELSE ROUND(100 - ((distance - 0.5) / (60.96 - 0.5) * 100)) -- New calculation matching update_bin_fullness
-               END as fullness_percentage
-        FROM bin_fullness bf
-        WHERE device_identity = ?
-        ORDER BY timestamp DESC
-        LIMIT 20";
+   $query = "
+    SELECT bf.*,
+           CASE 
+               WHEN distance < 0.5 THEN -1
+               WHEN distance <= 30 THEN 100
+               WHEN distance >= 90 THEN 0
+               ELSE ROUND(100 - ((distance - 30) / (90 - 30) * 100))
+           END as fullness_percentage
+    FROM bin_fullness bf
+    WHERE device_identity = ?
+    ORDER BY timestamp DESC
+    LIMIT 20";
 
     $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $device_identity);

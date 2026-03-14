@@ -24,7 +24,7 @@ if (isset($data['device_identity']) && isset($data['bin_name']) && isset($data['
 error_log("Processing bin fullness - Device: $device_identity, Bin: $bin_name, Distance: $distance");
 
 // Calculate fullness for logging
-$calculatedFullness = $distance < 0.5 ? -1 : ($distance > 60.96 ? 0 : round(100 - (($distance - 0.5) / (60.96 - 0.5) * 100)));
+$calculatedFullness = $distance < 0.5 ? -1 : ($distance <= 30 ? 100 : ($distance >= 90 ? 0 : round(100 - (($distance - 30) / (90 - 30) * 100))));
 error_log("Calculated fullness level: $calculatedFullness% (Distance: {$distance}cm)");
 
 
@@ -72,7 +72,7 @@ try {
     }
 
     $type = "bin_fullness";
-    $params = "sssssi"; // Parameter types for bind_param
+    $params = "sssssi";
     
     // Get the last 5 readings from the database
     $readings_sql = "SELECT distance FROM bin_fullness 
@@ -86,20 +86,19 @@ try {
     while ($row = $readings_result->fetch_assoc()) {
         $readings[] = floatval($row['distance']);
     }
-    // Add current reading if not already in array
     if (!in_array($distance, $readings)) {
         $readings[] = $distance;
     }
     
-    // Calculate fullness percentage for valid readings
+    // Calculate fullness percentage
     function calculateFullness($distance) {
-        if ($distance > 60.96) return 0; // If distance > 60.96cm (24 inches), bin is empty
-        if ($distance < 0.5) return -1;  // Sensor failure
-        // Map 0.5-60.96cm to 100-0% (inverse relationship)
-        return round(100 - (($distance - 0.5) / (60.96 - 0.5) * 100));
+        if ($distance < 0.5) return -1;   // Sensor failure
+        if ($distance <= 30) return 100;  // Full (trash at bin rim)
+        if ($distance >= 90) return 0;    // Empty
+        return round(100 - (($distance - 30) / (90 - 30) * 100));
     }
     
-    // First check for sensor failure (distance less than 0.5cm)
+    // First check for sensor failure
     if ($distance < 0.5) {
         error_log("Sensor failure detected - Distance: {$distance}cm");
         $message = "";
@@ -113,7 +112,6 @@ try {
             error_log("Warning sensor failure message: $message");
         }
 
-        // Check if there's already a sensor failure notification for this bin
         $check_existing_sql = "SELECT id FROM bin_notifications 
                              WHERE device_identity = ? AND bin_name = ? 
                              AND type = 'bin_fullness' 
@@ -125,7 +123,6 @@ try {
         $result = $check_stmt->get_result();
         
         if ($result->num_rows > 0) {
-            // Update the timestamp of the existing notification
             $row = $result->fetch_assoc();
             $update_sql = "UPDATE bin_notifications SET created_at = NOW() WHERE id = ?";
             $update_stmt = $conn->prepare($update_sql);
@@ -133,9 +130,8 @@ try {
             $update_stmt->execute();
             $update_stmt->close();
         } else {
-            // Create a new notification if one doesn't exist
             $priority = $distance <= 0.4 ? "critical" : "high";
-            $fullness_level = -1; // Indicating sensor failure
+            $fullness_level = -1;
             error_log("Creating new sensor failure notification - Priority: $priority, Fullness: $fullness_level");
             $notification_stmt->bind_param($params, $message, $type, $device_identity, $priority, $bin_name, $fullness_level);
             if (!$notification_stmt->execute()) {
@@ -146,7 +142,6 @@ try {
         }
         $check_stmt->close();
         
-        // Delete any older sensor failure notifications for this bin
         $delete_old_sql = "DELETE FROM bin_notifications 
                           WHERE device_identity = ? AND bin_name = ? 
                           AND type = 'bin_fullness' 
@@ -166,24 +161,20 @@ try {
         $delete_stmt->execute();
         $delete_stmt->close();
     }
-    // Check if current distance is in valid range and calculate fullness
+    // Check if current distance is in valid range
     else if ($distance >= 0.5 && $distance <= 400.0) {
         $fullness = calculateFullness($distance);
         
-        // Check if we have at least 2 readings and compare last two readings
         if (count($readings) >= 2) {
-            $latest_reading = $readings[0];  // Most recent reading
-            $previous_reading = $readings[1]; // Previous reading
+            $latest_reading = $readings[0];
+            $previous_reading = $readings[1];
             
-            // Check if both readings are in the full range (5-10cm)
-            $is_full = ($latest_reading >= 5 && $latest_reading <= 10 && 
-                       $previous_reading >= 5 && $previous_reading <= 10);
+            // Full = distance <= 30cm (trash at or above bin rim)
+            $is_full = ($latest_reading <= 30 && $previous_reading <= 30);
             
-            // Only notify if both readings indicate fullness
             if ($is_full) {
                 error_log("Bin fullness check - Latest: {$latest_reading}cm, Previous: {$previous_reading}cm");
                 
-                // Check if there's already a fullness notification for this bin
                 $check_existing_sql = "SELECT id FROM bin_notifications 
                                      WHERE device_identity = ? AND bin_name = ? 
                                      AND type = 'bin_fullness' 
@@ -199,7 +190,6 @@ try {
                 $fullness_level = $fullness;
 
                 if ($result->num_rows > 0) {
-                    // Update the timestamp of the existing notification
                     $row = $result->fetch_assoc();
                     $update_sql = "UPDATE bin_notifications 
                                  SET created_at = NOW(),
@@ -211,7 +201,6 @@ try {
                     $update_stmt->execute();
                     $update_stmt->close();
                 } else {
-                    // Create a new notification
                     $notification_stmt->bind_param($params, $message, $type, $device_identity, $priority, $bin_name, $fullness_level);
                     $notification_stmt->execute();
                 }
@@ -224,7 +213,6 @@ try {
         $notification_stmt->close();
     }
 
-    // Keep only the 20 most recent entries for each device and bin combination
     $cleanup_sql = "DELETE FROM bin_fullness 
                    WHERE device_identity = ? 
                    AND bin_name = ?
