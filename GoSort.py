@@ -32,7 +32,7 @@ def check_maintenance_mode(device_identity, base_path=None):
 
 def get_base_path():
     """Return the fixed server URL"""
-    return "https://gosortweb-production.up.railway.app/gs_DB"
+    return "https://web-production-15f71.up.railway.app/gs_DB"
 
 def load_config():
     config_file = 'gosort_config.json'

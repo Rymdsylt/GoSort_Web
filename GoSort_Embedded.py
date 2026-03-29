@@ -164,7 +164,7 @@ def draw_text_with_font(img, text, position, font_size, color, use_poppins=True)
 
 def get_base_path():
     """Return the fixed server URL"""
-    return "https://gosortweb-production.up.railway.app/gs_DB"
+    return "https://web-production-15f71.up.railway.app/gs_DB"
 
 def scan_network():
     # Network scanning no longer needed - using fixed server URL
@@ -1133,7 +1133,7 @@ def main():
         device_name = cpuinfo.get_cpu_info()['brand_raw']
         print(f"CPU: {device_name}")
     
-    model = YOLO('best885.pt')
+    model = YOLO('weights_11.pt')
     if device.type == 'cuda':
         model.to('cuda')
     else:
@@ -1264,6 +1264,11 @@ def main():
 
     trash_to_cmd = {v: k for k, v in mapping.items()}
 
+    # Detection buffer for 1000ms window (enables mixed waste detection)
+    detection_buffer = {}  # waste_type -> {'item', 'conf', 'frame', 'command'}
+    detection_window_start = None
+    DETECTION_WINDOW = 1.0  # 1 second
+
     # Initialize maintenance command checker
     maintenance_command_checker = MaintenanceCommandChecker(base_path, sorter_id, command_handler) if command_handler else None
 
@@ -1345,73 +1350,77 @@ def main():
                     cv2.putText(frame, f"{detected_item} {conf:.2f}", (x1, y1 - 10),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                    # Process detections with high confidence
+                    # Accumulate detections in 1000ms window buffer
                     if conf > 0.50:  # 50% confidence threshold
-                        # Map the detected category to a servo command
-                        command = map_category_to_command(class_name, mapping)
-                        # Get the corresponding trash type from the mapping
-                        trash_type = mapping.get(command, 'nbio')
-                        
-                        try:
-                            print(f"✅ Detection: {detected_item} ({conf:.2f}) - Category: {class_name}")
-                            
-                            # Convert clean frame to base64 for sending
-                            _, buffer = cv2.imencode('.jpg', clean_frame)
-                            image_base64 = base64.b64encode(buffer).decode('utf-8')
-                            
-                            # For mixed waste, we'll collect all detected items
-                            detected_classes = []
-                            if trash_type == 'mixed':
-                                # Look for other detections in this frame
-                                for other_box in boxes:
-                                    other_conf = other_box.conf[0]
-                                    if other_conf > 0.50:  # Use same confidence threshold
-                                        other_class_id = int(other_box.cls[0])
-                                        other_item = model.names[other_class_id]
-                                        detected_classes.append(other_item)
-                            else:
-                                detected_classes = [detected_item]
-                            
-                            # Join the detected classes with commas
-                            trash_class_str = ', '.join(detected_classes)
-                            
-                            # Queue sorting operation to async thread (non-blocking)
-                            record = SortingRecord(
-                                sorter_id=sorter_id,
-                                trash_type=trash_type,
-                                trash_class=trash_class_str,
-                                confidence=float(conf),
-                                image_base64=image_base64,
-                                is_maintenance=False
-                            )
-                            sorting_recorder.queue_record(record)
-                            
-                            print(f"✅ Detection: {detected_item} ({conf:.2f}) - Queued for posting")
-                            
-                            # Play audio feedback asynchronously (non-blocking)
-                            play_sorting_audio(trash_type)
-                            
-                            # Add to UI history for kiosk display (non-blocking)
-                            ui_renderer.add_to_history(trash_type)
+                        if detection_window_start is None:
+                            detection_window_start = time.time()
+                        if class_name not in detection_buffer or conf > detection_buffer[class_name]['conf']:
+                            detection_buffer[class_name] = {
+                                'item': detected_item,
+                                'conf': conf,
+                                'frame': clean_frame.copy(),
+                                'command': map_category_to_command(class_name, mapping)
+                            }
 
-                            # Send command to Arduino if available (non-blocking queue)
-                            if command_handler is not None:
-                                if command_handler.command_queue.empty():
-                                    print(f"⏱️ Sending sorting command: {command}")
-                                    cmd = ArduinoCommand(f"{command}\n")
-                                    command_handler.command_queue.put(cmd)
-                                    
-                                    # **WAIT for servo to finish sorting**
-                                    print("⏸️  Detection paused - waiting for servo to finish...")
-                                    if cmd.wait_for_completion(timeout=15):
-                                        print("✅ Servo finished - resuming detection")
-                                    else:
-                                        print("⚠️ Servo timeout - resuming detection anyway")
-                                else:
-                                    print("⏳ Arduino busy - skipping this detection")
-                                    
-                        except Exception as e:
-                            print(f"❌ Error processing detection: {e}")
+        # Process accumulated detections after 1000ms window
+        if detection_window_start is not None and time.time() - detection_window_start >= DETECTION_WINDOW:
+            if detection_buffer:
+                unique_types = list(detection_buffer.keys())
+                if len(unique_types) > 1:
+                    # Multiple waste types detected in window -> classify as mixed
+                    trash_type = 'mixed'
+                else:
+                    buf_command = detection_buffer[unique_types[0]]['command']
+                    trash_type = mapping.get(buf_command, unique_types[0])
+
+                command = map_category_to_command(trash_type, mapping)
+                best_type = max(detection_buffer, key=lambda k: detection_buffer[k]['conf'])
+                best = detection_buffer[best_type]
+                proc_conf = best['conf']
+                proc_frame = best['frame']
+                trash_class_str = ', '.join(d['item'] for d in detection_buffer.values())
+
+                try:
+                    print(f"✅ Detection: {trash_class_str} ({proc_conf:.2f}) - Type: {trash_type}")
+
+                    _, buf_enc = cv2.imencode('.jpg', proc_frame)
+                    image_base64 = base64.b64encode(buf_enc).decode('utf-8')
+
+                    record = SortingRecord(
+                        sorter_id=sorter_id,
+                        trash_type=trash_type,
+                        trash_class=trash_class_str,
+                        confidence=float(proc_conf),
+                        image_base64=image_base64,
+                        is_maintenance=False
+                    )
+                    sorting_recorder.queue_record(record)
+
+                    print(f"✅ Detection queued for posting")
+
+                    play_sorting_audio(trash_type)
+                    ui_renderer.add_to_history(trash_type)
+
+                    if command_handler is not None:
+                        if command_handler.command_queue.empty():
+                            print(f"⏱️ Sending sorting command: {command}")
+                            cmd = ArduinoCommand(f"{command}\n")
+                            command_handler.command_queue.put(cmd)
+
+                            print("⏸️  Detection paused - waiting for servo to finish...")
+                            if cmd.wait_for_completion(timeout=15):
+                                print("✅ Servo finished - resuming detection")
+                            else:
+                                print("⚠️ Servo timeout - resuming detection anyway")
+                        else:
+                            print("⏳ Arduino busy - skipping this detection")
+
+                except Exception as e:
+                    print(f"❌ Error processing detection: {e}")
+
+            # Reset buffer after processing
+            detection_buffer = {}
+            detection_window_start = None
 
         ui_panel = np.zeros((100, frame.shape[1], 3), dtype=np.uint8)
         
