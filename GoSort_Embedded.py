@@ -920,6 +920,54 @@ def restart_program():
     python = sys.executable
     os.execl(python, python, *sys.argv)
 
+def select_camera_from_list(available_cams):
+    """Prompt user to select a camera from available cameras"""
+    if not available_cams:
+        return None
+    
+    if len(available_cams) == 1:
+        print(f"\n✅ Using only available camera: index {available_cams[0]}")
+        return available_cams[0]
+    
+    print("\n📷 Available Cameras:")
+    for i, cam_idx in enumerate(available_cams):
+        print(f"  {i + 1}. Camera {cam_idx}")
+    
+    while True:
+        choice = input("\nSelect camera (enter number): ").strip()
+        try:
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(available_cams):
+                selected_cam = available_cams[choice_idx]
+                print(f"✅ Selected camera: index {selected_cam}")
+                return selected_cam
+            else:
+                print("❌ Invalid selection. Please try again.")
+        except ValueError:
+            print("❌ Invalid input. Please enter a number.")
+
+def select_arduino_from_list(candidate_ports):
+    """Prompt user to select an Arduino port from available ports"""
+    if not candidate_ports:
+        return None
+    
+    print("\n🔌 Available Arduino Ports:")
+    for i, port in enumerate(candidate_ports):
+        print(f"  {i + 1}. {port}")
+    
+    while True:
+        choice = input("\nSelect Arduino port (enter number): ").strip()
+        try:
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(candidate_ports):
+                selected_port = candidate_ports[choice_idx]
+                print(f"✅ Selected Arduino: {selected_port}")
+                return selected_port
+            else:
+                print("❌ Invalid selection. Please try again.")
+        except ValueError:
+            print("❌ Invalid input. Please enter a number.")
+
 def remove_from_waiting_devices(device_identity):
     try:
         base_path = get_base_path()
@@ -942,7 +990,7 @@ def list_arduino_ports():
         ports = serial.tools.list_ports.comports()
         candidates = []
         for port in ports:
-            if 'Arduino' in port.description or '2560' in port.description or 'Mega' in port.description:
+            if 'Arduino' in port.description or '2560' in port.description or 'Mega' in port.description or 'CH340' in port.description or 'CH341' in port.description:
                 print(f"Found Arduino-like device at: {port.device} ({port.description})")
                 candidates.append(port.device)
         # If none matched by description, return all ports as fallback
@@ -1133,7 +1181,7 @@ def main():
         device_name = cpuinfo.get_cpu_info()['brand_raw']
         print(f"CPU: {device_name}")
     
-    model = YOLO('weights_11.pt')
+    model = YOLO('best885.pt')
     if device.type == 'cuda':
         model.to('cuda')
     else:
@@ -1159,6 +1207,26 @@ def main():
         print("No cameras found!")
         return
     
+    # Ask user to select which camera to use (if not already configured)
+    if config.get('camera_index') is None:
+        selected_camera = select_camera_from_list(available_cams)
+        if selected_camera is None:
+            print("❌ No camera selected. Exiting...")
+            return
+        config['camera_index'] = selected_camera
+        save_config(config)
+    else:
+        selected_camera = config.get('camera_index')
+        print(f"\n✅ Using configured camera: index {selected_camera}")
+        if selected_camera not in available_cams:
+            print(f"⚠️  Configured camera {selected_camera} not found. Please reconfigure.")
+            config['camera_index'] = None
+            save_config(config)
+            print("Please restart the application.")
+            return
+    
+    cam_index = selected_camera
+    
     # Initialize UI renderer thread for async kiosk display with detected screen dimensions
     ui_renderer = AsyncUIRenderThread(kiosk_width=screen_width, kiosk_height=screen_height)
     
@@ -1174,75 +1242,98 @@ def main():
         arduino = None
         command_handler = None
         arduino_connected = False
+        
+        # Detect available Arduino ports
         candidate_ports = list_arduino_ports()
-        for p in candidate_ports:
-            ser = connect_to_arduino(p)
-            if ser is None:
-                continue
-            try:
-                arduino = ser
-                print(f"Connected to Arduino on {p}")
-                # Signal readiness to Arduino and read any initial messages
+        
+        # Ask user to select Arduino port if not already configured
+        selected_port = None
+        if candidate_ports:
+            if config.get('arduino_port') is None:
+                selected_port = select_arduino_from_list(candidate_ports)
+                if selected_port:
+                    config['arduino_port'] = selected_port
+                    save_config(config)
+            else:
+                selected_port = config.get('arduino_port')
+                print(f"\n✅ Using configured Arduino: {selected_port}")
+                if selected_port not in candidate_ports:
+                    print(f"⚠️  Configured Arduino {selected_port} not found. Available ports: {candidate_ports}")
+                    print("Please reconfigure.")
+                    config['arduino_port'] = None
+                    save_config(config)
+                    selected_port = select_arduino_from_list(candidate_ports)
+                    if selected_port:
+                        config['arduino_port'] = selected_port
+                        save_config(config)
+        
+        # Try to connect to the selected Arduino port only
+        if selected_port:
+            ser = connect_to_arduino(selected_port)
+            if ser is not None:
                 try:
-                    arduino.write(b'gosort_ready\n')
-                except Exception:
-                    pass
-                time.sleep(0.2)
-                while getattr(arduino, 'in_waiting', 0):
+                    arduino = ser
+                    print(f"Connected to Arduino on {selected_port}")
+                    # Signal readiness to Arduino and read any initial messages
                     try:
-                        response = arduino.readline().decode().strip()
-                        if response:
-                            print(f"Arduino: {response}")
-                            if response.startswith('bin_fullness:'):
-                                # Queue bin fullness for async posting (non-blocking)
-                                record = process_bin_fullness(response, sorter_id)
-                                if record:
-                                    bin_fullness_recorder.queue_record(record)
+                        arduino.write(b'gosort_ready\n')
                     except Exception:
-                        break
+                        pass
+                    time.sleep(0.2)
+                    while getattr(arduino, 'in_waiting', 0):
+                        try:
+                            response = arduino.readline().decode().strip()
+                            if response:
+                                print(f"Arduino: {response}")
+                                if response.startswith('bin_fullness:'):
+                                    # Queue bin fullness for async posting (non-blocking)
+                                    record = process_bin_fullness(response, sorter_id)
+                                    if record:
+                                        bin_fullness_recorder.queue_record(record)
+                        except Exception:
+                            break
 
-                command_handler = CommandHandler(arduino)
-                arduino_connected = True
+                    command_handler = CommandHandler(arduino)
+                    arduino_connected = True
 
-                def check_arduino_connection():
-                    nonlocal arduino_connected
-                    try:
-                        if not arduino or not getattr(arduino, 'is_open', True):
+                    def check_arduino_connection():
+                        nonlocal arduino_connected
+                        try:
+                            if not arduino or not getattr(arduino, 'is_open', True):
+                                arduino_connected = False
+                                return False
+                            arduino.write(b'ping\n')
+                            time.sleep(0.1)
+                            return True
+                        except Exception as e:
+                            print(f"\n❌ Arduino connection lost: {e}")
                             arduino_connected = False
                             return False
-                        arduino.write(b'ping\n')
-                        time.sleep(0.1)
-                        return True
-                    except Exception as e:
-                        print(f"\n❌ Arduino connection lost: {e}")
-                        arduino_connected = False
-                        return False
 
-                break
-            except Exception as e:
-                print(f"Failed to initialize serial on {p}: {e}")
-                try:
-                    ser.close()
-                except Exception:
-                    pass
-                arduino = None
+                except Exception as e:
+                    print(f"Failed to initialize serial on {selected_port}: {e}")
+                    try:
+                        ser.close()
+                    except Exception:
+                        pass
+                    arduino = None
+        
         if not arduino_connected:
-            print("No Arduino found on any COM port.")
+            print("⚠️  Arduino not connected. Continuing without Arduino...")
             def check_arduino_connection():
                 return False
     except Exception as e:
-        print(f"Error during Arduino port search: {e}")
+        print(f"Error during Arduino setup: {e}")
         arduino = None
         command_handler = None
         arduino_connected = False
         def check_arduino_connection():
             return False
 
-    cam_index = available_cams[0]
-    current_cam_idx = 0  # Index into available_cams list
+    # Set up current camera index for view switching
+    current_cam_idx = available_cams.index(cam_index)
     print(f"Using camera index: {cam_index}")
 
-   
     print("Starting video stream...")
     vs = VideoStream(cam_index)
     stream = vs.start()
