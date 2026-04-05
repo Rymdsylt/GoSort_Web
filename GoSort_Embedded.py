@@ -16,6 +16,7 @@ import sys
 import msvcrt
 import platform
 import cpuinfo
+import random
 from datetime import datetime
 
 try:
@@ -126,6 +127,23 @@ def get_poppins_font(font_size):
     except:
         return ImageFont.load_default()
 
+def get_poppins_font_bold(font_size):
+    if not PIL_AVAILABLE:
+        return None
+    font_paths = [
+        'fonts/Poppins-Bold.ttf',
+        'fonts/Poppins-ExtraBold.ttf',
+        'fonts/Poppins-SemiBold.ttf',
+        'C:/Windows/Fonts/Poppins-Bold.ttf',
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, font_size)
+            except:
+                continue
+    return get_poppins_font(font_size)
+
 def get_text_size_pil(text, font):
     """Get text size using PIL font"""
     if font is None:
@@ -136,11 +154,11 @@ def get_text_size_pil(text, font):
     except:
         return (len(text) * 20, 30)
 
-def draw_text_with_font(img, text, position, font_size, color, use_poppins=True):
+def draw_text_with_font(img, text, position, font_size, color, bold=False):
     """Draw text with Poppins font if available, otherwise use OpenCV default"""
-    if PIL_AVAILABLE and use_poppins:
+    if PIL_AVAILABLE:
         try:
-            font = get_poppins_font(font_size)
+            font = get_poppins_font_bold(font_size) if bold else get_poppins_font(font_size)
             
             # Convert OpenCV image to PIL
             img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -188,6 +206,189 @@ def check_server():
 def get_ip_address():
     # Fixed server URL - no configuration needed
     return get_base_path()
+
+# Kiosk state for idle timer
+_kiosk_state = {
+    'last_sorted_time': None,
+    'idle_timeout': 5.0,  # seconds before returning to idle
+    'current_waste': None,
+    'current_message': None,
+}
+
+WASTE_MESSAGES = {
+    'bio': [
+        'This item will be composted.',
+        'Organic waste sorted correctly!',
+        'This goes back to the earth.',
+        'Great job sorting your organic waste!',
+        'Biodegradable items help reduce landfill waste.',
+    ],
+    'nbio': [
+        'This item will be sent for recycling.',
+        'Keep plastics out of landfills.',
+        'Non-biodegradable waste handled correctly.',
+        'Recycling this helps the environment.',
+        'Thank you for sorting responsibly.',
+    ],
+    'hazardous': [
+        'This item needs special handling.',
+        'Hazardous waste isolated safely.',
+        'Handled with care. Thank you!',
+        'This item requires proper disposal.',
+        'Keeping hazardous waste separate protects everyone.',
+    ],
+    'mixed': [
+        'Multiple materials detected.',
+        'Mixed waste sorted for processing.',
+        'Try to separate waste next time!',
+        'Mixed items will be processed separately.',
+        'Sorting by type helps recycling efforts.',
+    ],
+}
+
+def draw_kiosk_ui(sorting_history, current_view='both', kiosk_width=1920, kiosk_height=1080):
+    # Colors (BGR)
+    bg_color     = (240, 247, 240)   # off-white with green tint
+    white        = (255, 255, 255)
+    border_color = (235, 235, 235)
+    dark_text    = (31, 41, 55)
+    muted        = (156, 163, 175)
+    green_logo1  = (39, 74, 23)      # #274a17 dark green (GOSORT)
+    green_logo2  = (66, 197, 88)     # #58C542 bright green (GO)
+    green_status_bg  = (240, 250, 240)
+    green_status_txt = (55, 129, 55)
+
+    waste_colors = {
+        'bio':       (24, 128, 21),   # #158018
+        'nbio':      (38, 38, 220),   # #dc2626
+        'hazardous': (9,  117, 180),  # #b45309
+        'mixed':     (107, 107, 107),
+    }
+    waste_names = {
+        'bio':       'Biodegradable',
+        'nbio':      'Non-Biodegradable',
+        'hazardous': 'Hazardous',
+        'mixed':     'Mixed Waste',
+    }
+
+    # Dotted background
+    kiosk_frame = np.full((kiosk_height, kiosk_width, 3), bg_color, dtype=np.uint8)
+    dot_spacing = 22
+    dot_color = (190, 220, 190)
+    for dy in range(0, kiosk_height, dot_spacing):
+        for dx in range(0, kiosk_width, dot_spacing):
+            cv2.circle(kiosk_frame, (dx, dy), 1, dot_color, -1)
+
+    # Header bar (white, subtle border)
+    header_h = 90
+    cv2.rectangle(kiosk_frame, (0, 0), (kiosk_width, header_h), white, -1)
+    cv2.line(kiosk_frame, (0, header_h), (kiosk_width, header_h), border_color, 1)
+
+    # GOSORT logo (GO in bright green, SORT in dark green)
+    logo_x, logo_y = 60, 22
+    font_logo = get_poppins_font_bold(46)
+    go_text = "GO"
+    go_w, _ = get_text_size_pil(go_text, font_logo)
+    kiosk_frame = draw_text_with_font(kiosk_frame, go_text, (logo_x, logo_y), 46, green_logo2, bold=True)
+    kiosk_frame = draw_text_with_font(kiosk_frame, "SORT", (logo_x + go_w, logo_y), 46, green_logo1, bold=True)
+
+    # Status pill (top right)
+    status_text = "Connected"
+    font_status = get_poppins_font(20)
+    st_w, st_h = get_text_size_pil(status_text, font_status)
+    pill_pad_x, pill_pad_y = 24, 10
+    pill_w = st_w + pill_pad_x * 2 + 20
+    pill_h = st_h + pill_pad_y * 2
+    pill_x = kiosk_width - pill_w - 60
+    pill_y = (header_h - pill_h) // 2
+    cv2.rectangle(kiosk_frame, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), green_status_bg, -1)
+    cv2.rectangle(kiosk_frame, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), (180, 220, 180), 1)
+    cv2.circle(kiosk_frame, (pill_x + pill_pad_x, pill_y + pill_h // 2), 5, green_logo2, -1)
+    kiosk_frame = draw_text_with_font(kiosk_frame, status_text,
+                                      (pill_x + pill_pad_x + 14, pill_y + pill_pad_y - 2),
+                                      20, green_status_txt)
+
+    # Footer
+    footer_h = 50
+    footer_y = kiosk_height - footer_h
+    cv2.rectangle(kiosk_frame, (0, footer_y), (kiosk_width, kiosk_height), white, -1)
+    cv2.line(kiosk_frame, (0, footer_y), (kiosk_width, footer_y), border_color, 1)
+    kiosk_frame = draw_text_with_font(kiosk_frame, "GoSort Kiosk Display",
+                                      (60, footer_y + 14), 20, muted)
+    time_str = datetime.now().strftime("%I:%M %p")
+    font_time = get_poppins_font(20)
+    tw, _ = get_text_size_pil(time_str, font_time)
+    kiosk_frame = draw_text_with_font(kiosk_frame, time_str,
+                                      (kiosk_width - tw - 60, footer_y + 14), 20, muted)
+
+    # Body center area
+    body_top = header_h
+    body_bottom = footer_y
+    center_x = kiosk_width // 2
+    center_y = body_top + (body_bottom - body_top) // 2
+
+    # Check idle state
+    now = time.time()
+    is_idle = True
+    if sorting_history and _kiosk_state['last_sorted_time'] is not None:
+        elapsed = now - _kiosk_state['last_sorted_time']
+        if elapsed < _kiosk_state['idle_timeout']:
+            is_idle = False
+
+    if is_idle or not sorting_history:
+        # Idle state
+        idle_text = "Ready to sort"
+        font_idle = get_poppins_font_bold(64)
+        iw, _ = get_text_size_pil(idle_text, font_idle)
+        kiosk_frame = draw_text_with_font(kiosk_frame, idle_text,
+                                          (center_x - iw // 2, center_y - 50), 64, muted, bold=True)
+        sub_text = "Place item inside the bin"
+        font_sub = get_poppins_font(32)
+        sw, _ = get_text_size_pil(sub_text, font_sub)
+        kiosk_frame = draw_text_with_font(kiosk_frame, sub_text,
+                                          (center_x - sw // 2, center_y + 36), 32, muted)
+    else:
+        # Sorted state
+        waste_type = _kiosk_state['current_waste']
+        message    = _kiosk_state['current_message']
+        color      = waste_colors.get(waste_type, (107, 107, 107))
+        label      = waste_names.get(waste_type, 'Unknown')
+
+        # "SORTED AS" label
+        sorted_label = "SORTED AS"
+        font_lbl = get_poppins_font(24)
+        lw, _ = get_text_size_pil(sorted_label, font_lbl)
+        kiosk_frame = draw_text_with_font(kiosk_frame, sorted_label,
+                                          (center_x - lw // 2, center_y - 160), 24, muted)
+
+        # Waste type name (big bold)
+        font_big = get_poppins_font_bold(96)
+        nw, nh = get_text_size_pil(label, font_big)
+        kiosk_frame = draw_text_with_font(kiosk_frame, label,
+                                          (center_x - nw // 2, center_y - 110), 96, color, bold=True)
+
+        # Colored bar
+        bar_w, bar_h = 60, 4
+        bar_x = center_x - bar_w // 2
+        bar_y = center_y - 110 + nh + 20
+        cv2.rectangle(kiosk_frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), color, -1)
+
+        # Message
+        font_msg = get_poppins_font(34)
+        mw, _ = get_text_size_pil(message, font_msg)
+        kiosk_frame = draw_text_with_font(kiosk_frame, message,
+                                          (center_x - mw // 2, bar_y + 36), 34, dark_text)
+
+        # Countdown
+        elapsed = now - _kiosk_state['last_sorted_time']
+        remaining = max(0, int(_kiosk_state['idle_timeout'] - elapsed) + 1)
+        cd_text = f"Returning to idle in {remaining}s..."
+        font_cd = get_poppins_font(22)
+        cw, _ = get_text_size_pil(cd_text, font_cd)
+        kiosk_frame = draw_text_with_font(kiosk_frame, cd_text,
+                                          (center_x - cw // 2, bar_y + 100), 22, muted)
+
+    return kiosk_frame
 
 class ArduinoCommand:
     def __init__(self, command):
@@ -545,97 +746,15 @@ class AsyncUIRenderThread:
             # Keep only last 10 items
             if len(self.sorting_history) > 10:
                 self.sorting_history.pop()
+            # Update kiosk state for the full UI
+            _kiosk_state['last_sorted_time'] = time.time()
+            _kiosk_state['current_waste'] = waste_type
+            _kiosk_state['current_message'] = random.choice(WASTE_MESSAGES.get(waste_type, ['Sorted!']))
     
     def get_kiosk_ui(self):
         """Get the current kiosk UI frame (non-blocking)"""
         with self.history_lock:
-            return self._draw_kiosk_ui(list(self.sorting_history))
-    
-    def _draw_kiosk_ui(self, sorting_history):
-        """Create a simplified kiosk-style UI showing only the last sorted item"""
-        # Webapp color scheme (BGR format for OpenCV)
-        bg_color = (239, 243, 243)  # #F3F3EF - app background
-        primary_green = (23, 74, 39)  # #274a17 - primary green
-        dark_gray = (55, 47, 31)  # #1f2937 - dark gray text
-        medium_gray = (128, 114, 107)  # #6b7280 - medium gray
-        
-        # Waste type colors (BGR format)
-        waste_colors = {
-            'bio': (129, 185, 16),  # #10b981 - green
-            'nbio': (68, 68, 239),  # #ef4444 - red
-            'hazardous': (11, 158, 245),  # #f59e0b - orange/amber
-            'mixed': (128, 114, 107)  # #6b7280 - gray
-        }
-        
-        # Simplified waste names
-        waste_names = {
-            'bio': 'Biodegradable',
-            'nbio': 'Non-Biodegradable',
-            'hazardous': 'Hazardous',
-            'mixed': 'Mixed'
-        }
-        
-        # Create background with webapp color
-        kiosk_frame = np.full((self.kiosk_height, self.kiosk_width, 3), bg_color, dtype=np.uint8)
-        
-        # Simple header
-        header_height = 80
-        cv2.rectangle(kiosk_frame, (0, 0), (self.kiosk_width, header_height), primary_green, -1)
-        
-        # GoSort title
-        kiosk_frame = draw_text_with_font(kiosk_frame, "GoSort", 
-                                          (20, 30), 36, (255, 255, 255))
-        
-        # Display only the last sorted item
-        if not sorting_history:
-            # Show "No items sorted yet" message
-            center_x = self.kiosk_width // 2
-            center_y = self.kiosk_height // 2
-            no_items_text = "No items sorted yet"
-            text_size = cv2.getTextSize(no_items_text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)[0]
-            text_x = center_x - text_size[0] // 2
-            kiosk_frame = draw_text_with_font(kiosk_frame, no_items_text, 
-                                             (text_x, center_y), 28, medium_gray)
-        else:
-            # Get the most recent (first) item
-            last_item = sorting_history[0]
-            waste_type = last_item.get('waste_type', 'nbio')
-            waste_label = waste_names.get(waste_type, 'Unknown')
-            color = waste_colors.get(waste_type, medium_gray)
-            
-            # Center the content
-            center_x = self.kiosk_width // 2
-            center_y = self.kiosk_height // 2 - 30
-            
-            # "Sorted:" text
-            sorted_text = "Sorted:"
-            
-            # Calculate text widths (use OpenCV for simplicity in embedded)
-            sorted_size = cv2.getTextSize(sorted_text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 2)[0]
-            waste_size = cv2.getTextSize(waste_label, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 2)[0]
-            
-            # Calculate starting position to center both texts together
-            total_width = sorted_size[0] + waste_size[0] + 20  # 20px spacing
-            start_x = center_x - total_width // 2
-            
-            # Draw "Sorted:" text
-            kiosk_frame = draw_text_with_font(kiosk_frame, sorted_text, 
-                                             (start_x, center_y), 36, dark_gray)
-            
-            # Draw waste type text in color (next to "Sorted:")
-            waste_x = start_x + sorted_size[0] + 20
-            kiosk_frame = draw_text_with_font(kiosk_frame, waste_label, 
-                                             (waste_x, center_y), 36, color)
-            
-            # "Have a nice day" message below
-            nice_day_y = center_y + 70
-            nice_day_text = "Have a nice day"
-            nice_day_size = cv2.getTextSize(nice_day_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-            nice_day_x = center_x - nice_day_size[0] // 2
-            kiosk_frame = draw_text_with_font(kiosk_frame, nice_day_text, 
-                                             (nice_day_x, nice_day_y), 24, medium_gray)
-        
-        return kiosk_frame
+            return draw_kiosk_ui(list(self.sorting_history), kiosk_width=self.kiosk_width, kiosk_height=self.kiosk_height)
     
     def _render_loop(self):
         """Background loop for UI rendering"""
