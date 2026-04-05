@@ -16,7 +16,7 @@ chcp 65001 >nul 2>&1
 :: ============================================================
 
 if "%~1"=="" (
-    set "BASE=https://gosortweb-production.up.railway.app"
+    set "BASE=https://gosort.up.railway.app"
 ) else (
     set "BASE=%~1"
 )
