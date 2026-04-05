@@ -56,7 +56,7 @@ const int hazardPos = 45;    // Hazardous position (pan)
 const int mixedPos = 135;    // Mixed position (pan)
 
 // Tilt positions
-const int tiltNeutralPos = 90;   // D9 neutral position
+const int tiltNeutralPos = 80;   // D9 neutral position
 const int tiltHighPos = 150;     // High tilt position
 const int tiltLowPos = 30;       // Low tilt position
 
@@ -311,7 +311,7 @@ void loop() {
         rotateServo.write(nbioPos);    // Pan to non-bio position (45)
         delay(500);
         tiltServo.write(tiltLowPos);   // Tilt down (30)
-        delay(500);
+        delay(1200);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
         rotateServo.write(neutralPos);  // Pan back to neutral (90)
@@ -329,7 +329,7 @@ void loop() {
         rotateServo.write(bioPos);     // Pan to bio position (135)
         delay(500);
         tiltServo.write(tiltHighPos);  // Tilt up (150)
-        delay(500);
+        delay(1200);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
         rotateServo.write(neutralPos);  // Pan back to neutral (90)
@@ -347,7 +347,7 @@ void loop() {
         rotateServo.write(hazardPos);   // Pan to hazardous position (45)
         delay(500);
         tiltServo.write(tiltHighPos);   // Tilt up (150)
-        delay(500);
+        delay(1200);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
         rotateServo.write(neutralPos);   // Pan back to neutral (90)
@@ -365,7 +365,7 @@ void loop() {
         rotateServo.write(mixedPos);    // Pan to mixed position (135)
         delay(500);
         tiltServo.write(tiltLowPos);    // Tilt down (30)
-        delay(500);
+        delay(1200);
         tiltServo.write(tiltNeutralPos); // Return tilt to neutral
         delay(500);
         rotateServo.write(neutralPos);   // Pan back to neutral (90)
