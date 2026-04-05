@@ -164,7 +164,7 @@ def draw_text_with_font(img, text, position, font_size, color, use_poppins=True)
 
 def get_base_path():
     """Return the fixed server URL"""
-    return "https://web-production-15f71.up.railway.app/gs_DB"
+    return "https://gosort.up.railway.app/gs_DB"
 
 def scan_network():
     # Network scanning no longer needed - using fixed server URL
@@ -1181,7 +1181,7 @@ def main():
         device_name = cpuinfo.get_cpu_info()['brand_raw']
         print(f"CPU: {device_name}")
     
-    model = YOLO('best885.pt')
+    model = YOLO('shit_weights.pt')
     if device.type == 'cuda':
         model.to('cuda')
     else:

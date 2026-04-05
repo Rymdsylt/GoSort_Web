@@ -52,7 +52,7 @@ def save_config(config):
         json.dump(config, f)
 
 def get_base_path():
-    return "https://gosortweb-production.up.railway.app/gs_DB"
+    return "https://web-production-15f71.up.railway.app/gs_DB"
 
 def scan_network():
     return [], []
