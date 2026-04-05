@@ -1,7 +1,11 @@
 {
   "meta": {
     "url": "https://web-production-15f71.up.railway.app",
+<<<<<<< Updated upstream
     "timestamp": "2026-03-14T10:51:05.905215",
+=======
+    "timestamp": "2026-03-15T15:27:34.154562",
+>>>>>>> Stashed changes
     "full_duration": false
   },
   "results": [
@@ -9,6 +13,7 @@
       "test_type": "performance",
       "platform": "Web",
       "users": 25,
+<<<<<<< Updated upstream
       "total_reqs": 1350,
       "errors": 0,
       "error_rate": 0.0,
@@ -19,11 +24,24 @@
       "throughput": 20.21,
       "duration_s": 66.8,
       "overall": "PASS*"
+=======
+      "total_reqs": 3825,
+      "errors": 2,
+      "error_rate": 0.05,
+      "avg_resp_ms": 158.0,
+      "avg_lat_ms": 152.0,
+      "min_resp_ms": 68.0,
+      "max_resp_ms": 1090.0,
+      "throughput": 60.42,
+      "duration_s": 63.3,
+      "overall": "PASS"
+>>>>>>> Stashed changes
     },
     {
       "test_type": "load",
       "platform": "Web",
       "users": 50,
+<<<<<<< Updated upstream
       "total_reqs": 3150,
       "errors": 1,
       "error_rate": 0.03,
@@ -34,11 +52,24 @@
       "throughput": 34.66,
       "duration_s": 90.9,
       "overall": "PASS*"
+=======
+      "total_reqs": 9000,
+      "errors": 2,
+      "error_rate": 0.02,
+      "avg_resp_ms": 281.0,
+      "avg_lat_ms": 268.0,
+      "min_resp_ms": 93.0,
+      "max_resp_ms": 1893.0,
+      "throughput": 98.2,
+      "duration_s": 91.7,
+      "overall": "PASS"
+>>>>>>> Stashed changes
     },
     {
       "test_type": "throughput",
       "platform": "Web",
       "users": 40,
+<<<<<<< Updated upstream
       "total_reqs": 1440,
       "errors": 0,
       "error_rate": 0.0,
@@ -49,11 +80,24 @@
       "throughput": 19.76,
       "duration_s": 72.9,
       "overall": "PASS*"
+=======
+      "total_reqs": 6120,
+      "errors": 1,
+      "error_rate": 0.02,
+      "avg_resp_ms": 237.0,
+      "avg_lat_ms": 228.0,
+      "min_resp_ms": 75.0,
+      "max_resp_ms": 715.0,
+      "throughput": 99.95,
+      "duration_s": 61.2,
+      "overall": "PASS"
+>>>>>>> Stashed changes
     },
     {
       "test_type": "stress",
       "platform": "Web",
       "users": 100,
+<<<<<<< Updated upstream
       "total_reqs": 3600,
       "errors": 1,
       "error_rate": 0.03,
@@ -63,12 +107,24 @@
       "max_resp_ms": 7594.0,
       "throughput": 39.28,
       "duration_s": 91.7,
+=======
+      "total_reqs": 9900,
+      "errors": 3,
+      "error_rate": 0.03,
+      "avg_resp_ms": 422.0,
+      "avg_lat_ms": 397.0,
+      "min_resp_ms": 90.0,
+      "max_resp_ms": 2664.0,
+      "throughput": 108.31,
+      "duration_s": 91.4,
+>>>>>>> Stashed changes
       "overall": "PASS"
     },
     {
       "test_type": "performance",
       "platform": "Mobile",
       "users": 20,
+<<<<<<< Updated upstream
       "total_reqs": 900,
       "errors": 0,
       "error_rate": 0.0,
@@ -79,11 +135,24 @@
       "throughput": 14.26,
       "duration_s": 63.1,
       "overall": "PASS*"
+=======
+      "total_reqs": 3700,
+      "errors": 1,
+      "error_rate": 0.03,
+      "avg_resp_ms": 121.0,
+      "avg_lat_ms": 117.0,
+      "min_resp_ms": 63.0,
+      "max_resp_ms": 1132.0,
+      "throughput": 61.03,
+      "duration_s": 60.6,
+      "overall": "PASS"
+>>>>>>> Stashed changes
     },
     {
       "test_type": "load",
       "platform": "Mobile",
       "users": 40,
+<<<<<<< Updated upstream
       "total_reqs": 2000,
       "errors": 1,
       "error_rate": 0.05,
@@ -94,11 +163,24 @@
       "throughput": 21.24,
       "duration_s": 94.2,
       "overall": "PASS*"
+=======
+      "total_reqs": 7400,
+      "errors": 2,
+      "error_rate": 0.03,
+      "avg_resp_ms": 188.0,
+      "avg_lat_ms": 181.0,
+      "min_resp_ms": 73.0,
+      "max_resp_ms": 1410.0,
+      "throughput": 82.07,
+      "duration_s": 90.2,
+      "overall": "PASS"
+>>>>>>> Stashed changes
     },
     {
       "test_type": "throughput",
       "platform": "Mobile",
       "users": 30,
+<<<<<<< Updated upstream
       "total_reqs": 1200,
       "errors": 0,
       "error_rate": 0.0,
@@ -109,11 +191,24 @@
       "throughput": 18.65,
       "duration_s": 64.4,
       "overall": "PASS*"
+=======
+      "total_reqs": 3300,
+      "errors": 1,
+      "error_rate": 0.03,
+      "avg_resp_ms": 294.0,
+      "avg_lat_ms": 287.0,
+      "min_resp_ms": 73.0,
+      "max_resp_ms": 4524.0,
+      "throughput": 54.18,
+      "duration_s": 60.9,
+      "overall": "PASS"
+>>>>>>> Stashed changes
     },
     {
       "test_type": "stress",
       "platform": "Mobile",
       "users": 75,
+<<<<<<< Updated upstream
       "total_reqs": 4125,
       "errors": 1,
       "error_rate": 0.02,
@@ -123,6 +218,17 @@
       "max_resp_ms": 6014.0,
       "throughput": 43.19,
       "duration_s": 95.5,
+=======
+      "total_reqs": 6750,
+      "errors": 2,
+      "error_rate": 0.03,
+      "avg_resp_ms": 647.0,
+      "avg_lat_ms": 631.0,
+      "min_resp_ms": 94.0,
+      "max_resp_ms": 4540.0,
+      "throughput": 69.11,
+      "duration_s": 97.7,
+>>>>>>> Stashed changes
       "overall": "PASS"
     }
   ]
